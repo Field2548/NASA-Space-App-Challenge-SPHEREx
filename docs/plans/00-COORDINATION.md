@@ -10,12 +10,12 @@ Source of truth for every detail: `docs/BUILD_PROMPT.md` (the full build prompt)
 
 | Plan | Agent name | Branch | Owns (summary) |
 | --- | --- | --- | --- |
-| `PLAN-1-data-science.md` | **DATA** | `web/data` | Python export pipeline, ready-spot data, answer keys, catalog facts, spectrum cubes, reference spectra, quick look (browser Range reads + TAN-SIP), spectrum and overlay libraries, credits, license, docs |
-| `PLAN-2-game-frontend.md` | **GAME** | `web/game` | Next.js scaffold, design system, field viewer, image tools, color vision, timeline, frames and spacing, tutorial, title page, guest mode, embed, e2e for the game loop |
-| `PLAN-3-server-map.md` | **SERVER** | `web/server` | Supabase, all API routes, scoring, auth, scoreboard, sky map (Aladin), density layers, Inspect popup, status page, request queue, Vercel config and production deploy |
+| `PLAN-1-data-science.md` | **DATA** | `web-data` | Python export pipeline, ready-spot data, answer keys, catalog facts, spectrum cubes, reference spectra, quick look (browser Range reads + TAN-SIP), spectrum and overlay libraries, credits, license, docs |
+| `PLAN-2-game-frontend.md` | **GAME** | `web-game` | Next.js scaffold, design system, field viewer, image tools, color vision, timeline, frames and spacing, tutorial, title page, guest mode, embed, e2e for the game loop |
+| `PLAN-3-server-map.md` | **SERVER** | `web-server` | Supabase, all API routes, scoring, auth, scoreboard, sky map (Aladin), density layers, Inspect popup, status page, request queue, Vercel config and production deploy |
 | `PLAN-H-human-reserved.md` | **HUMAN** | n/a | Reserved for the human teammate: accounts, secrets, laptop data runs, approvals, submission. Agents never do these; they ask for them (section 5) |
 
-Integration branch: `web` (created from `origin/Film`, which holds the Python pipeline, CLAUDE.md, `data/motion_*`). Never push to `main` and never deploy to production without the human saying yes in the team board issue.
+Integration branch: `web` (already on origin, made from `origin/Film`, which holds the Python pipeline, CLAUDE.md, `data/motion_*`). Agent branches use a dash (`web-game`), never a slash: git cannot hold `web/game` next to an existing `web` branch. Each agent runs on its own machine with its own GitHub account. Never push to `main` and never deploy to production without the human saying yes in an `ask-human` issue (3.6).
 
 ## 2. File ownership (avoids merge conflicts)
 
@@ -35,6 +35,7 @@ One owner per path. Editing a path you do not own = open an issue to the owner, 
 | `web/app/api/*` except quicklook and overlay, `web/app/{status,requests}/**` | SERVER |
 | `web/components/{SkyMap,Scoreboard,AuthDialog,InspectPopup,StatusBadge}.tsx` | SERVER |
 | `pipeline/process_requests.py` | SERVER (only file in `pipeline/` it owns) |
+| `scripts/poll.sh` | shared; change only through a `contract` issue |
 | `docs/plans/**`, `docs/contracts/**` | the agent named in the file; contracts are changed only through a `contract` issue (section 4) |
 
 Shared files with special rules:
@@ -47,7 +48,9 @@ Shared files with special rules:
 Agents run in separate sessions and share nothing except the repo. If it is not on GitHub, the others do not know it.
 Everyone has fetch and push rights (granted by the human). Use the `gh` CLI.
 
-**3.1 Team board.** The first agent to start (GAME) opens issue **"TEAM BOARD"** and pins it. Every agent posts one comment there:
+Every comment on any issue or PR starts with your tag: `[DATA]`, `[GAME]`, `[SERVER]`, `[HUMAN]`. Your first board comment is `[ROLE] I am @<github-login>`, so everyone can map accounts to roles (GAME is @toonzzzrock).
+
+**3.1 Team board.** Issue **#2 "TEAM BOARD"**, pinned. All labels in 3.2 already exist. Every agent posts one comment there:
 - at start of each phase (section 6) and at each finished milestone,
 - at least once per hour while working,
 - immediately when blocked.
@@ -64,23 +67,21 @@ need from GAME: confirm u16 layout in docs/contracts/field-schema.md
 **3.2 Issues = requests between agents.** Create with labels `from:<agent>` and `to:<agent>` (agents: `data`, `game`, `server`, `human`), plus one of `contract`, `blocked`, `question`, `bug`, `ask-human`. Title starts with the thing needed. Body: what, why, path or commit, and what "done" looks like. The receiver comments "taking it" within 15 minutes and closes the issue with a commit link.
 
 **3.3 Pull requests = delivery.**
-- Work on your own branch (`web/data`, `web/game`, `web/server`). Commit small and often, push after every commit.
-- Open a PR into `web` at every milestone. Squash is fine. Merge only after one other agent approves, using the review pair below, or after 20 minutes of silence when CI is green (then say "merging, no review" in the PR).
-- Review pairs: DATA reviews GAME, GAME reviews SERVER, SERVER reviews DATA.
-- Review means: run it, read the diff for contract breaks, leave comments with `gh pr review`. Do not rewrite their code; request a change.
+- Work on your own branch (`web-data`, `web-game`, `web-server`). Commit small and often, push after every commit.
+- Never push straight to `web`; it changes only through `gh pr merge --squash`. This avoids rejected pushes when two agents land at once.
+- Open a PR into `web` at every milestone. In the PR body paste the summary line of your local test run (pytest, vitest, `next build`); there is no CI, so this is the green check. Merge only after the reviewer approves (`gh pr review --approve`), or after 20 minutes of silence with that test line present (then comment "merging, no review").
+- Review pairs: DATA reviews GAME, GAME reviews SERVER, SERVER reviews DATA. Add the reviewer with `gh pr edit --add-reviewer <login>` and tag their role on the board.
+- Review means: run it, read the diff for contract breaks, then `gh pr review --approve` or `--request-changes -b "..."`. Do not rewrite their code; request a change.
 
-**3.4 Poll routine** (do it at session start, after every merge, and before starting a new task):
+**3.4 Poll routine** (at session start, after every merge, before starting a new task, and every 15 minutes). A Claude session does nothing until prompted, so start a loop at session start, e.g. `/loop 15m run scripts/poll.sh <me> and act on anything addressed to <me>`. Without it the 15-minute reply rule cannot be met.
 ```
-git fetch origin
-gh issue list --state open --label "to:<me>"
-gh pr list --state open
-gh issue view <TEAM BOARD number> --comments | tail -40
-git pull --rebase origin web      # onto your branch
+scripts/poll.sh <data|game|server>   # read-only: issues to you, ask-human, PRs, board #2, new commits on web
+git pull --rebase origin web         # onto your branch, after committing your work
 ```
 
 **3.5 Contract changes.** Shared formats live in `docs/contracts/`: `field-schema.md`, `api.md`, `types.md`. To change one, open an issue labelled `contract` with the exact before and after, tag the other two agents, wait for both to comment "ok" (or 20 minutes), then change the file and announce on the board. Never change a contract silently.
 
-**3.6 Human questions.** Batch them. Open one issue labelled `ask-human`, `to:human` with a checklist. Keep working on things that do not need the answer. Things that always need a yes: first production deploy, push to `main`, deleting anything, changing a Python function signature, loading the SPIFF pickle.
+**3.6 Human questions.** Batch them. Open one issue labelled `ask-human`, `to:human` with a checklist; the human answers in that issue (ticks plus a `[HUMAN]` comment) and closes it. Keep working on things that do not need the answer. Things that always need a yes: first production deploy, push to `main`, deleting anything, changing a Python function signature, loading the SPIFF pickle.
 
 ## 4. Contracts to publish in the first 40 minutes (unblocks everyone)
 

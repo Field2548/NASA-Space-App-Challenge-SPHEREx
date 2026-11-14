@@ -1,11 +1,11 @@
 # PLAN H - Reserved for the human teammate
 
-Agents cannot do these. Each agent opens an `ask-human` issue when it needs one; the list below is the full set so nothing surprises you. Answer on the TEAM BOARD issue.
+Agents cannot do these. Each agent opens an `ask-human` issue when it needs one; the list below is the full set so nothing surprises you. Answer inside each `ask-human` issue (tick the boxes, comment starting `[HUMAN]`, close it); TEAM BOARD #2 is for status.
 
 ## Before 04:30
 
 - [ ] Put the wireframe PDF at `docs/wireframe.pdf` (reference only, never shipped).
-- [ ] On the Windows laptop with cached FITS files: `git fetch && git checkout web`, then run the `export_web.py` commands DATA posts, and push `web/public/fields/**` and `web/data/**` to `web/data` (or hand the folder to DATA).
+- [ ] On the Windows laptop with cached FITS files: `git fetch && git checkout web`, then run the `export_web.py` commands DATA posts, and push `web/public/fields/**` and `web/data/**` to branch `web-data` (or hand the folder to DATA).
 - [ ] Start the five `spectral_bands.py` runs from `docs/BUILD_PROMPT.md` section 6.5 (about 15 minutes each, needs network). Use `--out` so committed Cygnus figures are not overwritten.
 
 ## Before 10:00
@@ -15,7 +15,7 @@ Agents cannot do these. Each agent opens an `ask-human` issue when it needs one;
 - [ ] Pick the project name (placeholder is "ONION//SKY", constant `{{PROJECT_NAME}}`).
 - [ ] Approve or reject loading the SPIFF `.joblib` (a Python pickle that runs code on load). If approved, DATA does it in a throwaway venv. Download Mamajek's table if DATA cannot fetch it. Mamajek asks users to email him; send it if you want.
 
-## Approvals (answer on the board)
+## Approvals (answer in the `ask-human` issue)
 
 - [ ] First production deploy.
 - [ ] Any push to `main` (agents never do this on their own).

@@ -120,7 +120,7 @@ supabase/migrations/      SQL from section 10
 CREDITS.md  LICENSE (GPL-3.0)
 ```
 
-Work on a new branch `web` made from `origin/Film`. Commit small and often. Open a PR into `Film` once Tier 1 works.
+The integration branch `web` (made from `origin/Film`) is on origin. Each agent works on its own branch (`web-data`, `web-game`, `web-server`) and delivers by PR into `web`, per `docs/plans/00-COORDINATION.md`. Commit small and often.
 
 ## 6. Data export (Python): make the ready spots
 

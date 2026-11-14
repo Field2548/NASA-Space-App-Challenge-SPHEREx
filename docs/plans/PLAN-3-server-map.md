@@ -1,6 +1,6 @@
 # PLAN 3 - SERVER agent (accounts, API, sky map, Inspect, deploy)
 
-Branch: `web/server`. Read first: `docs/plans/00-COORDINATION.md`, then `docs/BUILD_PROMPT.md` (BP) sections 3, 7, 8.2, 8.3, 8.10 to 8.12, 8.14, 8.16, 8.19, 9 (routes), 10, 11, 17, 18, 19.
+Branch: `web-server`. Read first: `docs/plans/00-COORDINATION.md`, then `docs/BUILD_PROMPT.md` (BP) sections 3, 7, 8.2, 8.3, 8.10 to 8.12, 8.14, 8.16, 8.19, 9 (routes), 10, 11, 17, 18, 19.
 Skills: `supabase`, `supabase-postgres-best-practices`, `vercel-react-best-practices`, `deploy-to-vercel`, `asset-license-audit`, `webapp-testing`.
 
 Your job in one line: everything server-side and everything that needs a database, the sky map, the Inspect popup shell, and getting the finished app onto Vercel.
@@ -16,7 +16,7 @@ Your job in one line: everything server-side and everything that needs a databas
 
 ## Phase 0 (03:30 - 04:00)
 
-- [ ] `git checkout -b web/server origin/web` (wait for GAME's scaffold; meanwhile write SQL and the API contract in `docs/contracts/api.md`: every route in BP section 9 list, request and response JSON, zod schemas, error shape, `mode=round|explore` rule, `/api/check` verdict `{kind: known|bot_match|candidate|static|nothing_correct|nothing_wrong, object_name?, points, message}`).
+- [ ] `git fetch origin && git checkout -b web-server origin/web`; post `[SERVER] I am @<login>` on TEAM BOARD #2 and start the 15-minute poll loop (coordination 3.4). Rebase onto `web` once GAME's scaffold lands (meanwhile meanwhile write SQL and the API contract in `docs/contracts/api.md`: every route in BP section 9 list, request and response JSON, zod schemas, error shape, `mode=round|explore` rule, `/api/check` verdict `{kind: known|bot_match|candidate|static|nothing_correct|nothing_wrong, object_name?, points, message}`).
 - [ ] Post on the board; tag GAME and DATA to confirm the contract (20 min).
 - [ ] `docs/credits/server.csv`: Supabase, Vercel, Aladin Lite (GPL-3.0), CDS HiPS (ODbL), Sesame, SIMBAD, Gaia, JPL, zod, `@hscmap/healpix`.
 - [ ] `ask-human` issue: Supabase project and keys, Vercel link, domain or project name.

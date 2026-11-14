@@ -1,6 +1,6 @@
 # PLAN 2 - GAME agent (scaffold, design, viewer, tools, tutorial)
 
-Branch: `web/game`. Read first: `docs/plans/00-COORDINATION.md`, then `docs/BUILD_PROMPT.md` (BP) sections 3, 5, 8.1, 8.3 to 8.10, 8.13, 8.15, 9, 11, 12, 13, 16.
+Branch: `web-game`. Read first: `docs/plans/00-COORDINATION.md`, then `docs/BUILD_PROMPT.md` (BP) sections 3, 5, 8.1, 8.3 to 8.10, 8.13, 8.15, 9, 11, 12, 13, 16.
 Skills to use: `frontend-design` (first), `vercel-react-best-practices`, `vercel-composition-patterns`, `web-design-guidelines` (review at end), `webapp-testing`.
 
 Your job in one line: create the web app from nothing and build everything a player touches in a round: viewer, tools, timeline, tutorial. You also open the team board and publish the type contract.
@@ -15,10 +15,10 @@ Your job in one line: create the web app from nothing and build everything a pla
 
 ## Phase 0 (03:30 - 04:00): do these first, everyone is waiting
 
-- [ ] `git checkout -b web origin/Film`; push `web`. Then `git checkout -b web/game`.
-- [ ] Open and pin issue **TEAM BOARD**. Create labels: `from:data|game|server|human`, `to:data|game|server|human`, `contract`, `blocked`, `question`, `bug`, `ask-human`. Post the poll routine from the coordination file.
+- [x] `web` is on origin; TEAM BOARD is issue #2 (pinned, poll routine in its body); all labels exist; `scripts/poll.sh` is on `web`.
+- [ ] `git fetch origin && git checkout -b web-game origin/web`. Post `[GAME] I am @toonzzzrock` on the board, start the 15-minute poll loop (coordination 3.4).
 - [ ] `web/`: Next.js latest stable, App Router, TypeScript, vitest, Playwright. Pin versions. `next/font/google` for Orbitron and JetBrains Mono. Tokens and P3 overrides in `globals.css` (BP 12). Blueprint grid background. ASCII logo placeholder constant `{{PROJECT_NAME}}` ("ONION//SKY") in one file.
-- [ ] `web/lib/types.ts` + `docs/contracts/types.md` (BP section 9 types). Push to `web` and announce on the board. PR into `web`, merge fast (this one needs no review).
+- [ ] `web/lib/types.ts` + `docs/contracts/types.md` (BP section 9 types). PR into `web`, merge fast (this one needs no review), and announce on the board.
 - [ ] Empty routes: `/`, `/tutorial`, `/play`, `/embed`, `/about`, `/credits`. First Vercel **preview** deploy (HUMAN links project; until then local only, say so on the board).
 - [ ] `docs/credits/game.csv`: Next.js, React, Orbitron, JetBrains Mono, lucide-react, vitest, Playwright.
 

@@ -1,6 +1,6 @@
 # PLAN 1 - DATA agent (data, science libraries, quick look, credits)
 
-Branch: `web/data`. Read first: `docs/plans/00-COORDINATION.md`, then `docs/BUILD_PROMPT.md` (BP) sections 2, 6, 7, 8.16 (C), 8.17, 8.18, 8.20, 9, 13, 16.
+Branch: `web-data`. Read first: `docs/plans/00-COORDINATION.md`, then `docs/BUILD_PROMPT.md` (BP) sections 2, 6, 7, 8.16 (C), 8.17, 8.18, 8.20, 9, 13, 16.
 Also read on branch `Film`: `CLAUDE.md`, `README.md`, `motion_frames.py`, `shift_stack.py`, `spectral_bands.py`, `download.py`, and `data/motion_*/`.
 Rule: never change a Python function signature; import and reuse.
 
@@ -17,7 +17,7 @@ Your job in one line: turn the repo's processed data into files the web app can 
 
 ## Phase 0 (03:30 - 04:00)
 
-- [ ] `git checkout -b web/data origin/Film` (if `web` exists, branch from it). Create `docs/credits/data.csv`.
+- [ ] `git fetch origin && git checkout -b web-data origin/web`. Post `[DATA] I am @<login>` on TEAM BOARD #2, start the 15-minute poll loop (coordination 3.4). Create `docs/credits/data.csv`.
 - [ ] Publish `docs/contracts/field-schema.md`: field.json (BP 6.2 schema, verbatim), frames.u16 layout, thumbs, `exposures.u16` + `exposures.json`, `spectrum/index.json` + tiles, `answers/<slug>.json`, `catalog/<slug>.json`, `index.json`. Include byte layout and the dequantize formula.
 - [ ] Write a synthetic fixture spot `web/public/fields/fixture/` (32x32 px, 4 frames, one dot moving 2 px per frame, 3 static stars) with a matching `web/data/answers/fixture.json`. Script: `pipeline/make_fixture.py`. Push and post on the board.
 - [ ] Post the `ask-human` issue: laptop with cached FITS, who starts `spectral_bands.py` runs (BP 6.5), SPIFF pickle approval (BP 6.6), Mamajek table download.
