@@ -137,6 +137,26 @@ def test_eros_is_bright_at_its_track_while_in_the_picture():
         assert np.nanmax(frames[p["frame"] - 1, y - 1:y + 2, x - 1:x + 2]) > 100   # rows top-down
 
 
+@pytest.mark.parametrize("slug", [s for s in SLUGS if SPOT[s]["track"]])
+def test_positions_carry_snr_and_change_snr(slug):
+    _, _, ans = load(slug)
+    for p in ans["objects"][0]["positions"]:
+        if p["in_grid"]:
+            assert "snr" in p and "change_snr" in p
+            for key in ("snr", "change_snr"):
+                assert p[key] is None or np.isfinite(p[key])
+        else:
+            assert "snr" not in p and "change_snr" not in p
+
+
+def test_eros_change_snr_is_bright_while_in_the_picture():
+    """Eros is fast: its residual (frame minus the others' median) stays bright in frames 1-3."""
+    _, _, ans = load("eros")
+    pos = ans["objects"][0]["positions"]
+    for p in pos[:3]:
+        assert p["in_grid"] and p["change_snr"] > 100
+
+
 def test_eris_bot_candidate_matches_jpl():
     """The bot's best Eris candidate, flipped to top-down, lands on the JPL track."""
     field, _, ans = load("eris")

@@ -279,7 +279,9 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     """The server-only answer key (field-schema.md section 6).
     track: a JPL Horizons small-body id; its position in every frame comes from
     motion_frames.track_positions. frames (top-down) adds the measured S/N at each position
-    (max of the 3x3 pixels, as the repo's --track check does). star is reserved for the
+    (max of the 3x3 pixels, as the repo's --track check does). change_snr is the same 3x3
+    maximum in the frame minus the median of the other frames (motion_frames.residuals): stars
+    cancel, so it tells whether the object itself is seen there. star is reserved for the
     Tier 2 star targets and not used yet."""
     if star is not None:
         raise NotImplementedError("star targets are not built yet")
@@ -293,6 +295,10 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
         fx, fy, name = track_positions(track, list(mjds), wcs)
         x, y = to_top_down(fx, fy, height)
         days = mjds - t_ref
+        resid = None
+        if frames is not None:
+            from motion_frames import residuals
+            resid = np.array(residuals(list(frames)))     # each frame minus the others' median
         positions = []
         for k in range(len(mjds)):
             inside = bool(-0.5 <= x[k] <= width - 0.5 and -0.5 <= y[k] <= height - 0.5)
@@ -302,6 +308,8 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
                 ix, iy = int(round(x[k])), int(round(y[k]))
                 box = frames[k, max(iy - 1, 0):iy + 2, max(ix - 1, 0):ix + 2]
                 p["snr"] = round(float(np.nanmax(box)), 1) if np.isfinite(box).any() else None
+                rbox = resid[k, max(iy - 1, 0):iy + 2, max(ix - 1, 0):ix + 2]
+                p["change_snr"] = round(float(np.nanmax(rbox)), 1) if np.isfinite(rbox).any() else None
             positions.append(p)
         objects.append({"id": str(track), "name": name, "kind": "asteroid", "source": "JPL Horizons",
                         "positions": positions,

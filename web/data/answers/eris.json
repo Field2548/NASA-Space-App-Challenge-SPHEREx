@@ -15,35 +15,40 @@
      "x": 27.98,
      "y": 30.55,
      "in_grid": true,
-     "snr": 3.1
+     "snr": 3.1,
+     "change_snr": 3.0
     },
     {
      "frame": 2,
      "x": 29.06,
      "y": 29.2,
      "in_grid": true,
-     "snr": 3.7
+     "snr": 3.7,
+     "change_snr": 3.9
     },
     {
      "frame": 3,
      "x": 30.01,
      "y": 27.79,
      "in_grid": true,
-     "snr": 2.7
+     "snr": 2.7,
+     "change_snr": 2.9
     },
     {
      "frame": 4,
      "x": 31.12,
      "y": 25.7,
      "in_grid": true,
-     "snr": 2.4
+     "snr": 2.4,
+     "change_snr": 3.4
     },
     {
      "frame": 5,
      "x": 31.79,
      "y": 24.07,
      "in_grid": true,
-     "snr": 7.8
+     "snr": 7.8,
+     "change_snr": 7.9
     }
    ],
    "vx_px_per_day": 0.736,
