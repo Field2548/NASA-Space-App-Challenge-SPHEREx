@@ -86,6 +86,9 @@ def parse_args():
                         "Keep it below size/1.41 so every rotated cutout covers it")
     p.add_argument("--out", default=None, help="output folder (default data/bands_<RA>_<DEC>)")
     p.add_argument("--deep", action="store_true", help="also search the Deep Survey collections")
+    p.add_argument("--redraw", action="store_true",
+                   help="only redraw composite.png and bands_grid.png from the saved cube.fits "
+                        "(no IRSA search or downloads)")
     p.add_argument("--workers", type=int, default=4,
                    help="parallel requests (default 4; IRSA throttles big bursts)")
     return p.parse_args()
@@ -297,19 +300,47 @@ def stretch(img, lo_pct=5, hi_pct=99.7, soften=50):
     return np.nan_to_num(np.arcsinh(soften * x) / np.arcsinh(soften))
 
 
-def save_composite(cube, channels, path, upscale=8):
+def group_fwhm_px(channels, cutout_dir):
+    """Median PSF FWHM (output pixels) of each colour group, from the cutouts' PSF_FWHM headers."""
+    out = {}
+    for name, dets in COLOR_GROUPS.items():
+        f = [fits.getheader(os.path.join(cutout_dir, ch["file"]), "IMAGE").get("PSF_FWHM", np.nan)
+             for ch in channels if ch["detector"] in dets and ch.get("file")]
+        out[name] = float(np.nanmedian(f)) / PIXEL_SCALE if f else np.nan
+    return out
+
+
+def save_composite(cube, channels, path, upscale=8, stretch_sigma=10, Q=8, fwhm_px=None):
+    """Colour composite with Lupton et al. (2004)'s colour-preserving asinh stretch, the method
+    behind SDSS and Legacy Survey colour images (astropy make_lupton_rgb). All three channels are
+    scaled by the same factor, so a star's colour doesn't change with its brightness (a
+    per-channel stretch turns every bright star white). Before that:
+      - PSF matching: sharper (shorter-wavelength) channels are blurred to the broadest PSF, so
+        bright stars don't get coloured rings (fwhm_px = {group: FWHM in pixels}).
+      - White balance: channels are scaled so the brightest stars come out roughly neutral.
+    Black is ~1 sigma below the sky, so the sky shows as faint grain like in survey images."""
     from PIL import Image
+    from astropy.visualization import make_lupton_rgb
+    from scipy.ndimage import gaussian_filter
     planes = []
+    target = max(v for v in (fwhm_px or {}).values() if np.isfinite(v)) if fwhm_px else None
     for name, dets in COLOR_GROUPS.items():  # red, green, blue
         idx = [i for i, ch in enumerate(channels) if ch["detector"] in dets and ch.get("path")]
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN pixels
             # Median, not mean: cosmic-ray hits, ghosts and asteroids sit in only one or two
             # of the ~34 bands per color, so the median ignores them.
-            planes.append(stretch(np.nanmedian(cube[idx], axis=0)))
-    rgb = (np.dstack(planes)[::-1] * 255).astype(np.uint8)  # flip: FITS row 0 is the bottom
+            p = np.nan_to_num(np.nanmedian(cube[idx], axis=0))
+        if target and np.isfinite(fwhm_px.get(name, np.nan)) and fwhm_px[name] < target:
+            p = gaussian_filter(p, np.sqrt(target ** 2 - fwhm_px[name] ** 2) / 2.3548)
+        planes.append(p / sigma_clipped_stats(p, sigma=2.5)[2])          # noise units
+    tops = np.array([np.percentile(p, 99.5) for p in planes])
+    balance = np.exp(np.log(tops).mean()) / tops                       # geometric-mean white balance
+    planes = [p * b for p, b in zip(planes, balance)]
+    rgb = make_lupton_rgb(*planes, minimum=-1, stretch=stretch_sigma, Q=Q)[::-1]  # FITS row 0 = bottom
     h, w = rgb.shape[:2]
-    Image.fromarray(rgb).resize((w * upscale, h * upscale), Image.BICUBIC).save(path)
+    # nearest neighbour: bicubic rings around 1-2 px stars
+    Image.fromarray(rgb).resize((w * upscale, h * upscale), Image.NEAREST).save(path)
 
 
 def save_grid(cube, channels, path, title):
@@ -341,10 +372,38 @@ def save_grid(cube, channels, path, title):
 
 
 # ---------------------------------------------------------------- main
+def redraw(out, ra, dec):
+    """Remake the pictures from cube.fits (e.g. after changing the stretch), no network needed."""
+    with fits.open(os.path.join(out, "cube.fits")) as hdul:
+        cube = hdul[0].data.astype(float)
+        t = hdul["BANDS"].data
+    files = {}
+    with open(os.path.join(out, "bands.csv"), newline="") as f:
+        for row in csv.DictReader(f):
+            files[int(row["band"])] = row["file"]
+    channels = []
+    for r in t:
+        wl = float(r["WAVELENGTH_UM"])
+        have = bool(np.isfinite(wl))
+        channels.append({"band": int(r["BAND"]), "detector": int(r["DETECTOR"]),
+                         "center_um": math.sqrt(float(r["BAND_LO_UM"]) * float(r["BAND_HI_UM"])),
+                         "frame": {"wavelength_um": wl} if have else None, "path": have,
+                         "file": files.get(int(r["BAND"])) or None})
+    done = sum(ch["path"] for ch in channels)
+    save_composite(cube, channels, os.path.join(out, "composite.png"),
+                   fwhm_px=group_fwhm_px(channels, os.path.join(out, "cutouts")))
+    save_grid(cube, channels, os.path.join(out, "bands_grid.png"),
+              f"SPHEREx: {done} of 102 bands at RA {ra}, Dec {dec}  (wavelength in um)")
+    print(f"Redrew {out}/composite.png and bands_grid.png")
+
+
 def main():
     a = parse_args()
     coord = SkyCoord(a.ra, a.dec, unit="deg")
     out = a.out or os.path.join("data", f"bands_{a.ra}_{a.dec}")
+    if a.redraw:
+        redraw(out, a.ra, a.dec)
+        return
     cut_dir = os.path.join(out, "cutouts")
     os.makedirs(cut_dir, exist_ok=True)
     if a.fov > a.size / math.sqrt(2):
@@ -418,7 +477,10 @@ def main():
                   bands_hdu]).writeto(os.path.join(out, "cube.fits"), overwrite=True)
 
     done = sum(1 for ch in channels if ch.get("path"))
-    save_composite(cube, channels, os.path.join(out, "composite.png"))
+    for ch in channels:
+        ch["file"] = os.path.basename(ch["path"]) if ch.get("path") else None
+    save_composite(cube, channels, os.path.join(out, "composite.png"),
+                   fwhm_px=group_fwhm_px(channels, cut_dir))
     save_grid(cube, channels, os.path.join(out, "bands_grid.png"),
               f"SPHEREx: {done} of 102 bands at RA {a.ra}, Dec {a.dec}  (wavelength in um)")
     dates = sorted(ch["frame"]["date_obs"] for ch in channels if ch.get("path"))

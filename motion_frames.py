@@ -90,6 +90,10 @@ def parse_args():
     p.add_argument("--deep", action="store_true", help="also search the Deep Survey collections")
     p.add_argument("--workers", type=int, default=3,
                    help="parallel downloads (default 3; IRSA answers 503 to big bursts)")
+    p.add_argument("--matched-filter", action="store_true",
+                   help="PSF matched-filter the frames before display. Off by default: on SPHEREx "
+                        "frames it LOWERED fake-star S/N to 0.56-0.81x (resampled noise is already "
+                        "smoothed, and faint background stars get boosted too)")
     p.add_argument("--track", default=None,
                    help="known solar-system object (e.g. 433 or Ceres): mark where JPL Horizons "
                         "says it was in each frame, on summary.png")
@@ -174,38 +178,73 @@ def noise_of(img):
 
 
 def build_frame(paths, sky):
-    """Merge all bands of one burst: each band in signal-to-noise units, then combined.
-    With 3+ images the median is used: a cosmic-ray hit is in only one exposure, while a
-    real object (star or asteroid) is in all exposures of the burst, so the median keeps
-    real objects and drops cosmic rays."""
-    planes = []
+    """Merge all bands of one burst: each band in signal-to-noise units, then combined with a
+    3-sigma-clipped mean. A cosmic-ray hit is in only one exposure, so it is clipped; a real
+    object (star or asteroid) is in every exposure, so it is kept. (Tested on Makemake: S/N 12.3
+    vs 7.6 for a plain median, with no extra false dots.)
+    Returns (frame in noise units, number of bands, median PSF FWHM in arcsec)."""
+    from astropy.stats import sigma_clip
+    planes, fwhm = [], []
     for p in paths:
         img, in_wcs, _ = clean_band(p)
         plane = resample(img, in_wcs, sky)
         if np.isfinite(plane).mean() > 0.2:
             planes.append(plane / noise_of(plane))
+            fwhm.append(float(fits.getheader(p, "IMAGE").get("PSF_FWHM", 8.0)))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        frame = np.nanmedian(planes, axis=0) if len(planes) >= 3 else np.nanmean(planes, axis=0)
-    return frame / noise_of(frame), len(planes)
+        if len(planes) >= 3:
+            frame = sigma_clip(np.array(planes), sigma=3, axis=0, cenfunc="median",
+                               stdfunc="mad_std", masked=True).mean(axis=0).filled(np.nan)
+        else:
+            frame = np.nanmean(planes, axis=0)
+    return frame / noise_of(frame), len(planes), float(np.median(fwhm))
+
+
+def matched_filter(frame, fwhm_px):
+    """PSF matched filter (Lang & Hogg 2020; the SExtractor/SEP detection filter): correlate with
+    the PSF divided by its norm. Optimal for point sources in WHITE noise. On our resampled
+    SPHEREx frames an injection test showed the opposite (fake-star S/N x0.56-0.81), because
+    the noise is already smoothed by resampling and faint background stars are boosted too,
+    so it is optional (--matched-filter). Result is re-normalised to noise units."""
+    from astropy.convolution import Gaussian2DKernel
+    from scipy.ndimage import correlate
+    k = Gaussian2DKernel(fwhm_px / 2.3548, x_size=7, mode="integrate").array
+    k /= np.sqrt((k ** 2).sum())
+    good = np.isfinite(frame)
+    out = correlate(np.where(good, frame, 0.0), k, mode="constant")
+    out[~good] = np.nan
+    return out / noise_of(out)
 
 
 # ---------------------------------------------------------------- 5. pictures
+# Okabe-Ito colour-blind-safe palette, ordered cool -> warm so time reads blue -> red.
+OKABE_ITO_TIME = ["#0072B2", "#56B4E9", "#009E73", "#E69F00", "#D55E00", "#CC79A7", "#F0E442"]
+
+
 def time_colors(n):
-    """n evenly spaced hues, red first. Their sum is nearly neutral (white)."""
-    return np.array([colorsys.hsv_to_rgb(i / n, 1.0, 1.0) for i in range(n)])
+    """Colour-blind-safe colours for n moments (Okabe & Ito). onion_dark rescales them so the
+    n colours add up exactly to white; more than 7 frames falls back to evenly spaced hues."""
+    if n <= len(OKABE_ITO_TIME):
+        return np.array([[int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)] for h in OKABE_ITO_TIME[:n]])
+    return np.array([colorsys.hsv_to_rgb(0.62 - 0.62 * i / (n - 1), 1.0, 1.0) for i in range(n)])
 
 
-def make_stretch(frames, lo_sigma=1.5, soften=20):
-    """One stretch for all frames (in S/N units), so a constant star looks the same in each."""
+def make_stretch(frames, lo_sigma=-1.0, soft_sigma=2.0):
+    """One asinh stretch for all frames (in S/N units), so a constant star looks the same in
+    each. Black point at -1 sigma, i.e. just below the sky, as SDSS/Lupton, the Legacy Survey
+    and Backyard Worlds do: the sky shows as faint grain and faint sources keep their wings.
+    Softening ~2 sigma (Lupton et al. 1999: linear near the noise, logarithmic for stars).
+    White point = 99.8th percentile of the median frame."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         med = np.nanmedian(np.stack(frames), axis=0)
-    hi = max(float(np.nanpercentile(med, 99.8)), 5 * lo_sigma)
+    hi = max(float(np.nanpercentile(med, 99.8)), lo_sigma + 10)
+    a = (hi - lo_sigma) / soft_sigma
 
     def f(img):
         x = np.clip((img - lo_sigma) / (hi - lo_sigma), 0, 1)
-        return np.nan_to_num(np.arcsinh(soften * x) / np.arcsinh(soften))
+        return np.nan_to_num(np.arcsinh(a * x) / np.arcsinh(a))
     return f
 
 
@@ -217,25 +256,38 @@ def onion_dark(grays, colors, gain=2.0):
 
 
 def onion_light(grays, colors):
-    """Like ink on paper (multiply blend). Static stars -> dark, movers -> their colour."""
+    """Like ink on paper (multiply blend). Static stars -> dark grey/black, movers -> their colour.
+    Each colour's 'ink' (1 - colour) is rescaled per channel so all frames together absorb red,
+    green and blue equally; otherwise static stars come out tinted (green with Okabe-Ito)."""
+    ink = 1 - colors
+    ink = np.clip(ink * (ink.sum(axis=0).mean() / ink.sum(axis=0)), 0, 1)
     rgb = np.ones(grays[0].shape + (3,))
-    for g, c in zip(grays, colors):
-        rgb *= 1 - g[..., None] * (1 - c)
+    for g, a in zip(grays, ink):
+        rgb *= 1 - g[..., None] * a
     return rgb
 
 
-def changes(frames, colors):
-    """Each frame minus (scaled) median of all frames, shown from 3 sigma up, coloured by time."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
-        med = np.nanmedian(np.stack(frames), axis=0)
-    bright = np.nan_to_num(med) > 20
+def residuals(frames):
+    """Each frame minus a template of the static sky built from the OTHER frames (leave-one-out
+    median, as Backyard Worlds does), in noise units. A mover is never in its own template, so
+    it survives in full while stars cancel."""
     resid = []
-    for f in frames:
+    stack = np.stack(frames)
+    for k, f in enumerate(frames):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            tmpl = np.nanmedian(np.delete(stack, k, axis=0), axis=0)
+        bright = np.nan_to_num(tmpl) > 20
         # bands differ between bursts, so star brightness differs a bit: match it first
-        scale = np.nanmedian(f[bright] / med[bright]) if bright.sum() > 5 else 1.0
-        r = f - scale * med
+        scale = np.nanmedian(f[bright] / tmpl[bright]) if bright.sum() > 5 else 1.0
+        r = f - scale * tmpl
         resid.append(r / noise_of(r))
+    return resid
+
+
+def changes(frames, colors):
+    """Leave-one-out difference images, shown from 3 sigma up, coloured by time."""
+    resid = residuals(frames)
     hi = max(float(np.nanpercentile(np.concatenate([r[np.isfinite(r)] for r in resid]), 99.9)), 10)
     grays = [np.nan_to_num(np.clip((r - 3) / (hi - 3), 0, 1)) for r in resid]
     grays = [np.arcsinh(10 * g) / np.arcsinh(10) for g in grays]
@@ -263,8 +315,8 @@ def to_png(rgb, path, upscale):
     from PIL import Image
     a = rgb if rgb.ndim == 3 else np.repeat(rgb[..., None], 3, axis=2)
     img = Image.fromarray((np.clip(a, 0, 1)[::-1] * 255).astype(np.uint8))  # FITS row 0 = bottom
-    if upscale > 1:
-        img = img.resize((img.width * upscale, img.height * upscale), Image.BICUBIC)
+    if upscale > 1:  # nearest neighbour: bicubic rings around 1-2 px stars
+        img = img.resize((img.width * upscale, img.height * upscale), Image.NEAREST)
     img.save(path)
     return np.asarray(img)
 
@@ -274,7 +326,7 @@ def save_gif(grays, colors, labels, path, upscale):
     images = []
     for g, c, label in zip(grays, colors, labels):
         im = Image.fromarray((g[::-1] * 255).astype(np.uint8)).convert("RGB")
-        im = im.resize((im.width * upscale, im.height * upscale), Image.BICUBIC)
+        im = im.resize((im.width * upscale, im.height * upscale), Image.NEAREST)
         draw = ImageDraw.Draw(im)
         draw.rectangle([0, 0, im.width - 1, 17], fill=(0, 0, 0))
         draw.text((5, 3), label, fill=tuple(int(255 * v) for v in c))
@@ -308,7 +360,7 @@ def save_summary(path, grays, colors, labels, panels, track, n_stars):
             s.set_visible(False)
     for i, (g, c, label) in enumerate(zip(grays, colors, labels)):
         ax = axes[0][i]
-        ax.imshow(g, cmap="gray", origin="lower", vmin=0, vmax=1)
+        ax.imshow(g, cmap="gray", origin="lower", vmin=0, vmax=1, interpolation="nearest")
         ax.set_title(label, color=c, fontsize=10)
         for s in ax.spines.values():
             s.set_visible(True)
@@ -320,7 +372,7 @@ def save_summary(path, grays, colors, labels, panels, track, n_stars):
                 ax.add_patch(Circle((tx[i], ty[i]), 4, fill=False, color=c, lw=1.2))
     for j, (title, img) in enumerate(panels):
         ax = axes[1][j]
-        ax.imshow(img, extent=(-0.5, w - 0.5, -0.5, h - 0.5))  # PNG already flipped
+        ax.imshow(img, extent=(-0.5, w - 0.5, -0.5, h - 0.5), interpolation="nearest")  # PNG already flipped
         ax.set_title(title, color="white", fontsize=10)
         if track is not None and title.startswith("onion (dark)"):
             tx, ty, _ = track
@@ -346,7 +398,16 @@ def main():
     os.makedirs(img_dir, exist_ok=True)
     size = round(a.fov * 1.5, 3)  # cutouts are rotated, so download a bit more than the fov
 
-    results = search_images(coord, a.deep)
+    # IRSA's search service is often down (502/503), so keep this field's results for re-runs
+    cache = os.path.join(out, "sia_results.ecsv")
+    if os.path.exists(cache):
+        from astropy.table import Table
+        results = Table.read(cache)
+        print(f"Using saved search results ({cache}); delete it to search IRSA again")
+    else:
+        results = search_images(coord, a.deep)
+        keep = ["access_url", "t_min", "s_region", "obs_id", "energy_bandpassname", "obs_collection"]
+        results[keep].write(cache, overwrite=True)
     meta = {str(r["access_url"]): (float(r["t_min"]), r["s_region"]) for r in results}
     images = [dict(img, mjd=meta[img["url"]][0]) for img in unique_images(results)]
     if not images:
@@ -381,19 +442,24 @@ def main():
     out_wcs, shape = grid_wcs(coord, a.fov)
     yy, xx = np.mgrid[0:shape[0], 0:shape[1]]
     sky = out_wcs.pixel_to_world(xx, yy)
-    frames, labels, mjds, rows = [], [], [], []
+    frames, labels, mjds, rows, fwhms = [], [], [], [], []
     for k, b in enumerate(window, 1):
         paths = [img["path"] for img in b if img.get("path")]
         if not paths:
             raise SystemExit(f"Frame {k}: no images downloaded.")
         dates = sorted(fits.getheader(p, "IMAGE")["DATE-OBS"] for p in paths)
         mjd = float(np.mean(Time(dates).mjd))
-        frame, nb = build_frame(paths, sky)
+        frame, nb, fwhm = build_frame(paths, sky)
         frames.append(frame)
         mjds.append(mjd)
-        labels.append(f"{k}: {Time(mjd, format='mjd').iso[:16]}  ({nb} bands)")
-        rows.append({"frame": k, "time_utc": Time(mjd, format="mjd").isot[:19], "n_bands": nb,
-                     "files": " ".join(os.path.basename(p) for p in paths)})
+        fwhms.append(fwhm)
+        gap = f"  +{(mjd - mjds[-2]) * 24:.1f} h" if k > 1 else ""
+        labels.append(f"{k}: {Time(mjd, format='mjd').iso[5:16]}{gap}  ({nb} bands)")
+        rows.append({"frame": k, "time_utc": Time(mjd, format="mjd").isot[:19],
+                     "hours_since_previous": round((mjd - mjds[-2]) * 24, 2) if k > 1 else 0,
+                     "n_bands": nb, "files": " ".join(os.path.basename(p) for p in paths)})
+    # PSF in output pixels, widened a little by the bilinear resampling (~1 px)
+    fwhm_px = float(np.hypot(np.median(fwhms) / 6.15, 1.0))
     # Only compare where every frame has data; otherwise a star missing from one frame's
     # coverage would look like it changed.
     covered = np.all([np.isfinite(f) for f in frames], axis=0)
@@ -405,6 +471,7 @@ def main():
     hdr["COMMENT"] = "Plane k = frame k+1 (see frames.csv): merged bands in noise units."
     for k, m in enumerate(mjds, 1):
         hdr[f"MJD{k}"] = (m, f"mean time of frame {k}")
+    hdr["PSFFWHM"] = (round(fwhm_px, 3), "effective PSF FWHM in output pixels")
     fits.PrimaryHDU(np.array(frames, dtype=np.float32), header=hdr).writeto(
         os.path.join(out, "frames.fits"), overwrite=True)
     with open(os.path.join(out, "frames.csv"), "w", newline="") as f:
@@ -414,13 +481,19 @@ def main():
 
     up = max(2, round(480 / shape[0]))
     colors = time_colors(len(frames))
-    st = make_stretch(frames)
-    grays = [st(f) for f in frames]
+    # what we look at (optionally matched-filtered; see --matched-filter for why it is off)
+    disp = [matched_filter(f, fwhm_px) for f in frames] if a.matched_filter else frames
+    st = make_stretch(disp)                     # frames and blink: black just below the sky
+    grays = [st(f) for f in disp]
     for k, g in enumerate(grays, 1):
         to_png(g, os.path.join(out, f"frame_{k}.png"), up)
-    panels = [("onion (dark)", to_png(onion_dark(grays, colors), os.path.join(out, "onion_dark.png"), up)),
-              ("onion (light)", to_png(onion_light(grays, colors), os.path.join(out, "onion_light.png"), up)),
-              ("changes only", to_png(changes(frames, colors), os.path.join(out, "changes.png"), up))]
+    # overlays: black at +1 sigma, otherwise every frame's independent sky noise adds up into
+    # coloured confetti
+    st_on = make_stretch(disp, lo_sigma=1.0)
+    on = [st_on(f) for f in disp]
+    panels = [("onion (dark)", to_png(onion_dark(on, colors), os.path.join(out, "onion_dark.png"), up)),
+              ("onion (light)", to_png(onion_light(on, colors), os.path.join(out, "onion_light.png"), up)),
+              ("changes only", to_png(changes(disp, colors), os.path.join(out, "changes.png"), up))]
 
     hat = [deglow.tophat(np.nan_to_num(f), upscale=4) for f in frames]
     # top-hat output is never negative, so set black at sky median + 3 sigma instead of 1.5 sigma
@@ -429,7 +502,7 @@ def main():
     panels.append(("no glow (top-hat)",
                    to_png(onion_dark([st_hat(h) for h in hat], colors),
                           os.path.join(out, "onion_noglow.png"), max(1, up // 4))))
-    layers, n_stars = points_layers(frames, upscale=8)
+    layers, n_stars = points_layers(disp, upscale=8)
     panels.append(("stars as points",
                    to_png(onion_dark(layers, colors, gain=2.5), os.path.join(out, "onion_points.png"),
                           max(1, up // 8))))
@@ -446,7 +519,7 @@ def main():
                     # frame and (median) in the other frames: a real mover is bright only now,
                     # a background star is bright in every frame
                     ix, iy = int(round(tx)), int(round(ty))
-                    peak = [np.nanmax(f[iy - 1:iy + 2, ix - 1:ix + 2]) for f in frames]
+                    peak = [np.nanmax(f[iy - 1:iy + 2, ix - 1:ix + 2]) for f in disp]
                     snr = peak[k - 1]
                     others = float(np.median(peak[:k - 1] + peak[k:]))
                     verdict = ("too faint to see" if snr - others < 4 else
