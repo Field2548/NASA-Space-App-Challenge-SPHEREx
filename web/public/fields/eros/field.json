@@ -1,0 +1,116 @@
+{
+ "slug": "eros",
+ "title": "(433) Eros",
+ "kind": "asteroid",
+ "difficulty": "easy",
+ "ra": 13.2004,
+ "dec": 14.38,
+ "fov_deg": 0.2,
+ "pixel_arcsec": 6.15,
+ "size": [
+  119,
+  119
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   13.2004,
+   14.38
+  ],
+  "crpix": [
+   60.0,
+   60.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60865.752835,
+   "utc": "2025-07-09T18:04:05",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60865.888837,
+   "utc": "2025-07-09T21:19:56",
+   "hours_since_prev": 3.26,
+   "n_bands": 6,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 60865.955692,
+   "utc": "2025-07-09T22:56:12",
+   "hours_since_prev": 1.6,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 60866.29479,
+   "utc": "2025-07-10T07:04:30",
+   "hours_since_prev": 8.14,
+   "n_bands": 6,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 60867.178335,
+   "utc": "2025-07-11T04:16:48",
+   "hours_since_prev": 21.21,
+   "n_bands": 6,
+   "detectors": [
+    3,
+    6
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0639,
+  "offset": -5.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 131.798
+ },
+ "psf_fwhm_px": 1.647,
+ "has": {
+  "exposures": true,
+  "spectrum": false
+ }
+}
