@@ -243,7 +243,7 @@ export function scoreSubmission(
     const p = best.obj.positions.find((q) => q.frame === first.frame)!;
     return make(
       "known",
-      `Confirmed: ${best.obj.name}, ${best.obj.kind}.`,
+      `Confirmed: ${best.obj.name}, ${best.obj.kind.replace(/-/g, " ")}.`,
       { track, reveal: { frame: p.frame, x: p.x, y: p.y }, matched: { object_id: best.obj.id } },
       best.obj.name,
     );
