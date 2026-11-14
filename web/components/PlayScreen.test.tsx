@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatDec, formatRA } from "@/lib/coords";
 import type { CheckResponse, Field } from "@/lib/types";
 import { blackToSlider } from "./BrightnessSlider";
 import { findTarget } from "./CoachMark";
@@ -227,11 +226,8 @@ describe("PlayScreen round mode", () => {
     const docTitle = document.title;
     const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
     const h1 = screen.getByRole("heading", { level: 1 });
-    const f = makeField();
-    expect(h1.textContent).toBe(neutralTitle(f));
-    expect(h1.textContent).toContain(formatRA(f.ra));
-    expect(h1.textContent).toContain(formatDec(f.dec));
-    expect(document.body.textContent).not.toContain("Test spot");
+    expect(h1.textContent).toBe("Field in Test");
+    expect(document.body.textContent).not.toContain("433 Eros");
     expect(document.body.textContent).not.toContain("fixture");
     expect(document.title).toBe(docTitle);
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
@@ -239,7 +235,19 @@ describe("PlayScreen round mode", () => {
     fireEvent.click(canvas, { clientX: 15, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Test spot");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("433 Eros");
+  });
+
+  it("shows spot_reveal.title after an unlocked verdict", async () => {
+    const withReveal: CheckResponse = { ...known, spot_reveal: { title: "(1) Revealed Rock", kind: "asteroid", difficulty: "medium" } };
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(withReveal), { status: 200 })) as unknown as typeof fetch });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("(1) Revealed Rock");
+    expect(screen.getByTestId("inspect-object").textContent).toBe("(1) Revealed Rock");
   });
 
   it("keeps the title hidden after a wrong verdict that leaves the spot locked", async () => {
@@ -255,13 +263,18 @@ describe("PlayScreen round mode", () => {
     fireEvent.click(canvas, { clientX: 15, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(neutralTitle(makeField()));
-    expect(document.body.textContent).not.toContain("Test spot");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Field in Test");
+    expect(document.body.textContent).not.toContain("433 Eros");
   });
 
-  it("the tutorial shows the title from the start", async () => {
-    await loadGame({ showTitle: true });
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Test spot");
+  it("falls back to the sky position when the public title is empty", async () => {
+    await loadGame({}, { title: "" });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(neutralTitle(makeField()));
+  });
+
+  it("the tutorial shows the object name from the start", async () => {
+    await loadGame({ showTitle: true, objectName: "433 Eros" });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("433 Eros");
   });
 
   it("Inspect shows the pixel but no object name before an unlocked verdict", async () => {
@@ -277,7 +290,6 @@ describe("PlayScreen round mode", () => {
     expect(region.textContent).toContain("RA");
     expect(screen.queryByTestId("inspect-object")).toBeNull();
     expect(document.body.textContent).not.toContain("433 Eros");
-    expect(document.body.textContent).not.toContain("Test spot");
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
     expect(screen.getByRole("region", { name: /Inspect pixel/ })).toBeTruthy();
@@ -297,10 +309,10 @@ describe("PlayScreen round mode", () => {
   });
 
   it("the tutorial's Inspect names the object from the start", async () => {
-    const canvas = await loadGame({ showTitle: true });
+    const canvas = await loadGame({ showTitle: true, objectName: "433 Eros" });
     fireEvent.keyDown(window, { key: "i" });
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
-    expect(screen.getByTestId("inspect-object").textContent).toBe("Test spot");
+    expect(screen.getByTestId("inspect-object").textContent).toBe("433 Eros");
   });
 
   it("does not echo the slug while loading", () => {

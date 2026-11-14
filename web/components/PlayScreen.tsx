@@ -87,6 +87,8 @@ export interface PlayScreenProps {
   /** Show field.title from the start (tutorial). Default: a round, so the heading is the sky
    * position until a verdict arrives, then the real title. */
   showTitle?: boolean;
+  /** Known object name for the tutorial heading and Inspect (the public field title is neutral). */
+  objectName?: string;
   /** Parts shown; the viewer, Play and Next frame are always there. Default: ALL_TOOLS. */
   tools?: ReadonlySet<PlayTool>;
 }
@@ -194,7 +196,7 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, tools = ALL_TOOLS }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools = ALL_TOOLS }: GameProps) {
   const [W, H] = field.size;
   const [marks, setMarks] = useState<Mark[]>([]);
   const [rawMode, setMode] = useState<ViewerMode>("mark");
@@ -202,6 +204,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   // A hidden Inspect (tutorial Back) never leaves the viewer stuck in inspect mode.
   const mode: ViewerMode = canInspect ? rawMode : "mark";
   const [revealName, setRevealName] = useState<string | null>(null);
+  const [revealTitle, setRevealTitle] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
@@ -275,7 +278,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const onResult = (res: CheckResponse) => {
     // A wrong answer leaves the spot locked (api.md 3), so the name stays hidden for a retry.
     if (res.unlocked) setVerdictIn(true);
-    if (res.unlocked && res.reveal) setRevealName(res.verdict.object_name ?? null);
+    if (res.unlocked) setRevealTitle(res.spot_reveal?.title ?? res.verdict.object_name ?? field.title);
+    if (res.unlocked && res.reveal) setRevealName(res.spot_reveal?.title ?? res.verdict.object_name ?? null);
     emit("submitted", marks);
     if (res.reveal && canInspect) {
       setInspected([Math.round(res.reveal.x), Math.round(res.reveal.y)]);
@@ -386,7 +390,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
         <div className={styles.viewportTop}>
           {tools.has("coordinates") && <Slot name="coordinate-box" label="coordinate box" />}
           <h1 className={styles.title} data-testid="field-title">
-            {showTitle || verdictIn ? field.title : neutralTitle(field)}
+            {showTitle ? (objectName ?? field.title) : verdictIn ? (revealTitle ?? field.title) : field.title || neutralTitle(field)}
           </h1>
           {tools.has("show-work") && <Slot name="show-work" label="show my / others' work" />}
         </div>
@@ -426,7 +430,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
                     frameIndex={k}
                     x={inspected[0]}
                     y={inspected[1]}
-                    objectName={revealName ?? (showTitle ? field.title : null)}
+                    objectName={revealName ?? (showTitle ? (objectName ?? null) : null)}
                   />
                 ) : null
               }

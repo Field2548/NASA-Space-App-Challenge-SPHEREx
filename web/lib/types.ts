@@ -5,10 +5,10 @@ export type RGB = [number, number, number]; // 0..255
 
 export type Vision = "normal" | "protan" | "deutan" | "tritan" | "mono";
 
-export type Difficulty = "easy" | "medium" | "hard" | "boss" | "expert" | "control";
+export type Difficulty = "easy" | "medium" | "hard" | "boss" | "expert" | "control"; // "control": legacy, public files no longer use it (issue #10)
 
 // field.json kinds are DATA's (field-schema.md section 2); "quicklook" is browser-only.
-export type FieldKind = "asteroid" | "dwarf-planet" | "control" | "star" | "fixture" | "quicklook";
+export type FieldKind = "asteroid" | "dwarf-planet" | "control" | "star" | "fixture" | "quicklook" | "spot";
 
 /** One burst (about 4 exposures, about 8 bands). */
 export interface FrameMeta {
@@ -124,6 +124,8 @@ export interface CheckResponse {
   reveal?: { frame: number; x: number; y: number };
   track?: { x0: number; y0: number; vx: number; vy: number; rms: number; rate_arcsec_per_hour: number };
   noise_bar_sigma: number | null;
+  /** Real title, kind and difficulty of the spot; sent only when unlocked (issue #10). */
+  spot_reveal?: { title: string; kind: FieldKind; difficulty: Difficulty };
 }
 
 export type VerdictKind =

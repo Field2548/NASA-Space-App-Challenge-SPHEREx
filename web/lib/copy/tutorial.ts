@@ -11,6 +11,8 @@ export type TutorialLevel = {
   id: number;
   title: string;
   spot: string;
+  /** Known object shown in the heading and Inspect; the public field title is neutral (issue #10). */
+  objectName: string;
   steps: TutorialStep[];
 };
 
@@ -23,6 +25,7 @@ export const TUTORIAL: TutorialLevel[] = [
     id: 0,
     title: "Boot",
     spot: "eros",
+    objectName: "(433) Eros",
     steps: [
       {
         id: "l0-intro",
@@ -42,6 +45,7 @@ export const TUTORIAL: TutorialLevel[] = [
     id: 1,
     title: "First contact",
     spot: "eros",
+    objectName: "(433) Eros",
     steps: [
       {
         id: "l1-mark-first",

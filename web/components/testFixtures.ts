@@ -5,7 +5,7 @@ import type { Field } from "@/lib/types";
 export function makeField(over: Partial<Field> = {}, n = 3, w = 20, h = 10): Field {
   return {
     slug: "test",
-    title: "Test spot",
+    title: "Field in Test",
     kind: "fixture",
     difficulty: "easy",
     ra: 133.795,

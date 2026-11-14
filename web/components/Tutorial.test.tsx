@@ -187,6 +187,17 @@ describe("Tutorial", () => {
     expect(screen.getByRole("button", { name: /Inspect on/ })).toBeTruthy();
   });
 
+  it("Inspect names the object from the level copy, not the public field title", async () => {
+    stubEros();
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 1, step: 2, done: [0] } }));
+    render(<Tutorial />);
+    const canvas = await screen.findByTestId("field-canvas");
+    fireEvent.click(screen.getByRole("button", { name: /Inspect off/ }));
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    expect(screen.getByTestId("inspect-object").textContent).toBe(TUTORIAL[1].objectName);
+    expect(TUTORIAL[1].objectName).toBe("(433) Eros");
+  });
+
   it("resumes saved progress and lets a step be skipped", async () => {
     stubEros();
     window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 1, step: 2, done: [0] } }));
