@@ -467,11 +467,24 @@ def rebuild_frame(planes, noises):
     return frame / noise_of(frame)
 
 
+def public_title(ra, dec):
+    """A title that does not give the answer away: the constellation of the spot centre."""
+    from astropy.coordinates import SkyCoord, get_constellation
+    return f"Field in {get_constellation(SkyCoord(ra, dec, unit='deg'))}"
+
+
+def public_difficulty(difficulty):
+    """The control spot must not be recognisable: it is listed (and scored) as medium."""
+    return "medium" if difficulty == "control" else difficulty
+
+
 def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None, kind="asteroid",
                  fov=0.2, noise_bar=None, nothing_moves=False, answers_dir=None, bands=None):
     """Export one spot. out_dir is web/public/fields; the answer key goes to answers_dir
     (default web/data/answers next to it, never under public/). bands: a data/bands_<slug>
     folder; when it holds cube.fits the spectrum tiles are written (section 8).
+    The public files get a neutral title, kind 'spot' and a non-revealing difficulty; the real
+    ones go into the answer key's 'reveal' block (issue #10).
     Returns field.json as a dict."""
     if star is not None:
         raise NotImplementedError("star targets are not built yet")
@@ -497,7 +510,8 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     if len(meta) != n:
         raise ValueError(f"{folder}: frames.csv has {len(meta)} rows but there are {n} frames")
     field = {
-        "slug": slug, "title": title, "kind": kind, "difficulty": difficulty,
+        "slug": slug, "title": public_title(ra, dec), "kind": "spot",
+        "difficulty": public_difficulty(difficulty),
         "ra": ra, "dec": dec, "fov_deg": fov, "pixel_arcsec": PIXEL_ARCSEC, "size": [w, h],
         "wcs": {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec],
                 "crpix": [float(v) for v in wcs.wcs.crpix],
@@ -531,12 +545,13 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
         import shutil
         shutil.rmtree(os.path.join(spot, "spectrum"))
     write_json(os.path.join(spot, "field.json"), field)
-    update_index(out_dir, {"slug": slug, "title": title, "ra": ra, "dec": dec, "fov_deg": fov,
-                           "difficulty": difficulty, "kind": kind,
+    update_index(out_dir, {"slug": slug, "title": field["title"], "ra": ra, "dec": dec, "fov_deg": fov,
+                           "difficulty": field["difficulty"], "kind": field["kind"],
                            "thumbnail": f"{slug}/thumbs/1.webp"})
     key = answer_key(folder, wcs, mjds, track=track, star=star, frames=frames,
                      noise_bar=noise_bar, nothing_moves=nothing_moves)
     key["slug"] = slug
+    key["reveal"] = {"title": title, "kind": kind, "difficulty": difficulty}
     for obj in key["objects"]:
         obj["kind"] = kind if kind in ("asteroid", "dwarf-planet") else obj["kind"]
     write_json(os.path.join(answers_dir, f"{slug}.json"), key)
