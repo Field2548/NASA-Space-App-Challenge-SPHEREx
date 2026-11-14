@@ -8,8 +8,10 @@ export const PIXEL_ARCSEC = 6.15;
  * Least-squares straight line x(t), y(t) through the marks, in px/day, with x0, y0 at the first
  * mark's time (t0Days = first mark tDays). rms is the RMS residual distance in px.
  */
-export function fitTrack(marks: Mark[]): Track {
-  if (marks.length < 2) throw new Error("fitTrack needs at least 2 marks");
+export function fitTrack(input: Mark[]): Track {
+  if (input.length < 2) throw new Error("fitTrack needs at least 2 marks");
+  // Marks may arrive in click order: sort a copy by time so x0, y0, t0Days are at the earliest mark.
+  const marks = input.slice().sort((a, b) => a.tDays - b.tDays);
   const first = marks[0];
   const n = marks.length;
   const dt = marks.map((m) => m.tDays - first.tDays);
@@ -34,7 +36,7 @@ export function fitTrack(marks: Mark[]): Track {
     ss += (marks[i].x - (x0 + vx * dt[i])) ** 2 + (marks[i].y - (y0 + vy * dt[i])) ** 2;
   }
   const rms = n === 2 ? 0 : Math.sqrt(ss / n);
-  return { x0, y0, t0Days: first.tDays, vx, vy, rms: rms < 1e-9 ? 0 : rms, marks: marks.slice() };
+  return { x0, y0, t0Days: first.tDays, vx, vy, rms: rms < 1e-9 ? 0 : rms, marks };
 }
 
 /** True when the fitted motion over the marked time span is under tolPx. */

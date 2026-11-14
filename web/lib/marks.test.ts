@@ -29,6 +29,19 @@ describe("fitTrack", () => {
     expect(t.vy).toBeCloseTo(-0.75, 9);
     expect(t.rms).toBe(0);
   });
+  it("shuffled marks: same fit, x0,y0,t0 at the earliest mark, marks sorted", () => {
+    const ordered = [mk(2, 10, 20, 0.5), mk(3, 12, 19, 1.5), mk(5, 16, 17, 3.5)];
+    const a = fitTrack(ordered);
+    const input = [ordered[2], ordered[0], ordered[1]];
+    const b = fitTrack(input);
+    expect(b.t0Days).toBe(0.5);
+    expect(b.x0).toBeCloseTo(10, 9);
+    expect(b.y0).toBeCloseTo(20, 9);
+    expect(b.vx).toBeCloseTo(a.vx, 9);
+    expect(b.vy).toBeCloseTo(a.vy, 9);
+    expect(b.marks.map((m) => m.frame)).toEqual([2, 3, 5]);
+    expect(input.map((m) => m.frame)).toEqual([5, 2, 3]); // caller's array untouched
+  });
   it("needs 2 marks", () => {
     expect(() => fitTrack([mk(1, 0, 0, 0)])).toThrow();
   });
