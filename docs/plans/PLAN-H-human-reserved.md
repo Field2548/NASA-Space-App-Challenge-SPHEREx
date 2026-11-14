@@ -1,6 +1,6 @@
 # PLAN H - Reserved for the human teammate
 
-Agents cannot do these. Each agent opens an `ask-human` issue when it needs one; the list below is the full set so nothing surprises you. Answer inside each `ask-human` issue (tick the boxes, comment starting `[HUMAN]`, close it); TEAM BOARD #2 is for status.
+Agents cannot do these. They are all asked once, in issue #3, each with the default agents apply while you sleep. Answer there when you wake (tick boxes, comment `[HUMAN] item N: ...`); TEAM BOARD #2 is for status.
 
 ## Before 04:30
 
@@ -15,7 +15,7 @@ Agents cannot do these. Each agent opens an `ask-human` issue when it needs one;
 - [ ] Pick the project name (placeholder is "ONION//SKY", constant `{{PROJECT_NAME}}`).
 - [ ] Approve or reject loading the SPIFF `.joblib` (a Python pickle that runs code on load). If approved, DATA does it in a throwaway venv. Download Mamajek's table if DATA cannot fetch it. Mamajek asks users to email him; send it if you want.
 
-## Approvals (answer in the `ask-human` issue)
+## Approvals (answer in issue #3)
 
 - [ ] First production deploy.
 - [ ] Any push to `main` (agents never do this on their own).
