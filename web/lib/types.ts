@@ -143,8 +143,9 @@ export interface Verdict {
 
 export interface Spectrum {
   wl: number[]; // micron
-  flux: number[]; // mJy
-  err: number[];
+  /** Path (aperture) spectra are in mJy; cube (per-pixel) spectra are in MJy/sr. */
+  flux: number[];
+  err: number[]; // same unit as flux
   det?: number[];
 }
 
