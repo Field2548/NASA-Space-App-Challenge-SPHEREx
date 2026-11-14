@@ -51,10 +51,10 @@ def _get(url, params, tries=4, timeout=180, post=False):
             time.sleep(10 * (attempt + 1))
 
 
-def tap_query(url, adql, tries=4):
+def tap_query(url, adql, tries=4, timeout=180):
     """Run one ADQL query on a TAP service; returns a list of dicts (None for missing)."""
     out = _get(url, {"REQUEST": "doQuery", "LANG": "ADQL", "FORMAT": "json", "QUERY": adql},
-               tries=tries, post=True)
+               tries=tries, timeout=timeout, post=True)
     names = [c["name"] for c in out["metadata"]]
     return [dict(zip(names, row)) for row in out["data"]]
 
@@ -65,7 +65,7 @@ def cone_radius(fov):
 
 
 def simbad_cone(ra, dec, radius):
-    return tap_query(SIMBAD_TAP, tries=SIMBAD_TRIES, adql=f"""
+    return tap_query(SIMBAD_TAP, tries=SIMBAD_TRIES, timeout=30, adql=f"""
         SELECT main_id, otype, sp_type, ra, dec, pmra, pmdec, plx_value, plx_err, rvz_redshift,
                rvz_radvel
         FROM basic
