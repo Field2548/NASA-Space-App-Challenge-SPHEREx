@@ -79,7 +79,9 @@ export function grantUnlock(request: Request, response: NextResponse, slugs: str
     value: encodeUnlocked(all),
     httpOnly: true,
     sameSite: "lax",
-    secure: new URL(request.url).protocol === "https:" || process.env.NODE_ENV === "production",
+    secure:
+      new URL(request.url).protocol === "https:" ||
+      request.headers.get("x-forwarded-proto")?.split(",")[0].trim().toLowerCase() === "https",
     path: "/api",
     maxAge: MAX_AGE_S,
   });
