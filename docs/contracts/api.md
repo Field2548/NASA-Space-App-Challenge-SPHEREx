@@ -147,7 +147,7 @@ Other keys:
 | `already_found` | this player already has this find in this spot (same find key, below); no points the second time |
 | `persisted` | `true` if a row was written to `finds`. `false` for guests and with no database: the client then keeps the result in localStorage. |
 | `unlocked` | `true` when the spot's spoiler lock is now off for this player: after a correct answer, or when it was already open. `false` after a wrong answer, and in production without `UNLOCK_SECRET` (section 2). A correct answer also sets the signed `unlock` cookie. |
-| `practice` | `true` when the spot was already open for this player before this call (their cookie covers it). The answer is judged but earns 0 points. Always present. |
+| `practice` | `true` when the spot was already open for this player before this call (their cookie covers it). The answer is judged but earns 0 points. Also `true` for a logged-in player with a saved visit to the spot (section 2). Always present. |
 | `reveal` | where to open Inspect as the reward (answer-key position of the found object). Present only for `known`. |
 | `track` | the server's fit: `x0, y0` at the first marked frame's time, `vx, vy` in px/day, `rms` in px. Absent for `answer: "nothing"`. |
 | `noise_bar_sigma` | the spot's noise bar, or `null` when no bot search was run. Never show a bot match without it. |

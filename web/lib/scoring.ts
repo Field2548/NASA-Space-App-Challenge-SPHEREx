@@ -71,6 +71,9 @@ export type AnswerKey = {
 export type FieldForScoring = {
   slug: string;
   difficulty: string;
+  /** The spot centre, degrees (field.json `ra`, `dec`). Used for the Finds layer, never the mover. */
+  ra?: number;
+  dec?: number;
   pixel_arcsec: number;
   /** [width, height] in pixels (field.json `size`). */
   size: [number, number];
