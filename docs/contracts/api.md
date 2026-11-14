@@ -175,6 +175,7 @@ Mark spots as checked and move guest progress into an account. Login required (`
 
 - `replay` holds the guest's saved `/api/check` request bodies (1 to 20). The server checks each again and saves them, so guest points are also computed on the server.
 - Replayed entries are **not** practice, even though the guest's cookie already covers those spots: that is the point of moving guest progress. `record_find`'s `already_found` (per find key) still stops anything from scoring twice on the account.
+- Each replayed entry costs one unit of the same per-address `/api/check` budget (30 a minute), so a replay of n entries uses n units, and a replay that would exceed the budget is refused whole with `429` before anything is scored.
 - Response: `{ "results": [ <one /api/check response per entry> ], "total_points": 350 }`.
 
 ## 5. `GET /api/resolve?name=`

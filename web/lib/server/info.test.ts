@@ -197,6 +197,41 @@ describe("GET /api/info: a ready spot without a catalog file", () => {
   });
 });
 
+describe("GET /api/info: overlapping ready spots", () => {
+  let overlapRoot: string | undefined;
+  afterAll(() => {
+    if (overlapRoot) rmSync(overlapRoot, { recursive: true, force: true });
+  });
+
+  it("a position inside two spots is unlocked only with the cookie for both", async () => {
+    // Two spots with the same picture, so every position in one is in the other too.
+    overlapRoot = mkdtempSync(path.join(tmpdir(), "info-overlap-"));
+    for (const slug of ["alpha", "beta"]) {
+      mkdirSync(path.join(overlapRoot, "public", "fields", slug), { recursive: true });
+      copyFileSync(
+        path.join(WEB, "public", "fields", "eros", "field.json"),
+        path.join(overlapRoot, "public", "fields", slug, "field.json"),
+      );
+    }
+    writeFileSync(
+      path.join(overlapRoot, "public", "fields", "index.json"),
+      JSON.stringify([{ slug: "alpha" }, { slug: "beta" }]),
+    );
+    const req = (cookieSpots: string[]) =>
+      new Request("http://localhost/api/info", {
+        headers: { cookie: `${UNLOCK_COOKIE}=${encodeUnlocked(cookieSpots)}` },
+      });
+    const query = { ra: erosCentre.ra, dec: erosCentre.dec, mode: "explore" } as const;
+
+    const oneOnly = await answerInfo(req(["alpha"]), query, overlapRoot);
+    expect(oneOnly).toMatchObject({ mode: "round", locked: true });
+    expect(Object.keys(oneOnly).sort()).toEqual(["locked", "mode", "position"]);
+
+    const both = await answerInfo(req(["alpha", "beta"]), query, overlapRoot);
+    expect(both).toMatchObject({ mode: "explore", locked: false, sources: { simbad: "skipped" } });
+  });
+});
+
 describe("GET /api/info: input errors", () => {
   it("400 for a missing position", async () => {
     expect((await get("mode=explore")).status).toBe(400);

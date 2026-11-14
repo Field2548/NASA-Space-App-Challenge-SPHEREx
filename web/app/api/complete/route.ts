@@ -15,8 +15,11 @@ type Entry = Done | { error: { code: string; message: string } };
 
 export async function POST(request: NextRequest): Promise<Response> {
   return handle(async () => {
-    rateLimit(request, "complete", 5);
     const body = parse(CompleteBody, await readJsonBody(request));
+    // Order: body parse, then the limiters (each replayed entry costs one /api/check unit, so
+    // guessing through this route uses the same budget as /api/check), then 503 and 401.
+    rateLimit(request, "complete", 5);
+    rateLimit(request, "check", 30, 60_000, body.replay.length);
     if (!dbConfigured() || !serviceClient()) {
       throw new ApiFail("db_unavailable", "Saving progress needs the database, which is not set up here.");
     }

@@ -2,8 +2,8 @@
 // Contract: docs/contracts/api.md sections 2 and 6. Build prompt: section 8.16 (radii, lock).
 //
 // The server decides the mode (api.md section 2). A position inside a ready spot is answered in
-// full (explore) only when the caller asked for explore AND the signed unlock cookie covers that
-// spot. Everything else gets the locked shape, which has exactly the keys mode, locked, position.
+// full (explore) only when the caller asked for explore AND the signed unlock cookie covers every
+// ready spot whose picture contains it. Everything else gets the locked shape, which has exactly the keys mode, locked, position.
 // Positions outside every ready spot are always explore: SIMBAD and Gaia are asked live (liveCatalog.ts),
 // JPL is skipped because there is no observation time here.
 //
@@ -172,10 +172,11 @@ type Located = { slug: string; field: SpotField; x: number; y: number; ra: numbe
 
 /**
  * Work out where the call points. A spot plus x, y is used as given (after the 2 px margin
- * check). Otherwise ra, dec is converted into each ready spot's picture; the first one that
- * contains it wins. Returns null when the position is outside every ready spot.
+ * check), giving one entry. Otherwise ra, dec is converted into every ready spot's picture and
+ * each spot that contains it is returned, in index order. An empty list means the position is
+ * outside every ready spot.
  */
-async function locate(q: InfoQuery, root?: string): Promise<Located | null> {
+async function locate(q: InfoQuery, root?: string): Promise<Located[]> {
   if (q.spot !== undefined) {
     if (q.x === undefined || q.y === undefined) {
       throw bad("A spot needs x and y, the pixel on its picture.");
@@ -189,21 +190,22 @@ async function locate(q: InfoQuery, root?: string): Promise<Located | null> {
       throw bad("That pixel is more than 2 px outside the picture.");
     }
     const [ra, dec] = pixelToSky(field.wcs as FieldWcs, h, x, y);
-    return { slug: q.spot, field, x, y, ra, dec };
+    return [{ slug: q.spot, field, x, y, ra, dec }];
   }
   if (q.x !== undefined || q.y !== undefined) throw bad("x and y need a spot.");
   if (q.ra === undefined || q.dec === undefined) {
     throw bad("Give either spot with x and y, or ra and dec.");
   }
+  const found: Located[] = [];
   for (const slug of await readySpotSlugs(root)) {
     const field = await readSpotField(slug, root);
     const [w, h] = field.size;
     const p = skyToPixel(field.wcs as FieldWcs, h, q.ra, q.dec);
     if (p && p[0] >= 0 && p[0] < w && p[1] >= 0 && p[1] < h) {
-      return { slug, field, x: p[0], y: p[1], ra: q.ra, dec: q.dec };
+      found.push({ slug, field, x: p[0], y: p[1], ra: q.ra, dec: q.dec });
     }
   }
-  return null;
+  return found;
 }
 
 /** Nearest SIMBAD objects within 9 arcsec of the sky position, nearest first. */
@@ -352,9 +354,9 @@ export async function answerInfo(
   live?: LiveDeps,
 ): Promise<Record<string, unknown>> {
   const asked = q.mode === "explore";
-  const loc = await locate(q, root);
+  const hits = await locate(q, root);
 
-  if (!loc) {
+  if (hits.length === 0) {
     // Outside every ready spot: explore is always granted, and only then is anything asked live.
     // A round answer returns before any network call. JPL is skipped: this lookup has no time.
     const position = { ra: q.ra as number, dec: q.dec as number };
@@ -372,8 +374,12 @@ export async function answerInfo(
     };
   }
 
-  const granted = asked && isUnlocked(request, loc.slug);
-  const position = { ra: round(loc.ra, 6), dec: round(loc.dec, 6), x: loc.x, y: loc.y };
+  // Inside ready spots: locked unless the cookie covers EVERY spot that contains the position.
+  // The answer is built from the first containing spot the cookie covers.
+  const first = hits[0];
+  const position = { ra: round(first.ra, 6), dec: round(first.dec, 6), x: first.x, y: first.y };
+  const covered = (h: Located) => isUnlocked(request, h.slug);
+  const granted = asked && hits.every(covered);
   if (!granted) return lockedBody(position);
-  return exploreReady(loc, root);
+  return exploreReady(hits.find(covered) as Located, root);
 }
