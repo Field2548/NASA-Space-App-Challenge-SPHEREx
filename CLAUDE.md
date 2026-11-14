@@ -12,6 +12,7 @@ into pictures and searches that reveal **moving solar-system objects**, working 
 asteroids to the slow, faint movers a distant "Planet X" would be.
 
 Key physics that drives design decisions:
+
 - Apparent motion is mostly parallax from Earth's orbit. At opposition, rate ≈
   148″/hr × (1 − 1/√r) / Δ (r = Sun distance, Δ = Earth distance, AU). Main belt ~35″/hr,
   Neptune ~4″/hr, Eris (~96 AU) ~1.7 px between frames, Planet X (400–800 AU) ~0.2–0.35″/hr,
@@ -26,7 +27,7 @@ Key physics that drives design decisions:
 Plain top-level scripts (no package, no `src/`), each with `argparse` and a `main()`.
 Some import helpers from each other, so **changing a function signature can break another script**:
 
-```
+```text
 download.py         search_images, cutout_url            (IRSA SIA search + cutout URLs)
   └─ spectral_bands.py  fetch, unique_images, clean_band, resample, grid_wcs
        └─ motion_frames.py  (also imports deglow)        onion skin, residuals, time_colors, ...
@@ -92,6 +93,24 @@ Windows machine; use the project venv (Python 3.14):
   JPL Horizons position check. The README reports honest margins, including weak ones.
 - The README is written in plain language for a non-specialist audience (challenge judges).
   Keep that tone when updating it, and update its tables when results change.
+
+## Website (planned: Vercel) and project skills
+
+A public website showing these results will be deployed on Vercel. Project skills live in
+`.claude/skills/` (installed with `npx skills add ... -a claude-code`, pinned in `skills-lock.json`):
+
+| Skill | Source | Use for |
+| --- | --- | --- |
+| `frontend-design` | anthropics/skills | distinctive, non-generic UI design |
+| `webapp-testing` | anthropics/skills | Playwright end-to-end checks of the running site |
+| `vercel-react-best-practices`, `vercel-composition-patterns` | vercel-labs/agent-skills | React / Next.js code |
+| `web-design-guidelines` | vercel-labs/agent-skills | UI/accessibility review (fetches rules from Vercel's GitHub) |
+| `deploy-to-vercel` | vercel-labs/agent-skills | deploys; preview by default, production only when asked |
+| `supabase`, `supabase-postgres-best-practices` | supabase/agent-skills | database, auth, storage, row-level security |
+| `asset-license-audit` | ours | copyright/licence check of fonts, sounds, images, data, packages; maintains `CREDITS.md` |
+
+Run `asset-license-audit` whenever an asset or dependency is added and before every production
+deploy. Never use NASA logos/insignia on the site. Credit SPHEREx/IRSA data.
 
 ## Ideas not yet built
 
