@@ -1,8 +1,8 @@
 {
  "slug": "cygnus",
- "title": "Cygnus control field",
- "kind": "control",
- "difficulty": "control",
+ "title": "Field in Cygnus",
+ "kind": "spot",
+ "difficulty": "medium",
  "ra": 304.6935,
  "dec": 42.4437,
  "fov_deg": 0.2,
@@ -34,7 +34,7 @@
   {
    "i": 1,
    "mjd": 61174.798617,
-   "utc": "2026-05-14T19:10:01",
+   "utc": "2026-05-14T19:10:00",
    "hours_since_prev": 0,
    "n_bands": 8,
    "detectors": [
@@ -56,7 +56,7 @@
   {
    "i": 3,
    "mjd": 61176.29025,
-   "utc": "2026-05-16T06:57:58",
+   "utc": "2026-05-16T06:57:57",
    "hours_since_prev": 14.66,
    "n_bands": 6,
    "detectors": [
@@ -111,6 +111,6 @@
  "psf_fwhm_px": 1.673,
  "has": {
   "exposures": true,
-  "spectrum": false
+  "spectrum": true
  }
 }

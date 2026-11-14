@@ -15,8 +15,8 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from export_web import (BLACK_SIGMA, PIXEL_ARCSEC, SOFT_SIGMA, make_thumbs, mjd_to_utc,  # noqa: E402
-                        simple_wcs, update_index, white_point, write_json, write_u16)
+from export_web import (BLACK_SIGMA, PIXEL_ARCSEC, SOFT_SIGMA, candidate_status, make_thumbs,  # noqa: E402
+                        mjd_to_utc, simple_wcs, update_index, white_point, write_json, write_u16)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZE, N_FRAMES, HALF = 32, 4, 16
@@ -87,18 +87,21 @@ def main():
 
     t_ref = float(np.mean(mjds))
     vx, vy = MOVER["dx"] / STEP_DAYS, MOVER["dy"] / STEP_DAYS
+    obj = {
+        "id": "fixture-1", "name": "Fixture mover", "kind": "asteroid", "source": "synthetic",
+        "positions": [{"frame": k + 1, "x": MOVER["x0"] + MOVER["dx"] * k,
+                       "y": MOVER["y0"] + MOVER["dy"] * k, "in_grid": True}
+                      for k in range(N_FRAMES)],
+        "vx_px_per_day": vx, "vy_px_per_day": vy}
+    candidate = {
+        "rank": 1, "x": MOVER["x0"] + vx * (t_ref - MJD0), "y": MOVER["y0"] + vy * (t_ref - MJD0),
+        "vx_px_per_day": vx, "vy_px_per_day": vy, "stacked_snr": 38.0,
+        "above_noise_bar": True, "snr_per_frame": [19.0, 19.0, 19.0, 19.0]}
+    candidate.update(candidate_status(candidate, np.asarray(mjds, dtype=float), t_ref, [obj]))
     answer = {
         "slug": "fixture", "nothing_moves": False, "noise_bar_sigma": 6.0, "t_ref_mjd": t_ref,
-        "objects": [{
-            "id": "fixture-1", "name": "Fixture mover", "kind": "asteroid", "source": "synthetic",
-            "positions": [{"frame": k + 1, "x": MOVER["x0"] + MOVER["dx"] * k,
-                           "y": MOVER["y0"] + MOVER["dy"] * k, "in_grid": True}
-                          for k in range(N_FRAMES)],
-            "vx_px_per_day": vx, "vy_px_per_day": vy}],
-        "bot": {"source": "synthetic", "candidates": [{
-            "rank": 1, "x": MOVER["x0"] + vx * (t_ref - MJD0), "y": MOVER["y0"] + vy * (t_ref - MJD0),
-            "vx_px_per_day": vx, "vy_px_per_day": vy, "stacked_snr": 38.0,
-            "above_noise_bar": True, "snr_per_frame": [19.0, 19.0, 19.0, 19.0]}]},
+        "objects": [obj],
+        "bot": {"source": "synthetic", "candidates": [candidate]},
     }
     write_json(os.path.join(ROOT, "web", "data", "answers", "fixture.json"), answer)
     print(f"fixture: {N_FRAMES} frames {SIZE}x{SIZE}, scale {scale}, offset {offset}, "

@@ -15,21 +15,24 @@
      "x": 83.56,
      "y": 78.71,
      "in_grid": true,
-     "snr": 721.2
+     "snr": 721.2,
+     "change_snr": 763.6
     },
     {
      "frame": 2,
      "x": 54.03,
      "y": 54.46,
      "in_grid": true,
-     "snr": 582.3
+     "snr": 582.3,
+     "change_snr": 636.1
     },
     {
      "frame": 3,
      "x": 39.52,
      "y": 42.53,
      "in_grid": true,
-     "snr": 760.2
+     "snr": 760.2,
+     "change_snr": 791.2
     },
     {
      "frame": 4,
@@ -51,5 +54,10 @@
  "bot": {
   "source": "shift_stack.py",
   "candidates": []
+ },
+ "reveal": {
+  "title": "(433) Eros",
+  "kind": "asteroid",
+  "difficulty": "easy"
  }
 }

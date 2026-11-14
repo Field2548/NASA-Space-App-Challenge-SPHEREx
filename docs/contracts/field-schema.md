@@ -1,6 +1,6 @@
 # Contract: field schema (owner: DATA)
 
-Version 1, published 2026-11-15 04:10 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1, published 2026-11-15 04:10 Bangkok. Change only through a `contract` issue (coordination 3.5). Version 1.1 (2026-11-15): neutral public title, kind and difficulty; `reveal` in the answer key (issue #10); `change_snr` in answer-key positions.
 Every file below is written by `pipeline/export_web.py` (real spots) or `pipeline/make_fixture.py` (the `fixture` spot).
 
 ```
@@ -34,7 +34,7 @@ Schema from BUILD_PROMPT 6.2, verbatim, plus the marked additions.
 
 ```json
 {
-  "slug": "eros", "title": "(433) Eros", "kind": "asteroid", "difficulty": "easy",
+  "slug": "eros", "title": "Field in Pisces", "kind": "spot", "difficulty": "easy",
   "ra": 13.2004, "dec": 14.38, "fov_deg": 0.2, "pixel_arcsec": 6.15, "size": [119, 119],
   "wcs": { "ctype": ["RA---TAN", "DEC--TAN"], "crval": [13.2004, 14.38], "crpix": [60, 60],
            "cdelt": [-0.0017083, 0.0017083], "rows": "top-down" },
@@ -51,8 +51,9 @@ Schema from BUILD_PROMPT 6.2, verbatim, plus the marked additions.
 
 | Key | Meaning |
 | --- | --- |
-| `kind` | `asteroid`, `dwarf-planet`, `control`, `star`, `fixture` |
-| `difficulty` | `easy`, `medium`, `hard`, `boss`, `control` |
+| `title` | neutral on purpose: `Field in <constellation of the spot centre>`. The object's name is in the answer key only (`reveal`, section 6) |
+| `kind` | `spot` for every ready spot (`fixture` for the test spot). The real kind is in the answer key only |
+| `difficulty` | `easy`, `medium`, `hard`, `boss`. The control spot is listed as `medium` so it cannot be recognised; its real difficulty is in the answer key only |
 | `frames[].i` | frame number, **from 1**, in time order. Plane `i - 1` of `frames.u16`. |
 | `frames[].mjd` | mean time of the frame (MJD, UTC). `utc` is the same time as ISO text. |
 | `frames[].hours_since_prev` | 0 for the first frame |
@@ -84,8 +85,8 @@ const frame = (k: number) => Float32Array.from(u.subarray(k * W * H, (k + 1) * W
 ## 5. `index.json`
 
 ```json
-[ { "slug": "eros", "title": "(433) Eros", "ra": 13.2004, "dec": 14.38, "fov_deg": 0.2,
-    "difficulty": "easy", "kind": "asteroid", "thumbnail": "eros/thumbs/1.webp" } ]
+[ { "slug": "eros", "title": "Field in Pisces", "ra": 13.2004, "dec": 14.38, "fov_deg": 0.2,
+    "difficulty": "easy", "kind": "spot", "thumbnail": "eros/thumbs/1.webp" } ]
 ```
 
 `thumbnail` is relative to `web/public/fields/`. The `fixture` spot is listed only until real spots land; after that its folder stays (tests use it) but it leaves the index.
@@ -100,13 +101,14 @@ Never import this from client code and never copy it under `public/`.
   "nothing_moves": false,
   "noise_bar_sigma": null,
   "t_ref_mjd": 60866.1,
+  "reveal": { "title": "(433) Eros", "kind": "asteroid", "difficulty": "easy" },
   "objects": [
     { "id": "433", "name": "433 Eros (A898 PA)", "kind": "asteroid", "source": "JPL Horizons",
-      "positions": [ { "frame": 1, "x": 51.2, "y": 63.9, "in_grid": true, "snr": 721.2 } ],
+      "positions": [ { "frame": 1, "x": 51.2, "y": 63.9, "in_grid": true, "snr": 721.2, "change_snr": 763.6 } ],
       "vx_px_per_day": 12.1, "vy_px_per_day": -3.4 } ],
   "bot": { "source": "shift_stack.py", "candidates": [
       { "rank": 1, "x": 30, "y": 28, "vx_px_per_day": 0.663, "vy_px_per_day": -1.245,
-        "stacked_snr": 6.86, "above_noise_bar": true, "snr_per_frame": [2.2, 3.0, 2.9, 3.4, 3.8] } ] }
+        "stacked_snr": 6.86, "above_noise_bar": true, "snr_per_frame": [2.2, 3.0, 2.9, 3.4, 3.8], "status": "known", "object_id": "136199", "near_object_frames": [1, 2, 3, 4, 5] } ] }
 }
 ```
 
@@ -114,9 +116,11 @@ Never import this from client code and never copy it under `public/`.
 | --- | --- |
 | `nothing_moves` | `true` for the control spot: the right answer is "Nothing moved" |
 | `noise_bar_sigma` | the field's noise bar for the bot search (stacked S/N). `null` if no bot search was run. Never report a bot match without it. |
-| `objects[].positions` | one entry per frame, in the top-down grid (section 1). `in_grid` is false when the object is outside the picture in that frame (Eros leaves after frame 3; `x, y` are then outside `0..W-1`). Optional `snr`: measured S/N there (max of the 3 x 3 pixels), absent when out of the grid, `null` when there is no data. |
+| `objects[].positions` | one entry per frame, in the top-down grid (section 1). `in_grid` is false when the object is outside the picture in that frame (Eros leaves after frame 3; `x, y` are then outside `0..W-1`). Optional `snr`: measured S/N there (max of the 3 x 3 pixels), absent when out of the grid, `null` when there is no data. Optional `change_snr`: the same 3 x 3 maximum taken in the frame minus the median of the other frames (`motion_frames.residuals`), so stars cancel. Use `change_snr`, not `snr`, to say whether the object itself is seen in a frame: `snr` also counts a background star that happens to lie under the path. |
 | `objects[].v*_px_per_day` | straight-line fit to the positions of all frames, top-down (positive `vy` = moving down = south). A summary only: score against `positions`, because fast objects do not move in a straight line. |
+| `reveal` | the real title, kind and difficulty of the spot (for the control spot: `control`). Public files never carry these (issue #10). The server sends them only after a correct answer |
 | `bot.candidates` | from `candidates.csv`, already converted: `y = H - 1 - y_csv`, `vy = -vy_csv`. `x, y` is the position at `t_ref_mjd` (the mean of the frame times); position in frame `i` is `x + vx * (mjd_i - t_ref_mjd)`, same for y. |
+| `bot.candidates[].status` | `known`: the candidate is the known object (within 3 px of it in at least 3 frames); `object_id` says which. `alias`: a wrong track that passes within 3 px of the known object in only one or two frames and borrows its light there (`near_object_frames` lists them); never score or announce it as a find. `unconfirmed`: matches no known object; above the noise bar it is an honest candidate, not a confirmed object. `above_noise_bar` is unchanged by this: it states what the search measured |
 
 `objects` is `[]` and `bot.candidates` is `[]` when there are none.
 
@@ -197,3 +201,4 @@ Draft shape. It becomes final when DATA closes the `contract` issue for it (befo
 - 3 static stars at `(8, 8)`, `(24, 10)`, `(12, 25)` with peak S/N 40, 25, 15.
 - 1 mover with peak S/N 20 at `(10, 16)` in frame 1, moving `+2 px` in x per frame: `(12, 16)`, `(14, 16)`, `(16, 16)`.
 - One pixel `(31, 31)` is no data (65535) in every frame, to exercise the NaN path.
+- Its answer key has one bot candidate on the mover (`status: "known"`, `noise_bar_sigma` 6.0), so "matches the bot" paths can be tested.
