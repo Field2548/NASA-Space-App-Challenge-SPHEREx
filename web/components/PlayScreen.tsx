@@ -4,25 +4,50 @@
 // broken spot shows an ASCII empty state. Empty, named slots (data-slot="...") are left for
 // the parts other batches build: Submit, "Nothing moved here", scoreboard, auth, sky map, etc.
 //
-// Props: { spot?: string }
+// Keyboard marking: focus the viewer, arrows move a crosshair (Shift = 10 px), Enter marks
+// (or inspects in Inspect mode). Tutorial hooks: data-tutorial-target on the parts a coach mark
+// points at, and onEvent(name) from the handlers (never from state effects).
+//
+// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher? }
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import { loadField, loadFrames } from "@/lib/fields";
-import type { Field, Mark } from "@/lib/types";
+import type { CheckResponse, Field, Mark } from "@/lib/types";
 import { useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import styles from "./PlayScreen.module.css";
+import SubmitBar from "./SubmitBar";
 import Timeline from "./Timeline";
 
 type Loaded = { spot: string; field: Field; frames: Float32Array[] } | { spot: string; error: string };
 
+/** Events the tutorial listens for (TutorialStep.doneWhen). */
+export type PlayEvent =
+  | "play-pressed"
+  | "frame-changed"
+  | "mark-placed"
+  | "inspect-opened"
+  | "overlay-toggled"
+  | "color-by-time-toggled"
+  | "submitted";
+export interface PlayEventDetail {
+  markedFrames: number; // distinct frames with a mark, after the event
+}
+
 export interface PlayScreenProps {
   spot?: string;
   loading?: boolean; // Suspense fallback while ?spot= is read
+  onEvent?(name: PlayEvent, detail: PlayEventDetail): void;
+  /** Only these FrameMeta.i values accept a mark; others show markHint instead. */
+  markFrames?: number[];
+  markHint?: string;
+  fetcher?: typeof fetch; // for /api/check (tests)
 }
+
+type GameProps = Omit<PlayScreenProps, "spot" | "loading"> & { spot: string; field: Field; frames: Float32Array[] };
 
 export const MAX_SCALE = 32;
 
@@ -31,7 +56,7 @@ export function upsertMark(marks: Mark[], m: Mark): Mark[] {
   return [...marks.filter((x) => x.frame !== m.frame), m].sort((a, b) => a.frame - b.frame);
 }
 
-export default function PlayScreen({ spot, loading = false }: PlayScreenProps) {
+export default function PlayScreen({ spot, loading = false, ...hooks }: PlayScreenProps) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
   useEffect(() => {
@@ -76,7 +101,7 @@ export default function PlayScreen({ spot, loading = false }: PlayScreenProps) {
       ) : "error" in current ? (
         <EmptyState title="NO SIGNAL" text={`Could not load spot “${spot}”. ${current.error}`} />
       ) : (
-        <Game key={spot} field={current.field} frames={current.frames} />
+        <Game key={spot} spot={spot} field={current.field} frames={current.frames} {...hooks} />
       )}
     </div>
   );
@@ -91,7 +116,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   *   |  [ ${title} ]  |   .
       +${bar}+
  .          .      *`}</pre>
-      <h2 className="sr-only">{title}</h2>
+      <h1 className="sr-only">{title}</h1>
       <p>{text}</p>
       <p>
         <Link href="/">Back to the start</Link>
@@ -108,20 +133,116 @@ function Slot({ name, label }: { name: string; label: string }) {
   );
 }
 
-function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
+/** Crosshair step for an arrow key, or null for other keys. */
+export function arrowStep(key: string, big: boolean): [number, number] | null {
+  const d = big ? 10 : 1;
+  if (key === "ArrowLeft") return [-d, 0];
+  if (key === "ArrowRight") return [d, 0];
+  if (key === "ArrowUp") return [0, -d];
+  if (key === "ArrowDown") return [0, d];
+  return null;
+}
+
+const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
+
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: GameProps) {
   const [W, H] = field.size;
   const [marks, setMarks] = useState<Mark[]>([]);
   const [mode, setMode] = useState<ViewerMode>("mark");
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
+  const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
   const fit = useMemo(() => fitScale(W, H, 900, 560), [W, H]);
   const [scale, setScale] = useState(fit);
   const [inspected, setInspected] = useState<[number, number] | null>(null);
   const [scoreOpen, setScoreOpen] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<[number, number] | null>(null);
+  const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
+  const statusId = useId();
   const blink = useBlink(frames.length);
   const { pause } = blink;
 
-  const toggleInspect = useCallback(() => setMode((m) => (m === "inspect" ? "mark" : "inspect")), []);
+  const emit = useCallback(
+    (name: PlayEvent, ms: Mark[]) => onEvent?.(name, { markedFrames: distinctFrames(ms) }),
+    [onEvent],
+  );
+
+  const toggleInspect = useCallback(() => {
+    const on = mode !== "inspect";
+    setMode(on ? "inspect" : "mark");
+    if (on) emit("inspect-opened", marks);
+  }, [mode, marks, emit]);
+
+  /** The one mark path shared by click and keyboard. */
+  const placeMark = (m: Mark) => {
+    if (markFrames && !markFrames.includes(m.frame)) {
+      setNotice(markHint ?? "This frame does not take marks here.");
+      return;
+    }
+    setNotice(null);
+    const next = upsertMark(marks, m);
+    setMarks(next);
+    emit("mark-placed", next);
+  };
+
+  const k = Math.min(Math.max(0, blink.index), Math.max(0, frames.length - 1));
+  const meta = field.frames[k];
+  const markAt = (x: number, y: number) => {
+    if (!meta) return;
+    if (mode === "inspect") setInspected([x, y]);
+    else placeMark({ frame: meta.i, x, y, tDays: meta.mjd - field.frames[0].mjd });
+  };
+
+  const onViewerKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const step = arrowStep(e.key, e.shiftKey);
+    if (step || e.key === "Enter") setPointer(false);
+    if (step) {
+      e.preventDefault();
+      setCursor((c) => {
+        const [x, y] = c ?? [Math.floor(W / 2), Math.floor(H / 2)];
+        return [Math.min(W - 1, Math.max(0, x + step[0])), Math.min(H - 1, Math.max(0, y + step[1]))];
+      });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const [x, y] = cursor ?? [Math.floor(W / 2), Math.floor(H / 2)];
+      if (!cursor) setCursor([x, y]);
+      markAt(x, y);
+    }
+  };
+
+  // Crosshair geometry, measured off the canvas FieldViewer renders (it has no crosshair prop).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [geom, setGeom] = useState<{ left: number; top: number; s: number } | null>(null);
+  const [resizeTick, bump] = useState(0);
+  useEffect(() => {
+    const onResize = () => bump((n) => n + 1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  // Re-measure whenever something can move the canvas: zoom, the inspect popup, the scoreboard
+  // collapse, a resize.
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    const canvas = wrap?.querySelector<HTMLCanvasElement>('[data-testid="field-canvas"]');
+    if (!wrap || !canvas || !cursor) return;
+    const w = wrap.getBoundingClientRect();
+    const c = canvas.getBoundingClientRect();
+    const next = { left: c.left - w.left + wrap.scrollLeft, top: c.top - w.top + wrap.scrollTop, s: c.width > 0 ? c.width / W : scale };
+    setGeom((g) => (g && g.left === next.left && g.top === next.top && g.s === next.s ? g : next));
+  }, [cursor, scale, W, mode, inspected, scoreOpen, resizeTick]);
+
+  const onResult = (res: CheckResponse) => {
+    emit("submitted", marks);
+    if (res.reveal) {
+      setInspected([Math.round(res.reveal.x), Math.round(res.reveal.y)]);
+      if (mode !== "inspect") {
+        setMode("inspect");
+        emit("inspect-opened", marks);
+      }
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -140,7 +261,13 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
     <div className={`${styles.body} ${scoreOpen ? "" : styles.scoreClosed}`}>
       <aside className={styles.left}>
         <section className="panel" data-part="PNL-01 // INSPECT">
-          <button type="button" aria-pressed={mode === "inspect"} onClick={toggleInspect} className={styles.wide}>
+          <button
+            type="button"
+            aria-pressed={mode === "inspect"}
+            onClick={toggleInspect}
+            className={styles.wide}
+            data-tutorial-target="inspect-toggle"
+          >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
               <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" />
@@ -152,9 +279,13 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
           <button
             type="button"
             aria-pressed={overlay === "colorByTime"}
-            onClick={() => setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"))}
+            onClick={() => {
+              setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"));
+              emit("color-by-time-toggled", marks);
+            }}
             title="Still things turn white. Moving things leave colored dots."
             className={styles.wide}
+            data-tutorial-target="color-by-time"
           >
             Color by time
           </button>
@@ -164,7 +295,23 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
           <Slot name="wavelength" label="wavelength switch" />
         </section>
         <section className="panel" data-part="PNL-04 // OVERLAYS">
-          <Slot name="overlays" label="overlay toggles" />
+          <div className={styles.slot} data-slot="overlays">
+            {/* Placeholder until DATA ships the overlays: the toggle works, nothing is drawn yet. */}
+            <button
+              type="button"
+              aria-pressed={knownOverlay}
+              onClick={() => {
+                setKnownOverlay((v) => !v);
+                emit("overlay-toggled", marks);
+              }}
+              className={styles.wide}
+              data-tutorial-target="overlay-known-asteroids"
+              title="Preview: JPL's predicted spots (diamonds) arrive in a later build."
+            >
+              Known asteroids
+            </button>
+            {knownOverlay && <span className={styles.small}>Preview: the diamonds are not drawn yet.</span>}
+          </div>
         </section>
         <section className="panel" data-part="PNL-05 // COLOR VISION">
           <Slot name="color-vision" label="vision picker" />
@@ -173,7 +320,8 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
           <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} />
         </section>
         <footer className={styles.footer}>
-          <Link href="/status" className={styles.statusLight} data-slot="status-light">
+          {/* /status is not built yet: no prefetch, so no 404 in the console. */}
+          <Link href="/status" prefetch={false} className={styles.statusLight} data-slot="status-light">
             <span aria-hidden="true" />
             Status
           </Link>
@@ -188,25 +336,58 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
           <Slot name="show-work" label="show my / others' work" />
         </div>
         <div className={styles.viewer}>
-          <FieldViewer
-            field={field}
-            frames={frames}
-            frameIndex={blink.index}
-            marks={marks}
-            onMark={(m) => setMarks((ms) => upsertMark(ms, m))}
-            mode={mode}
-            onInspect={(x, y) => setInspected([x, y])}
-            overlay={overlay}
-            brightness={black}
-            scale={scale}
-            inspectSlot={
-              mode === "inspect" && inspected ? (
-                <div className={styles.slot} data-slot="inspect-popup">
-                  INSPECT x {inspected[0]} y {inspected[1]}
-                </div>
-              ) : null
-            }
-          />
+          <div
+            ref={wrapRef}
+            className={styles.kbd}
+            tabIndex={0}
+            role="group"
+            aria-label="Field viewer. Arrow keys move the crosshair, Shift moves 10 pixels, Enter marks."
+            aria-describedby={statusId}
+            data-tutorial-target="frame-viewer mark-tool"
+            onKeyDown={onViewerKey}
+            data-pointer={pointer}
+            onPointerDown={() => setPointer(true)}
+            onFocus={(e) => {
+              if (e.target === e.currentTarget && !cursor) setCursor([Math.floor(W / 2), Math.floor(H / 2)]);
+            }}
+          >
+            <FieldViewer
+              field={field}
+              frames={frames}
+              frameIndex={blink.index}
+              marks={marks}
+              onMark={placeMark}
+              mode={mode}
+              onInspect={(x, y) => setInspected([x, y])}
+              overlay={overlay}
+              brightness={black}
+              scale={scale}
+              inspectSlot={
+                mode === "inspect" && inspected ? (
+                  <div className={styles.slot} data-slot="inspect-popup">
+                    INSPECT x {inspected[0]} y {inspected[1]}
+                  </div>
+                ) : null
+              }
+            />
+            {cursor && geom && (
+              <div
+                className={styles.crosshair}
+                data-testid="kbd-crosshair"
+                aria-hidden="true"
+                style={{
+                  left: geom.left + (cursor[0] + 0.5) * geom.s,
+                  top: geom.top + (cursor[1] + 0.5) * geom.s,
+                  width: Math.max(12, geom.s * 3),
+                  height: Math.max(12, geom.s * 3),
+                }}
+              />
+            )}
+          </div>
+          <p id={statusId} className={styles.kbdStatus} aria-live="polite">
+            {notice ? <span className={styles.notice}>{notice}</span> : null}
+            {cursor ? ` Crosshair x ${cursor[0]} y ${cursor[1]}.` : ""}
+          </p>
           <div className={styles.zoom} role="group" aria-label="Zoom">
             <button type="button" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(MAX_SCALE, s + 1))} disabled={scale >= MAX_SCALE}>
               +
@@ -229,8 +410,8 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
               <p className={styles.small}>
                 {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames. Mark the mover in at least 2 frames.
               </p>
-              <Slot name="submit" label="Submit" />
-              <Slot name="nothing-moved" label="Nothing moved here" />
+              {markHint && <p className={styles.small}>{markHint}</p>}
+              <SubmitBar spot={spot} marks={marks} fetcher={fetcher} onResult={onResult} />
               <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
                 Clear marks
               </button>
@@ -242,16 +423,24 @@ function Game({ field, frames }: { field: Field; frames: Float32Array[] }) {
         )}
       </aside>
 
-      <footer className={styles.bottom}>
+      <footer className={styles.bottom} data-tutorial-target="timeline frame-picker play-button">
         <Timeline
           field={field}
           frames={frames}
           index={blink.index}
-          onIndexChange={blink.setIndex}
+          onIndexChange={(i) => {
+            blink.setIndex(i);
+            emit("frame-changed", marks);
+            // Play is off under reduced motion: stepping frames is the way to watch them change.
+            if (blink.reducedMotion) emit("play-pressed", marks);
+          }}
           marks={marks}
           brightness={black}
           playing={blink.playing}
-          onTogglePlay={blink.toggle}
+          onTogglePlay={() => {
+            blink.toggle();
+            emit("play-pressed", marks);
+          }}
           reducedMotion={blink.reducedMotion}
         />
       </footer>

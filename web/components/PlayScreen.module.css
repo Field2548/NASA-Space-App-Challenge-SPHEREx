@@ -156,6 +156,43 @@
   min-height: 0;
 }
 
+.kbd {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.kbd:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.crosshair {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    linear-gradient(var(--magenta), var(--magenta)) center / 100% 1px no-repeat,
+    linear-gradient(var(--magenta), var(--magenta)) center / 1px 100% no-repeat;
+}
+
+/* Keyboard users only: hidden after a pointer press, shown again by Tab focus or an arrow key. */
+.kbd[data-pointer="true"] .crosshair,
+.kbd:not(:focus-within) .crosshair {
+  display: none;
+}
+
+.kbdStatus {
+  margin: var(--space-1) 0 0;
+  min-height: 1.2em;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.notice {
+  color: var(--magenta);
+}
+
 .zoom {
   position: absolute;
   right: 0;

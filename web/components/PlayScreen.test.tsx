@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PlayScreen, { upsertMark } from "./PlayScreen";
 import { makeField, mockCanvas } from "./testFixtures";
@@ -72,5 +72,44 @@ describe("PlayScreen", () => {
     }
     fireEvent.keyDown(window, { key: "i" });
     expect(screen.getByTestId("mode-status").textContent).toMatch(/INSPECT/);
+  });
+
+  it("has exactly one h1 in every state", async () => {
+    const { unmount } = render(<PlayScreen />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    unmount();
+    stubFetch(true);
+    render(<PlayScreen spot="fixture" />);
+    await screen.findByTestId("field-canvas");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("marks by keyboard: focus the viewer, arrows move the crosshair, Enter marks", async () => {
+    stubFetch(true);
+    const onEvent = vi.fn();
+    render(<PlayScreen spot="fixture" onEvent={onEvent} />);
+    await screen.findByTestId("field-canvas");
+    const viewer = screen.getByRole("group", { name: /Field viewer/ });
+    act(() => viewer.focus());
+    expect(screen.getByText(/Crosshair x 2 y 1\./)).toBeTruthy(); // centre of a 4 x 2 grid
+    fireEvent.keyDown(viewer, { key: "ArrowRight" });
+    fireEvent.keyDown(viewer, { key: "ArrowRight", shiftKey: true }); // clamps at x 3
+    fireEvent.keyDown(viewer, { key: "ArrowUp" });
+    expect(screen.getByText(/Crosshair x 3 y 0\./)).toBeTruthy();
+    fireEvent.keyDown(viewer, { key: "Enter" });
+    expect(screen.getByText("1 mark in 3 frames. Mark the mover in at least 2 frames.")).toBeTruthy();
+    expect(document.querySelector('svg [data-frame="1"]')).not.toBeNull();
+    expect(onEvent).toHaveBeenCalledWith("mark-placed", { markedFrames: 1 });
+  });
+
+  it("refuses marks outside markFrames with the hint", async () => {
+    stubFetch(true);
+    render(<PlayScreen spot="fixture" markFrames={[2, 3]} markHint="Mark frames 2 or 3 only." />);
+    await screen.findByTestId("field-canvas");
+    const viewer = screen.getByRole("group", { name: /Field viewer/ });
+    act(() => viewer.focus());
+    fireEvent.keyDown(viewer, { key: "Enter" });
+    expect(screen.getByText("0 marks in 3 frames. Mark the mover in at least 2 frames.")).toBeTruthy();
+    expect(screen.getAllByText("Mark frames 2 or 3 only.").length).toBeGreaterThan(1); // panel hint + notice
   });
 });
