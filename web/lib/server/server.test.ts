@@ -3,8 +3,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { POST as check, PRACTICE_SUFFIX } from "@/app/api/check/route";
-import { loadAnswerKey, loadFieldForScoring } from "@/lib/scoring";
+import { POST as check } from "@/app/api/check/route";
+import { PRACTICE_SUFFIX, responseBody } from "@/lib/server/checkResponse";
+import { loadAnswerKey, loadFieldForScoring, scoreSubmission, type AnswerKey, type FieldForScoring, type Scored } from "@/lib/scoring";
 import { ApiFail, handle } from "@/lib/server/http";
 import { hit, resetRateLimit } from "@/lib/server/rateLimit";
 import { decodeUnlocked, encodeUnlocked, isUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
@@ -245,5 +246,57 @@ describe("POST /api/check", () => {
     expect((await last!.json()).error.details.retry_after_s).toBeGreaterThan(0);
     const other = await check(post({ spot: "fixture", answer: "nothing" }, { "x-forwarded-for": "203.0.113.10" }));
     expect(other.status).toBe(200);
+  });
+});
+
+describe("spot_reveal", () => {
+  const REVEAL = { title: "A Secret Rock", kind: "asteroid", difficulty: "easy" };
+  const key = (reveal?: AnswerKey["reveal"]): AnswerKey => ({
+    slug: "spot-x",
+    nothing_moves: false,
+    noise_bar_sigma: null,
+    t_ref_mjd: 0,
+    objects: [],
+    bot: { candidates: [] },
+    ...(reveal ? { reveal } : {}),
+  });
+  const field: FieldForScoring = {
+    slug: "spot-x",
+    difficulty: "easy",
+    pixel_arcsec: 6.15,
+    size: [100, 100],
+    frames: [{ i: 1, mjd: 0 }, { i: 2, mjd: 1 }],
+  };
+  const scoredWrong: Scored = {
+    verdict: { kind: "nothing_wrong", points: 0, message: "Something does move here. Look again." },
+    noise_bar_sigma: null,
+  };
+  const scoredKnown: Scored = {
+    verdict: { kind: "known", object_name: "Rock", points: 100, message: "Confirmed: Rock, asteroid." },
+    noise_bar_sigma: null,
+    spot_reveal: REVEAL,
+  };
+
+  it("scoreSubmission carries the key's reveal on the result", () => {
+    const scored = scoreSubmission(key(REVEAL), field, { answer: "nothing" });
+    expect(scored.spot_reveal).toEqual(REVEAL);
+    expect(scoreSubmission(key(), field, { answer: "nothing" }).spot_reveal).toBeUndefined();
+  });
+  it("a correct, unlocking answer carries spot_reveal", () => {
+    const body = responseBody(scoredKnown, { unlocked: true, practice: false });
+    expect(body.unlocked).toBe(true);
+    expect(body.spot_reveal).toEqual(REVEAL);
+  });
+  it("a wrong answer to a locked spot never carries spot_reveal", () => {
+    const body = responseBody({ ...scoredWrong, spot_reveal: REVEAL }, { unlocked: false, practice: false });
+    expect(body.unlocked).toBe(false);
+    expect("spot_reveal" in body).toBe(false);
+  });
+  it("a practice answer on an open spot carries spot_reveal, with the practice rules", () => {
+    const body = responseBody({ ...scoredWrong, spot_reveal: REVEAL }, { unlocked: true, practice: true });
+    expect(body.practice).toBe(true);
+    expect(body.spot_reveal).toEqual(REVEAL);
+    expect(body.verdict.points).toBe(0);
+    expect(body.verdict.message.endsWith(PRACTICE_SUFFIX)).toBe(true);
   });
 });

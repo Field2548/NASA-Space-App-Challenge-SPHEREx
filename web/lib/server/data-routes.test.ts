@@ -78,6 +78,20 @@ describe("GET /api/leaderboard without a database", () => {
   });
 });
 
+describe("GET /api/leaderboard for an unknown spot", () => {
+  it("answers 404 not_found for a slug that is not a ready spot", async () => {
+    const res = await leaderboard(get("/api/leaderboard?scope=spot&slug=no-such-spot"));
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error.code).toBe("not_found");
+    expect(typeof json.error.message).toBe("string");
+  });
+  it("still serves a ready spot and the test-only fixture", async () => {
+    expect((await leaderboard(get("/api/leaderboard?scope=spot&slug=eris"))).status).toBe(200);
+    expect((await leaderboard(get("/api/leaderboard?scope=spot&slug=fixture"))).status).toBe(200);
+  });
+});
+
 describe("mergeBot", () => {
   const h = (name: string, score: number, is_me = false) => ({ name, score, accuracy: 0.5, is_me });
   it("puts the bot by score, humans first on a tie, and renumbers", () => {

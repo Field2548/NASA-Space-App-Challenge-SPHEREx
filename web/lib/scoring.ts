@@ -64,6 +64,8 @@ export type AnswerKey = {
   t_ref_mjd: number;
   objects: AnswerObject[];
   bot: { source?: string; candidates: BotCandidate[] };
+  /** The spot's real title, sent to the player once the spot is open (api.md section 3). */
+  reveal?: { title: string; kind: string; difficulty: string };
 };
 
 export type FieldForScoring = {
@@ -91,6 +93,8 @@ export type Scored = {
   noise_bar_sigma: number | null;
   /** Internal: which answer-key object or bot candidate matched. Not sent to the client. */
   matched?: { find_key: FindKey; object_id?: string; bot_rank?: number };
+  /** The spot's real title and kind, from the answer key's `reveal`. undefined when the key has none. */
+  spot_reveal?: { title: string; kind: string; difficulty: string };
 };
 
 export class ScoringError extends Error {
@@ -113,6 +117,18 @@ export const MIN_MATCHED_FRAMES = 2;
  * straight-line path for Hektor is up to 2.5 px from JPL's positions.
  */
 export const BOT_KNOWN_RADIUS_PX = 3;
+/**
+ * A bot candidate is above the noise bar when it is flagged above it and its stacked S/N is
+ * over the spot's bar. No bar (null) means no candidate counts. The one shared rule for
+ * /api/check (bot_match) and the bot's scoreboard row.
+ */
+export function isAboveBar(
+  c: { above_noise_bar: boolean; stacked_snr: number },
+  noiseBar: number | null,
+): boolean {
+  return noiseBar !== null && c.above_noise_bar && c.stacked_snr > noiseBar;
+}
+
 /** A track that moved less than this in total is a star, not a mover. */
 export const STATIC_MOTION_PX = 1;
 /** Marks may sit at most this far outside the picture (a click on the edge pixel's border). */
@@ -270,6 +286,9 @@ export function scoreSubmission(
   sub: Submission,
 ): Scored {
   const noise_bar_sigma = key.noise_bar_sigma ?? null;
+  const spot_reveal = key.reveal
+    ? { title: key.reveal.title, kind: key.reveal.kind, difficulty: key.reveal.difficulty }
+    : undefined;
   const make = (
     kind: VerdictKind,
     message: string,
@@ -283,6 +302,7 @@ export function scoreSubmission(
       message,
     },
     noise_bar_sigma,
+    spot_reveal,
     ...extra,
   });
 
@@ -355,7 +375,7 @@ export function scoreSubmission(
   // Never claimed without the noise bar.
   if (noise_bar_sigma !== null) {
     for (const c of onPath) {
-      if (!c.above_noise_bar || !(c.stacked_snr > noise_bar_sigma)) continue;
+      if (!isAboveBar(c, noise_bar_sigma)) continue;
       return make(
         "bot_match",
         `Matches the bot: ${fmt(c.stacked_snr)}σ against a ${fmt(noise_bar_sigma)}σ noise bar. ` +

@@ -7,8 +7,9 @@ import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { anonClient } from "@/lib/server/db";
+import { readySlugs } from "@/lib/scoring";
 import { botScore, mergeBot, type BoardMe, type BoardRow } from "@/lib/server/bot";
-import { handle, parse, queryObject } from "@/lib/server/http";
+import { ApiFail, handle, parse, queryObject } from "@/lib/server/http";
 import { rateLimit } from "@/lib/server/rateLimit";
 
 const Query = z
@@ -78,6 +79,10 @@ export async function GET(request: NextRequest): Promise<Response> {
     rateLimit(request, "leaderboard", 60);
     const q = parse(Query, queryObject(request));
     const slug = q.scope === "spot" ? (q.slug as string) : null;
+    // A spot that is not ready (not in public/fields/index.json) is unknown. `fixture` is the test-only spot.
+    if (slug !== null && slug !== "fixture" && !(await readySlugs()).includes(slug)) {
+      throw new ApiFail("not_found", `No spot called "${slug}".`);
+    }
 
     const db = await fromDb(request, slug);
     if (!db) return NextResponse.json(await snapshot(q.scope, slug));

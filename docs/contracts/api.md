@@ -117,6 +117,8 @@ Response `200` for the request above, as a guest with no database, before the sp
   "noise_bar_sigma": null }
 ```
 
+The example above has no `spot_reveal`: today's Eros answer key has no `reveal` block, so the server adds nothing. Once DATA's keys carry one, the same open response adds `"spot_reveal": { "title": ..., "kind": ..., "difficulty": ... }`.
+
 `verdict` is the `Verdict` type in `web/lib/types.ts`. **The checks run in the order of this table, and the first that fits wins:**
 
 | Order | `kind` | Meaning | `object_name` | Points |
@@ -149,6 +151,7 @@ Other keys:
 | `reveal` | where to open Inspect as the reward (answer-key position of the found object). Present only for `known`. |
 | `track` | the server's fit: `x0, y0` at the first marked frame's time, `vx, vy` in px/day, `rms` in px. Absent for `answer: "nothing"`. |
 | `noise_bar_sigma` | the spot's noise bar, or `null` when no bot search was run. Never show a bot match without it. |
+| `spot_reveal` | `{ title, kind, difficulty }`: the spot's real title, sent once the spot is open (`unlocked` or `practice` is `true`), never on a wrong answer to a locked spot. Absent until DATA's answer keys carry a `reveal` block. |
 
 **Find key** (server only, never sent): what "the same find" means in a spot, so one thing scores once. `object:<id>` for a known object however it was reached, `bot:<rank>` for a bot candidate that is no known object, `nothing` for `nothing_correct`; none for wrong answers. The route passes it to `record_find(p_find_key)`, which decides `already_found` and the first finder per find key.
 
@@ -224,7 +227,7 @@ Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need 
 
 ## 7. `GET /api/leaderboard?scope=spot|all&slug=`
 
-`slug` is required when `scope=spot`. Never returns emails or user ids. A logged-in call also gets `me`.
+`slug` is required when `scope=spot`. A slug that is not a ready spot (not in `web/public/fields/index.json`; the test-only `fixture` excepted) answers `404 not_found`. Never returns emails or user ids. A logged-in call also gets `me`.
 
 ```json
 { "scope": "all", "slug": null, "source": "db", "updated_at": "2026-11-15T09:30:00Z",

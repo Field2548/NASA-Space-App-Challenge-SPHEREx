@@ -10,6 +10,7 @@ import {
   loadFieldForScoring,
   MATCH_RADIUS_PX,
   MIN_MATCHED_FRAMES,
+  isAboveBar,
   pointsFor,
   type AnswerKey,
   type FieldForScoring,
@@ -45,7 +46,7 @@ export function botScoreForSpot(
   const mjd = new Map(field.frames.map((f) => [f.i, f.mjd]));
   const spot: BotSpot = { slug, score: 0, above_bar: 0, matched: 0, matches: [] };
   for (const c of key.bot.candidates) {
-    if (!c.above_noise_bar) continue;
+    if (!isAboveBar(c, key.noise_bar_sigma ?? null)) continue;
     spot.above_bar += 1;
     let hit: string | null = null;
     for (const obj of key.objects) {

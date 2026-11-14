@@ -8,6 +8,7 @@ import {
   checkSubmission,
   firstFinderBonus,
   fitTrack,
+  isAboveBar,
   loadAnswerKey,
   loadFieldForScoring,
   MATCH_RADIUS_PX,
@@ -390,6 +391,20 @@ describe("the real spots", () => {
     );
     expect(r.verdict.kind).toBe("candidate");
     expect(r.verdict.points).toBe(0);
+  });
+});
+
+describe("isAboveBar", () => {
+  const c = (above_noise_bar: boolean, stacked_snr: number) => ({ above_noise_bar, stacked_snr });
+  it("needs the flag, a bar, and S/N strictly over the bar", () => {
+    expect(isAboveBar(c(true, 6.2), 5.9)).toBe(true);
+    expect(isAboveBar(c(true, 5.9), 5.9)).toBe(false); // equal is not above
+    expect(isAboveBar(c(true, 5.8), 5.9)).toBe(false);
+    expect(isAboveBar(c(false, 6.2), 5.9)).toBe(false); // flag alone is not enough
+    expect(isAboveBar(c(false, 9), 5.9)).toBe(false);
+  });
+  it("never counts without a noise bar", () => {
+    expect(isAboveBar(c(true, 50), null)).toBe(false);
   });
 });
 
