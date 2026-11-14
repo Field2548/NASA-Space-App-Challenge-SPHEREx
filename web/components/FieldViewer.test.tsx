@@ -126,6 +126,17 @@ describe("FieldViewer cursor and readout label", () => {
     expect(screen.queryByTestId("kb-cursor")).toBeNull();
   });
 
+  it("draws the crosshair tuple prop in the marks SVG; null draws nothing", () => {
+    setup({ crosshair: [5, 2] });
+    const g = screen.getByTestId("kb-cursor");
+    expect(g.closest("svg")).not.toBeNull();
+    expect(g.querySelector("rect")?.getAttribute("x")).toBe("20");
+    expect(g.querySelector("rect")?.getAttribute("y")).toBe("8");
+    cleanup();
+    setup({ crosshair: null });
+    expect(screen.queryByTestId("kb-cursor")).toBeNull();
+  });
+
   it("labels the hover value as S/N (frame k) under Color by time", () => {
     const { canvas } = setup({ overlay: "colorByTime" });
     fireEvent.pointerMove(canvas, { clientX: 100 + 4 * 7 + 1, clientY: 50 + 4 * 3 + 1 });

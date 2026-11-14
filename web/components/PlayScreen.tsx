@@ -8,19 +8,23 @@
 // (or inspects in Inspect mode). Tutorial hooks: data-tutorial-target on the parts a coach mark
 // points at, and onEvent(name) from the handlers (never from state effects).
 //
-// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher? }
+// Round mode (default): the heading is the sky position, never the title or slug, until a
+// verdict arrives; Tutorial passes showTitle.
+//
+// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle? }
 
 import Link from "next/link";
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
+import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
 import type { CheckResponse, Field, Mark } from "@/lib/types";
-import { useBlink } from "@/lib/useBlink";
+import { type BlinkMode, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import styles from "./PlayScreen.module.css";
 import SubmitBar from "./SubmitBar";
-import Timeline from "./Timeline";
+import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
 
 type Loaded = { spot: string; field: Field; frames: Float32Array[] } | { spot: string; error: string };
 
@@ -45,6 +49,14 @@ export interface PlayScreenProps {
   markFrames?: number[];
   markHint?: string;
   fetcher?: typeof fetch; // for /api/check (tests)
+  /** Show field.title from the start (tutorial). Default: a round, so the heading is the sky
+   * position until a verdict arrives, then the real title. */
+  showTitle?: boolean;
+}
+
+/** Heading that does not give the answer away: the field's sky position. */
+export function neutralTitle(field: Pick<Field, "ra" | "dec">): string {
+  return `Field at RA ${formatRA(field.ra)} Dec ${formatDec(field.dec)}`;
 }
 
 type GameProps = Omit<PlayScreenProps, "spot" | "loading"> & { spot: string; field: Field; frames: Float32Array[] };
@@ -97,9 +109,9 @@ export default function PlayScreen({ spot, loading = false, ...hooks }: PlayScre
       ) : !spot ? (
         <EmptyState title="NO SPOT SELECTED" text="Pick a spot from the sky map, or open /play?spot=fixture." />
       ) : !current ? (
-        <EmptyState title="LOADING" text={`Loading spot “${spot}”…`} />
+        <EmptyState title="LOADING" text="Loading the spot…" />
       ) : "error" in current ? (
-        <EmptyState title="NO SIGNAL" text={`Could not load spot “${spot}”. ${current.error}`} />
+        <EmptyState title="NO SIGNAL" text={`Could not load spot. ${current.error.split(spot).join("this spot")}`} />
       ) : (
         <Game key={spot} spot={spot} field={current.field} frames={current.frames} {...hooks} />
       )}
@@ -145,7 +157,7 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false }: GameProps) {
   const [W, H] = field.size;
   const [marks, setMarks] = useState<Mark[]>([]);
   const [mode, setMode] = useState<ViewerMode>("mark");
@@ -160,7 +172,11 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
   const statusId = useId();
-  const blink = useBlink(frames.length);
+  const [loopMode, setLoopMode] = useState<BlinkMode>("loop");
+  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion([0, ONION_MAX - 1], frames.length));
+  const [realSpacing, setRealSpacing] = useState(false);
+  const [verdictIn, setVerdictIn] = useState(false);
+  const blink = useBlink(frames.length, { mode: loopMode });
   const { pause } = blink;
 
   const emit = useCallback(
@@ -212,28 +228,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
     }
   };
 
-  // Crosshair geometry, measured off the canvas FieldViewer renders (it has no crosshair prop).
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [geom, setGeom] = useState<{ left: number; top: number; s: number } | null>(null);
-  const [resizeTick, bump] = useState(0);
-  useEffect(() => {
-    const onResize = () => bump((n) => n + 1);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  // Re-measure whenever something can move the canvas: zoom, the inspect popup, the scoreboard
-  // collapse, a resize.
-  useLayoutEffect(() => {
-    const wrap = wrapRef.current;
-    const canvas = wrap?.querySelector<HTMLCanvasElement>('[data-testid="field-canvas"]');
-    if (!wrap || !canvas || !cursor) return;
-    const w = wrap.getBoundingClientRect();
-    const c = canvas.getBoundingClientRect();
-    const next = { left: c.left - w.left + wrap.scrollLeft, top: c.top - w.top + wrap.scrollTop, s: c.width > 0 ? c.width / W : scale };
-    setGeom((g) => (g && g.left === next.left && g.top === next.top && g.s === next.s ? g : next));
-  }, [cursor, scale, W, mode, inspected, scoreOpen, resizeTick]);
-
   const onResult = (res: CheckResponse) => {
+    setVerdictIn(true);
     emit("submitted", marks);
     if (res.reveal) {
       setInspected([Math.round(res.reveal.x), Math.round(res.reveal.y)]);
@@ -317,7 +313,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
           <Slot name="color-vision" label="vision picker" />
         </section>
         <section className="panel" data-part="PNL-06 // BRIGHTNESS">
-          <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} />
+          <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
         </section>
         <footer className={styles.footer}>
           {/* /status is not built yet: no prefetch, so no 404 in the console. */}
@@ -332,12 +328,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
       <main className={styles.center}>
         <div className={styles.viewportTop}>
           <Slot name="coordinate-box" label="coordinate box" />
-          <h1 className={styles.title}>{field.title}</h1>
+          <h1 className={styles.title} data-testid="field-title">
+            {showTitle || verdictIn ? field.title : neutralTitle(field)}
+          </h1>
           <Slot name="show-work" label="show my / others' work" />
         </div>
         <div className={styles.viewer}>
           <div
-            ref={wrapRef}
             className={styles.kbd}
             tabIndex={0}
             role="group"
@@ -360,6 +357,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
               mode={mode}
               onInspect={(x, y) => setInspected([x, y])}
               overlay={overlay}
+              overlayFrames={onionRangeFrames(onionRange)}
+              crosshair={pointer ? null : cursor}
               brightness={black}
               scale={scale}
               inspectSlot={
@@ -370,19 +369,6 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
                 ) : null
               }
             />
-            {cursor && geom && (
-              <div
-                className={styles.crosshair}
-                data-testid="kbd-crosshair"
-                aria-hidden="true"
-                style={{
-                  left: geom.left + (cursor[0] + 0.5) * geom.s,
-                  top: geom.top + (cursor[1] + 0.5) * geom.s,
-                  width: Math.max(12, geom.s * 3),
-                  height: Math.max(12, geom.s * 3),
-                }}
-              />
-            )}
           </div>
           <p id={statusId} className={styles.kbdStatus} aria-live="polite">
             {notice ? <span className={styles.notice}>{notice}</span> : null}
@@ -423,7 +409,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
         )}
       </aside>
 
-      <footer className={styles.bottom} data-tutorial-target="timeline frame-picker play-button">
+      <footer className={styles.bottom} data-tutorial-target="timeline">
         <Timeline
           field={field}
           frames={frames}
@@ -442,6 +428,12 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher }: G
             emit("play-pressed", marks);
           }}
           reducedMotion={blink.reducedMotion}
+          loopMode={loopMode}
+          onLoopModeChange={setLoopMode}
+          onionRange={onionRange}
+          onOnionRangeChange={setOnionRange}
+          realSpacing={realSpacing}
+          onRealSpacingChange={setRealSpacing}
         />
       </footer>
     </div>

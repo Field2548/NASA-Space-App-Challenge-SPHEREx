@@ -18,14 +18,17 @@
 //   scale?: number                   integer upscale (default: fits 640 x 560)
 //   colors?: RGB[]                   time colours per frame (default Okabe-Ito order)
 //   inspectSlot?: ReactNode          slot drawn beside the image (Inspect popup, SERVER/DATA fill it)
+//   crosshair?: [x, y] | null        keyboard crosshair drawn in the marks SVG (data-testid="kb-cursor")
 
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
 import { colorByTime, makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB } from "@/lib/types";
 import { pixelToSky } from "@/lib/wcs";
+import { timeColors } from "@/lib/palettes";
 import styles from "./FieldViewer.module.css";
-import { rgbCss, timeColors } from "./timeColors";
+
+export const rgbCss = ([r, g, b]: RGB) => `rgb(${r} ${g} ${b})`;
 
 export type ViewerMode = "mark" | "inspect";
 export type ViewerOverlay = "none" | "colorByTime";
@@ -46,6 +49,8 @@ export interface FieldViewerProps {
   inspectSlot?: ReactNode;
   /** Keyboard crosshair at a native pixel; also feeds the readout when the pointer is away. */
   cursor?: { x: number; y: number };
+  /** Same as cursor as an [x, y] tuple (PlayScreen's keyboard crosshair); wins over cursor. */
+  crosshair?: [number, number] | null;
 }
 
 /** Largest integer scale that fits the box, at least 1. */
@@ -98,7 +103,7 @@ export default function FieldViewer(props: FieldViewerProps) {
   const n = frames.length;
   const k = Math.min(Math.max(0, frameIndex), Math.max(0, n - 1));
   const meta = field.frames[k];
-  const colors = useMemo(() => props.colors ?? timeColors(n), [props.colors, n]);
+  const colors = useMemo(() => props.colors ?? timeColors(n, "normal"), [props.colors, n]);
   const overlayFrames = useMemo(
     () => (props.overlayFrames ?? Array.from({ length: Math.min(n, 7) }, (_, i) => i)).filter((i) => i >= 0 && i < n),
     [props.overlayFrames, n],
@@ -155,8 +160,8 @@ export default function FieldViewer(props: FieldViewerProps) {
   };
 
   let readout = "move the pointer over the image";
-  const cur = props.cursor && props.cursor.x >= 0 && props.cursor.x < W && props.cursor.y >= 0 && props.cursor.y < H ? props.cursor : null;
-  const probe = hover ?? (cur ? ([cur.x, cur.y] as [number, number]) : null);
+  const want = props.crosshair ? { x: props.crosshair[0], y: props.crosshair[1] } : props.cursor;
+  const cur = want && want.x >= 0 && want.x < W && want.y >= 0 && want.y < H ? want : null;  const probe = hover ?? (cur ? ([cur.x, cur.y] as [number, number]) : null);
   if (probe) {
     const [x, y] = probe;
     const [ra, dec] = pixelToSky(field.wcs, H, x, y);

@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fields from "@/lib/fields";
+import { timeColors as libTimeColors } from "@/lib/palettes";
+import { timeColors as reTimeColors } from "./timeColors";
 import { makeField, makeFrames, mockCanvas } from "./testFixtures";
 import Timeline, { clampOnion, clipOffsets, keyToIndex, onionRangeFrames } from "./Timeline";
 
@@ -141,6 +143,21 @@ describe("Timeline v1 completion", () => {
     expect(screen.queryByText("ONION")).toBeNull();
     await user.click(screen.getByRole("checkbox", { name: /Real time spacing/ }));
     expect(onSpacing).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("Timeline tutorial targets and colours", () => {
+  it("tags the play button and the frames track for coach marks", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onTogglePlay={() => {}} />);
+    expect(screen.getByRole("button", { name: "Play blink" }).getAttribute("data-tutorial-target")).toBe("play-button");
+    expect(screen.getByRole("listbox", { name: "Frames" }).getAttribute("data-tutorial-target")).toBe("frame-picker");
+  });
+
+  it("uses the lib/palettes time colours; components/timeColors re-exports them", () => {
+    expect(reTimeColors).toBe(libTimeColors);
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
+    const [r, g, b] = libTimeColors(4, "normal")[0];
+    expect((screen.getAllByRole("option")[0] as HTMLElement).style.borderColor).toBe(`rgb(${r}, ${g}, ${b})`);
   });
 });
 

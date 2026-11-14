@@ -157,7 +157,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
           </Link>
         </CoachMark>
       )}
-      <PlayScreen spot={level.spot} onEvent={onEvent} markFrames={level.spot === "eros" ? EROS_FRAMES : undefined} markHint={level.spot === "eros" ? EROS_HINT : undefined} fetcher={fetcher} />
+      <PlayScreen spot={level.spot} onEvent={onEvent} markFrames={level.spot === "eros" ? EROS_FRAMES : undefined} markHint={level.spot === "eros" ? EROS_HINT : undefined} fetcher={fetcher} showTitle />
     </div>
   );
 }

@@ -28,9 +28,9 @@ import { loadThumbs } from "@/lib/fields";
 import { makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB } from "@/lib/types";
 import type { BlinkMode } from "@/lib/useBlink";
-import { formatGap, stretchPoints } from "./FieldViewer";
+import { timeColors } from "@/lib/palettes";
+import { formatGap, rgbCss, stretchPoints } from "./FieldViewer";
 import styles from "./Timeline.module.css";
-import { rgbCss, timeColors } from "./timeColors";
 
 export const CLIP_W = 112;
 export const CLIP_GAP = 8;
@@ -144,7 +144,7 @@ export default function Timeline(props: TimelineProps) {
   const { loopMode, onLoopModeChange, realSpacing = false, onRealSpacingChange, onOnionRangeChange } = props;
   const [W, H] = field.size;
   const n = frames.length;
-  const colors = useMemo(() => props.colors ?? timeColors(n), [props.colors, n]);
+  const colors = useMemo(() => props.colors ?? timeColors(n, "normal"),[props.colors, n]);
   const black = props.brightness ?? field.stretch.black_sigma;
 
   const [loaded, setLoaded] = useState<{ field: Field; list: ImageBitmap[] } | null>(null);
@@ -263,7 +263,7 @@ export default function Timeline(props: TimelineProps) {
             ◀
           </button>
           {onTogglePlay && (
-            <button type="button" aria-label={playing ? "Pause blink" : "Play blink"} aria-pressed={playing} onClick={onTogglePlay} disabled={reducedMotion || n < 2}>
+            <button type="button" aria-label={playing ? "Pause blink" : "Play blink"} aria-pressed={playing} onClick={onTogglePlay} disabled={reducedMotion || n < 2} data-tutorial-target="play-button">
               {playing ? "Pause" : "Blink"}
             </button>
           )}
@@ -300,6 +300,7 @@ export default function Timeline(props: TimelineProps) {
           className={styles.clips}
           role="listbox"
           aria-label="Frames"
+          data-tutorial-target="frame-picker"
           aria-orientation="horizontal"
           aria-activedescendant={n ? clipId(index) : undefined}
           tabIndex={0}

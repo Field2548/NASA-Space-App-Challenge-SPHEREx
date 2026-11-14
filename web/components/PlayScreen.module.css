@@ -167,18 +167,14 @@
   outline-offset: 2px;
 }
 
-.crosshair {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  background:
-    linear-gradient(var(--magenta), var(--magenta)) center / 100% 1px no-repeat,
-    linear-gradient(var(--magenta), var(--magenta)) center / 1px 100% no-repeat;
+/* FieldViewer draws the crosshair in its marks SVG. Keyboard users only: hidden after a pointer
+   press, shown again by Tab focus or an arrow key. */
+.kbd [data-testid="kb-cursor"] {
+  stroke: var(--magenta);
 }
 
-/* Keyboard users only: hidden after a pointer press, shown again by Tab focus or an arrow key. */
-.kbd[data-pointer="true"] .crosshair,
-.kbd:not(:focus-within) .crosshair {
+.kbd[data-pointer="true"] [data-testid="kb-cursor"],
+.kbd:not(:focus-within) [data-testid="kb-cursor"] {
   display: none;
 }
 
