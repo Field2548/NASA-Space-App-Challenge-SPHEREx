@@ -21,7 +21,7 @@
  *   }
  *
  * - exposures.json and exposures.u16 are fetched lazily, once per field slug, and cached across
- *   selections. The frames are rebuilt synchronously (about 20 to 40 ms for a 119 px spot) whenever
+ *   selections. The frames are rebuilt synchronously (about 60 to 90 ms for a 119 px spot with 34 planes, measured in node) whenever
  *   field or selection changes; the result is memoised.
  * - 'all' is rebuilt too (it is NOT the original frames.u16; the caller decides which to show).
  * - The returned frames are already blanked (a pixel NaN in any shown frame is NaN in all of them),
