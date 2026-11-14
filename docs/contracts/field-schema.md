@@ -108,7 +108,7 @@ Never import this from client code and never copy it under `public/`.
       "vx_px_per_day": 12.1, "vy_px_per_day": -3.4 } ],
   "bot": { "source": "shift_stack.py", "candidates": [
       { "rank": 1, "x": 30, "y": 28, "vx_px_per_day": 0.663, "vy_px_per_day": -1.245,
-        "stacked_snr": 6.86, "above_noise_bar": true, "snr_per_frame": [2.2, 3.0, 2.9, 3.4, 3.8] } ] }
+        "stacked_snr": 6.86, "above_noise_bar": true, "snr_per_frame": [2.2, 3.0, 2.9, 3.4, 3.8], "status": "known", "object_id": "136199", "near_object_frames": [1, 2, 3, 4, 5] } ] }
 }
 ```
 
@@ -120,6 +120,7 @@ Never import this from client code and never copy it under `public/`.
 | `objects[].v*_px_per_day` | straight-line fit to the positions of all frames, top-down (positive `vy` = moving down = south). A summary only: score against `positions`, because fast objects do not move in a straight line. |
 | `reveal` | the real title, kind and difficulty of the spot (for the control spot: `control`). Public files never carry these (issue #10). The server sends them only after a correct answer |
 | `bot.candidates` | from `candidates.csv`, already converted: `y = H - 1 - y_csv`, `vy = -vy_csv`. `x, y` is the position at `t_ref_mjd` (the mean of the frame times); position in frame `i` is `x + vx * (mjd_i - t_ref_mjd)`, same for y. |
+| `bot.candidates[].status` | `known`: the candidate is the known object (within 3 px of it in at least 3 frames); `object_id` says which. `alias`: a wrong track that passes within 3 px of the known object in only one or two frames and borrows its light there (`near_object_frames` lists them); never score or announce it as a find. `unconfirmed`: matches no known object; above the noise bar it is an honest candidate, not a confirmed object. `above_noise_bar` is unchanged by this: it states what the search measured |
 
 `objects` is `[]` and `bot.candidates` is `[]` when there are none.
 
@@ -200,3 +201,4 @@ Draft shape. It becomes final when DATA closes the `contract` issue for it (befo
 - 3 static stars at `(8, 8)`, `(24, 10)`, `(12, 25)` with peak S/N 40, 25, 15.
 - 1 mover with peak S/N 20 at `(10, 16)` in frame 1, moving `+2 px` in x per frame: `(12, 16)`, `(14, 16)`, `(16, 16)`.
 - One pixel `(31, 31)` is no data (65535) in every frame, to exercise the NaN path.
+- Its answer key has one bot candidate on the mover (`status: "known"`, `noise_bar_sigma` 6.0), so "matches the bot" paths can be tested.
