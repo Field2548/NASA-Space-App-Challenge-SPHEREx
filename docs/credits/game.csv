@@ -1,0 +1,10 @@
+name,author,link,license,used_for,date_checked
+Next.js 16.4.6,Vercel,https://github.com/vercel/next.js,MIT,web framework,2026-11-15
+React 19.3.0,Meta,https://github.com/facebook/react,MIT,UI library,2026-11-15
+Orbitron,Matt McInerney,https://fonts.google.com/specimen/Orbitron,OFL-1.1,headings and buttons,2026-11-15
+JetBrains Mono,JetBrains,https://fonts.google.com/specimen/JetBrains+Mono,OFL-1.1,numbers and terminal text,2026-11-15
+lucide-react 1.73.0,Lucide contributors,https://github.com/lucide-icons/lucide,ISC,icons,2026-11-15
+zod 4.6.7,Colin McDonnell,https://github.com/colinhacks/zod,MIT,input validation,2026-11-15
+vitest 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,unit tests,2026-11-15
+Playwright 1.65.1,Microsoft,https://github.com/microsoft/playwright,Apache-2.0,end-to-end tests,2026-11-15
+jsdom 31.0.1,jsdom contributors,https://github.com/jsdom/jsdom,MIT,test DOM,2026-11-15
