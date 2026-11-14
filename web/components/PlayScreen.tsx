@@ -11,7 +11,13 @@
 // Round mode (default): the heading is the sky position, never the title or slug, until a
 // verdict arrives; Tutorial passes showTitle.
 //
-// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle? }
+// Inspect shows InspectPanel for the clicked pixel; the object name appears only after an
+// unlocked verdict with `reveal`, or from the start when showTitle is set (tutorial).
+//
+// Tools: `tools` lists the parts shown (ALL_TOOLS on /play). The tutorial passes a growing set
+// so parts unlock one by one; a hidden tool also ignores its keyboard shortcut.
+//
+// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools? }
 
 import Link from "next/link";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -22,6 +28,7 @@ import type { CheckResponse, Field, Mark } from "@/lib/types";
 import { type BlinkMode, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
+import InspectPanel from "./InspectPanel";
 import styles from "./PlayScreen.module.css";
 import SubmitBar from "./SubmitBar";
 import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
@@ -34,12 +41,40 @@ export type PlayEvent =
   | "frame-changed"
   | "mark-placed"
   | "inspect-opened"
+  | "inspect-closed"
   | "overlay-toggled"
   | "color-by-time-toggled"
   | "submitted";
 export interface PlayEventDetail {
   markedFrames: number; // distinct frames with a mark, after the event
+  inspectOn?: boolean; // Inspect mode after the event; set on inspect-opened / inspect-closed
 }
+
+/** Parts of the screen a caller can show or hide (PlayScreenProps.tools). */
+export type PlayTool =
+  | "mark" // marking, the answer panel and the scoreboard
+  | "inspect"
+  | "color-by-time" // the button and its onion range on the timeline
+  | "overlays"
+  | "brightness"
+  | "frames-spacing" // loop order and real spacing on the timeline
+  | "wavelength"
+  | "color-vision"
+  | "coordinates" // coordinate box
+  | "show-work";
+
+export const ALL_TOOLS: ReadonlySet<PlayTool> = new Set<PlayTool>([
+  "mark",
+  "inspect",
+  "color-by-time",
+  "overlays",
+  "brightness",
+  "frames-spacing",
+  "wavelength",
+  "color-vision",
+  "coordinates",
+  "show-work",
+]);
 
 export interface PlayScreenProps {
   spot?: string;
@@ -52,6 +87,8 @@ export interface PlayScreenProps {
   /** Show field.title from the start (tutorial). Default: a round, so the heading is the sky
    * position until a verdict arrives, then the real title. */
   showTitle?: boolean;
+  /** Parts shown; the viewer, Play and Next frame are always there. Default: ALL_TOOLS. */
+  tools?: ReadonlySet<PlayTool>;
 }
 
 /** Heading that does not give the answer away: the field's sky position. */
@@ -157,10 +194,14 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, tools = ALL_TOOLS }: GameProps) {
   const [W, H] = field.size;
   const [marks, setMarks] = useState<Mark[]>([]);
-  const [mode, setMode] = useState<ViewerMode>("mark");
+  const [rawMode, setMode] = useState<ViewerMode>("mark");
+  const canInspect = tools.has("inspect");
+  // A hidden Inspect (tutorial Back) never leaves the viewer stuck in inspect mode.
+  const mode: ViewerMode = canInspect ? rawMode : "mark";
+  const [revealName, setRevealName] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
@@ -180,18 +221,21 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const { pause } = blink;
 
   const emit = useCallback(
-    (name: PlayEvent, ms: Mark[]) => onEvent?.(name, { markedFrames: distinctFrames(ms) }),
+    (name: PlayEvent, ms: Mark[], inspectOn?: boolean) =>
+      onEvent?.(name, inspectOn === undefined ? { markedFrames: distinctFrames(ms) } : { markedFrames: distinctFrames(ms), inspectOn }),
     [onEvent],
   );
 
   const toggleInspect = useCallback(() => {
+    if (!canInspect) return;
     const on = mode !== "inspect";
     setMode(on ? "inspect" : "mark");
-    if (on) emit("inspect-opened", marks);
-  }, [mode, marks, emit]);
+    emit(on ? "inspect-opened" : "inspect-closed", marks, on);
+  }, [canInspect, mode, marks, emit]);
 
   /** The one mark path shared by click and keyboard. */
   const placeMark = (m: Mark) => {
+    if (!tools.has("mark")) return;
     if (markFrames && !markFrames.includes(m.frame)) {
       setNotice(markHint ?? "This frame does not take marks here.");
       return;
@@ -231,12 +275,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const onResult = (res: CheckResponse) => {
     // A wrong answer leaves the spot locked (api.md 3), so the name stays hidden for a retry.
     if (res.unlocked) setVerdictIn(true);
+    if (res.unlocked && res.reveal) setRevealName(res.verdict.object_name ?? null);
     emit("submitted", marks);
-    if (res.reveal) {
+    if (res.reveal && canInspect) {
       setInspected([Math.round(res.reveal.x), Math.round(res.reveal.y)]);
       if (mode !== "inspect") {
         setMode("inspect");
-        emit("inspect-opened", marks);
+        emit("inspect-opened", marks, true);
       }
     }
   };
@@ -255,70 +300,81 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const png8 = field.data.precision === "png8";
 
   return (
-    <div className={`${styles.body} ${scoreOpen ? "" : styles.scoreClosed}`}>
+    <div className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}>
       <aside className={styles.left}>
-        <section className="panel" data-part="PNL-01 // INSPECT">
-          <button
-            type="button"
-            aria-pressed={mode === "inspect"}
-            onClick={toggleInspect}
-            className={styles.wide}
-            data-tutorial-target="inspect-toggle"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-              <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" />
-            </svg>{" "}
-            Inspect {mode === "inspect" ? "on" : "off"} <kbd>I</kbd>
-          </button>
-        </section>
-        <section className="panel" data-part="PNL-02 // IMAGE TOOLS">
-          <button
-            type="button"
-            aria-pressed={overlay === "colorByTime"}
-            onClick={() => {
-              setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"));
-              emit("color-by-time-toggled", marks);
-            }}
-            title="Still things turn white. Moving things leave colored dots."
-            className={styles.wide}
-            data-tutorial-target="color-by-time"
-          >
-            Color by time
-          </button>
-          <Slot name="image-tools" label="more tools" />
-        </section>
-        <section className="panel" data-part="PNL-03 // WAVELENGTH">
-          <Slot name="wavelength" label="wavelength switch" />
-        </section>
-        <section className="panel" data-part="PNL-04 // OVERLAYS">
-          <div className={styles.slot} data-slot="overlays">
-            {/* Placeholder until DATA ships the overlays: the toggle works, nothing is drawn yet. */}
+        {canInspect && (
+          <section className="panel" data-part="PNL-01 // INSPECT">
             <button
               type="button"
-              aria-pressed={knownOverlay}
-              onClick={() => {
-                setKnownOverlay((v) => !v);
-                emit("overlay-toggled", marks);
-              }}
+              aria-pressed={mode === "inspect"}
+              onClick={toggleInspect}
               className={styles.wide}
-              data-tutorial-target="overlay-known-asteroids"
-              title="Preview: JPL's predicted spots (diamonds) arrive in a later build."
+              data-tutorial-target="inspect-toggle"
             >
-              Known asteroids
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.5" />
+              </svg>{" "}
+              Inspect {mode === "inspect" ? "on" : "off"} <kbd>I</kbd>
             </button>
-            {knownOverlay && <span className={styles.small}>Preview: the diamonds are not drawn yet.</span>}
-          </div>
-        </section>
-        <section className="panel" data-part="PNL-05 // COLOR VISION">
-          <Slot name="color-vision" label="vision picker" />
-        </section>
-        <section className="panel" data-part="PNL-06 // BRIGHTNESS">
-          <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
-        </section>
+          </section>
+        )}
+        {tools.has("color-by-time") && (
+          <section className="panel" data-part="PNL-02 // IMAGE TOOLS">
+            <button
+              type="button"
+              aria-pressed={overlay === "colorByTime"}
+              onClick={() => {
+                setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"));
+                emit("color-by-time-toggled", marks);
+              }}
+              title="Still things turn white. Moving things leave colored dots."
+              className={styles.wide}
+              data-tutorial-target="color-by-time"
+            >
+              Color by time
+            </button>
+            <Slot name="image-tools" label="more tools" />
+          </section>
+        )}
+        {tools.has("wavelength") && (
+          <section className="panel" data-part="PNL-03 // WAVELENGTH">
+            <Slot name="wavelength" label="wavelength switch" />
+          </section>
+        )}
+        {tools.has("overlays") && (
+          <section className="panel" data-part="PNL-04 // OVERLAYS">
+            <div className={styles.slot} data-slot="overlays">
+              {/* Placeholder until DATA ships the overlays: the toggle works, nothing is drawn yet. */}
+              <button
+                type="button"
+                aria-pressed={knownOverlay}
+                onClick={() => {
+                  setKnownOverlay((v) => !v);
+                  emit("overlay-toggled", marks);
+                }}
+                className={styles.wide}
+                data-tutorial-target="overlay-known-asteroids"
+                title="Preview: JPL's predicted spots (diamonds) arrive in a later build."
+              >
+                Known asteroids
+              </button>
+              {knownOverlay && <span className={styles.small}>Preview: the diamonds are not drawn yet.</span>}
+            </div>
+          </section>
+        )}
+        {tools.has("color-vision") && (
+          <section className="panel" data-part="PNL-05 // COLOR VISION">
+            <Slot name="color-vision" label="vision picker" />
+          </section>
+        )}
+        {tools.has("brightness") && (
+          <section className="panel" data-part="PNL-06 // BRIGHTNESS">
+            <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
+          </section>
+        )}
         <footer className={styles.footer}>
-          {/* /status is not built yet: no prefetch, so no 404 in the console. */}
-          <Link href="/status" prefetch={false} className={styles.statusLight} data-slot="status-light">
+          <Link href="/status" className={styles.statusLight} data-slot="status-light">
             <span aria-hidden="true" />
             Status
           </Link>
@@ -328,11 +384,11 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
 
       <main className={styles.center}>
         <div className={styles.viewportTop}>
-          <Slot name="coordinate-box" label="coordinate box" />
+          {tools.has("coordinates") && <Slot name="coordinate-box" label="coordinate box" />}
           <h1 className={styles.title} data-testid="field-title">
             {showTitle || verdictIn ? field.title : neutralTitle(field)}
           </h1>
-          <Slot name="show-work" label="show my / others' work" />
+          {tools.has("show-work") && <Slot name="show-work" label="show my / others' work" />}
         </div>
         <div className={styles.viewer}>
           <div
@@ -364,9 +420,14 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               scale={scale}
               inspectSlot={
                 mode === "inspect" && inspected ? (
-                  <div className={styles.slot} data-slot="inspect-popup">
-                    INSPECT x {inspected[0]} y {inspected[1]}
-                  </div>
+                  <InspectPanel
+                    field={field}
+                    frames={frames}
+                    frameIndex={k}
+                    x={inspected[0]}
+                    y={inspected[1]}
+                    objectName={revealName ?? (showTitle ? field.title : null)}
+                  />
                 ) : null
               }
             />
@@ -387,28 +448,30 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
         </div>
       </main>
 
-      <aside className={styles.right} aria-label="Scoreboard panel">
-        <button type="button" className={styles.collapse} aria-expanded={scoreOpen} onClick={() => setScoreOpen((o) => !o)}>
-          {scoreOpen ? "click to minimize" : "▸"}
-        </button>
-        {scoreOpen && (
-          <>
-            <section className="panel" data-part="PNL-07 // ANSWER">
-              <p className={styles.small}>
-                {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames. Mark the mover in at least 2 frames.
-              </p>
-              {markHint && <p className={styles.small}>{markHint}</p>}
-              <SubmitBar spot={spot} marks={marks} fetcher={fetcher} onResult={onResult} />
-              <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
-                Clear marks
-              </button>
-            </section>
-            <section className="panel" data-part="PNL-08 // SCOREBOARD">
-              <Slot name="scoreboard" label="scoreboard" />
-            </section>
-          </>
-        )}
-      </aside>
+      {tools.has("mark") && (
+        <aside className={styles.right} aria-label="Scoreboard panel">
+          <button type="button" className={styles.collapse} aria-expanded={scoreOpen} onClick={() => setScoreOpen((o) => !o)}>
+            {scoreOpen ? "click to minimize" : "▸"}
+          </button>
+          {scoreOpen && (
+            <>
+              <section className="panel" data-part="PNL-07 // ANSWER">
+                <p className={styles.small}>
+                  {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames. Mark the mover in at least 2 frames.
+                </p>
+                {markHint && <p className={styles.small}>{markHint}</p>}
+                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} onResult={onResult} />
+                <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
+                  Clear marks
+                </button>
+              </section>
+              <section className="panel" data-part="PNL-08 // SCOREBOARD">
+                <Slot name="scoreboard" label="scoreboard" />
+              </section>
+            </>
+          )}
+        </aside>
+      )}
 
       <footer className={styles.bottom} data-tutorial-target="timeline">
         <Timeline
@@ -430,11 +493,11 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           }}
           reducedMotion={blink.reducedMotion}
           loopMode={loopMode}
-          onLoopModeChange={setLoopMode}
-          onionRange={onionRange}
-          onOnionRangeChange={setOnionRange}
+          onLoopModeChange={tools.has("frames-spacing") ? setLoopMode : undefined}
+          onionRange={tools.has("color-by-time") ? onionRange : undefined}
+          onOnionRangeChange={tools.has("color-by-time") ? setOnionRange : undefined}
           realSpacing={realSpacing}
-          onRealSpacingChange={setRealSpacing}
+          onRealSpacingChange={tools.has("frames-spacing") ? setRealSpacing : undefined}
         />
       </footer>
     </div>

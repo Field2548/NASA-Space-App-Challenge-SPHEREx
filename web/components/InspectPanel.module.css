@@ -1,0 +1,28 @@
+.panel {
+  border: 1px solid var(--line);
+  padding: var(--space-1) var(--space-2);
+  font-size: 12px;
+  max-width: 320px;
+}
+
+.title {
+  margin: 0 0 var(--space-1);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-2);
+  margin: 0;
+}
+
+.list dt {
+  color: var(--text-dim);
+}
+
+.list dd {
+  margin: 0;
+}

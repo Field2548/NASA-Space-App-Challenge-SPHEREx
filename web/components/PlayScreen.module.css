@@ -48,6 +48,14 @@
   grid-template-columns: 220px 1fr 40px;
 }
 
+/* No scoreboard yet (tutorial level 0): the right column goes away. */
+.noRight {
+  grid-template-columns: 220px 1fr;
+  grid-template-areas:
+    "left center"
+    "bottom bottom";
+}
+
 .left,
 .right {
   display: flex;

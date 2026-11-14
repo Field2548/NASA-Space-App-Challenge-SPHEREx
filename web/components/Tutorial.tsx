@@ -6,11 +6,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { TUTORIAL, type TutorialLevel } from "@/lib/copy/tutorial";
+import { REVEAL_INSPECT_ON, TUTORIAL, type TutorialLevel } from "@/lib/copy/tutorial";
 import { GUEST_KEY, type GuestData, loadGuest, saveGuest } from "@/lib/guest";
 import { usePrefersReducedMotion } from "@/lib/useBlink";
 import CoachMark from "./CoachMark";
-import PlayScreen, { type PlayEvent, type PlayEventDetail } from "./PlayScreen";
+import PlayScreen, { type PlayEvent, type PlayEventDetail, type PlayTool } from "./PlayScreen";
 import styles from "./Tutorial.module.css";
 
 export const EROS_FRAMES = [1, 2, 3];
@@ -42,6 +42,30 @@ export function nextPos(pos: TutorialPos, event: string, detail: PlayEventDetail
     if (detail.markedFrames < n) return null;
   }
   return { level: pos.level, step: pos.step + 1 };
+}
+
+/** Tools a level unlocks at its start (BP 8.13 table); the rest unlock at the step that targets them. */
+export const LEVEL_TOOLS: Record<number, PlayTool[]> = { 1: ["color-by-time"] };
+/** Coach-mark target -> the tool that step introduces. */
+export const STEP_TOOLS: Record<string, PlayTool> = {
+  "mark-tool": "mark",
+  "inspect-toggle": "inspect",
+  "overlay-known-asteroids": "overlays",
+};
+
+/** Tools shown at `pos`: every earlier level's, plus this level's start set and its steps so far. */
+export function toolsAt(pos: TutorialPos | null, levels: TutorialLevel[] = TUTORIAL): Set<PlayTool> {
+  const out = new Set<PlayTool>();
+  if (!pos) return out;
+  levels.slice(0, pos.level + 1).forEach((l, li) => {
+    for (const t of LEVEL_TOOLS[l.id] ?? []) out.add(t);
+    const upto = li < pos.level ? l.steps.length : pos.step + 1;
+    for (const s of l.steps.slice(0, upto)) {
+      const t = s.target ? STEP_TOOLS[s.target] : undefined;
+      if (t) out.add(t);
+    }
+  });
+  return out;
 }
 
 export function backPos(pos: TutorialPos, levels: TutorialLevel[] = TUTORIAL): TutorialPos {
@@ -78,6 +102,10 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
     posRef.current = pos;
   }, [pos]);
   const reducedMotion = usePrefersReducedMotion();
+  // Inspect state as PlayScreen last reported it, so the reveal step never asks to open an
+  // Inspect that is already on (clicking it would turn it off and stall the step).
+  const [inspectOn, setInspectOn] = useState(false);
+  const tools = useMemo(() => toolsAt(pos, levels), [pos, levels]);
 
   const go = useCallback(
     (next: TutorialPos, finishedLevel?: number) => {
@@ -101,6 +129,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
 
   const onEvent = useCallback(
     (name: PlayEvent | "intro-seen", detail: PlayEventDetail) => {
+      if (detail.inspectOn !== undefined) setInspectOn(detail.inspectOn);
       const p = posRef.current;
       if (!p) return;
       const next = nextPos(p, name, detail, levels);
@@ -115,7 +144,8 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
   const lastLevel = pos !== null && pos.level === levels.length - 1;
   const progress = `LEVEL ${level.id} // ${level.title.toUpperCase()}${step && pos ? ` // STEP ${pos.step + 1} OF ${level.steps.length}` : ""}`;
 
-  let text = step?.text ?? "";
+  const inspectAlreadyOn = step?.doneWhen === "inspect-opened" && inspectOn;
+  let text = inspectAlreadyOn ? REVEAL_INSPECT_ON : (step?.text ?? "");
   if (step?.doneWhen === "play-pressed" && reducedMotion) text = `${text} ${REDUCED_MOTION_NOTE}`;
   if (step?.doneWhen === "mark-placed") text = `${text} ${EROS_HINT}`;
   if (step?.doneWhen === "overlay-toggled") text = `${text} (Preview: the toggle works; the diamonds arrive in a later build.)`;
@@ -131,6 +161,11 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
         >
           {step?.doneWhen === "intro-seen" && (
             <button type="button" onClick={() => onEvent("intro-seen", { markedFrames: 0 })}>
+              Next
+            </button>
+          )}
+          {inspectAlreadyOn && (
+            <button type="button" onClick={() => advance({ level: pos.level, step: pos.step + 1 })}>
               Next
             </button>
           )}
@@ -157,7 +192,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
           </Link>
         </CoachMark>
       )}
-      <PlayScreen spot={level.spot} onEvent={onEvent} markFrames={level.spot === "eros" ? EROS_FRAMES : undefined} markHint={level.spot === "eros" ? EROS_HINT : undefined} fetcher={fetcher} showTitle />
+      <PlayScreen spot={level.spot} onEvent={onEvent} markFrames={level.spot === "eros" ? EROS_FRAMES : undefined} markHint={level.spot === "eros" ? EROS_HINT : undefined} fetcher={fetcher} showTitle tools={tools} />
     </div>
   );
 }

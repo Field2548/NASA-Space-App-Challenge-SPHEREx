@@ -14,6 +14,10 @@ export type TutorialLevel = {
   steps: TutorialStep[];
 };
 
+/** Reveal step text when Inspect is already on as the step starts (it then finishes with Next). */
+export const REVEAL_INSPECT_ON =
+  "The dot is (433) Eros. Inspect is already on: click the dot to see its name, its place on the sky, how bright it is, and when the picture was taken.";
+
 export const TUTORIAL: TutorialLevel[] = [
   {
     id: 0,
@@ -53,7 +57,7 @@ export const TUTORIAL: TutorialLevel[] = [
       },
       {
         id: "l1-reveal",
-        text: "The dot is (433) Eros. Open Inspect to see its real distance from Earth.",
+        text: "The dot is (433) Eros. Turn on Inspect, then click the dot to see its name, its place on the sky, how bright it is, and when the picture was taken.",
         target: "inspect-toggle",
         doneWhen: "inspect-opened",
       },

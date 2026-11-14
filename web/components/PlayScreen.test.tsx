@@ -178,6 +178,50 @@ describe("PlayScreen wiring", () => {
   });
 });
 
+// Level 0 keeps the disabled login stub, zoom (part of the viewer) and the frame stepper.
+const ALLOWED_AT_LEVEL_0 = ["Log in / Sign up", "Zoom in", "Zoom out", "Previous frame", "Play blink", "Next frame"];
+
+describe("PlayScreen tools", () => {
+  it("shows every tool by default", async () => {
+    await loadGame();
+    for (const name of [/Inspect off/, "Color by time", "Known asteroids", "Submit", /Blink order/]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    expect(screen.getByRole("slider", { name: "Onion range end" })).toBeTruthy();
+  });
+
+  it("with no tools shows only the viewer, Play and Next frame; clicks and I do nothing", async () => {
+    const onEvent = vi.fn();
+    const canvas = await loadGame({ tools: new Set(), onEvent });
+    expect(screen.getByRole("button", { name: /Play blink/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next frame" })).toBeTruthy();
+    for (const name of [/Inspect/, "Color by time", "Known asteroids", "Submit", "Clear marks", /Blink order/]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+    expect(screen.queryByRole("slider", { name: "Onion range end" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "Scoreboard panel" })).toBeNull();
+    expect(document.querySelector('[data-slot="coordinate-box"], [data-slot="show-work"]')).toBeNull();
+    const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim());
+    expect(names).toEqual(ALLOWED_AT_LEVEL_0);
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.keyDown(window, { key: "i" });
+    expect(document.querySelector("svg [data-frame]")).toBeNull();
+    expect(screen.queryByRole("region", { name: /Inspect pixel/ })).toBeNull();
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it("reports the Inspect state on open and close", async () => {
+    const onEvent = vi.fn();
+    await loadGame({ onEvent });
+    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.keyDown(window, { key: "i" });
+    expect(onEvent.mock.calls.map((c) => [c[0], c[1].inspectOn])).toEqual([
+      ["inspect-opened", true],
+      ["inspect-closed", false],
+    ]);
+  });
+});
+
 describe("PlayScreen round mode", () => {
   it("hides the title and slug until the verdict, then shows the title", async () => {
     const docTitle = document.title;
@@ -218,6 +262,45 @@ describe("PlayScreen round mode", () => {
   it("the tutorial shows the title from the start", async () => {
     await loadGame({ showTitle: true });
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Test spot");
+  });
+
+  it("Inspect shows the pixel but no object name before an unlocked verdict", async () => {
+    // A locked reply that still carries a name and a reveal must not leak the name.
+    const locked: CheckResponse = { ...known, verdict: { ...known.verdict, kind: "candidate", message: "Not yet." }, unlocked: false };
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(locked), { status: 200 })) as unknown as typeof fetch });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: /Inspect off/ }));
+    fireEvent.click(canvas, { clientX: 25, clientY: 15 });
+    const region = screen.getByRole("region", { name: "Inspect pixel 2, 1" });
+    expect(region.textContent).toContain("RA");
+    expect(screen.queryByTestId("inspect-object")).toBeNull();
+    expect(document.body.textContent).not.toContain("433 Eros");
+    expect(document.body.textContent).not.toContain("Test spot");
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    expect(screen.getByRole("region", { name: /Inspect pixel/ })).toBeTruthy();
+    expect(screen.queryByTestId("inspect-object")).toBeNull();
+    expect(document.body.textContent).not.toContain("433 Eros");
+  });
+
+  it("an unlocked verdict with reveal opens Inspect on the object with its name", async () => {
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    expect(screen.getByRole("region", { name: "Inspect pixel 1, 1" })).toBeTruthy();
+    expect(screen.getByTestId("inspect-object").textContent).toBe("433 Eros");
+  });
+
+  it("the tutorial's Inspect names the object from the start", async () => {
+    const canvas = await loadGame({ showTitle: true });
+    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    expect(screen.getByTestId("inspect-object").textContent).toBe("Test spot");
   });
 
   it("does not echo the slug while loading", () => {
