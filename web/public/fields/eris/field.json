@@ -110,7 +110,7 @@
  },
  "psf_fwhm_px": 1.647,
  "has": {
-  "exposures": false,
+  "exposures": true,
   "spectrum": false
  }
 }

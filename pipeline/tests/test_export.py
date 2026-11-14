@@ -96,10 +96,23 @@ def test_png_fallback_equals_fits_within_one_level(slug):
         im = np.asarray(Image.open(os.path.join(folder, f"frame_{k + 1}.png")).convert("L"))
         levels_png = im[::im.shape[0] // h, ::im.shape[0] // h].astype(int)
         assert np.abs(levels_png - levels_fits[k]).max() <= 1
-    # and the S/N it recovers is close where the preview is neither black nor white
+    # Undoing the stretch: the picture is exact (drawing the recovered values with the
+    # recovered white point gives the preview back) ...
     png_frames, _, _, _, white = ew.frames_from_png(folder, SPOT[slug]["fov"])
-    mid = np.isfinite(fits_frames) & (fits_frames > -0.5) & (fits_frames < 0.5 * white)
-    assert np.median(np.abs(png_frames - fits_frames)[mid]) < 0.1
+    for k in range(fits_frames.shape[0]):
+        im = np.asarray(Image.open(os.path.join(folder, f"frame_{k + 1}.png")).convert("L"))
+        levels_png = im[::im.shape[0] // h, ::im.shape[0] // h].astype(int)
+        redrawn = (ew.stretch_gray(png_frames[k], white) * 255).astype(int)
+        assert np.abs(redrawn - levels_png).max() <= 1
+    # ... and the S/N numbers are approximate: "preview quality". These are the measured
+    # limits (worst case is the crowded Cygnus field), not a wish.
+    seen = np.isfinite(fits_frames) & np.isfinite(png_frames)
+    sky = seen & (fits_frames > -0.9) & (fits_frames < 3)
+    stars = seen & (fits_frames >= 5) & (fits_frames < 50)
+    assert np.median(np.abs(png_frames - fits_frames)[sky]) < 0.15
+    assert np.median(np.abs(png_frames / fits_frames - 1)[stars]) < 0.3
+    # no-data pixels: nearly the same set as in the FITS
+    assert (np.isnan(png_frames) != np.isnan(fits_frames)).mean() < 0.01
 
 
 @pytest.mark.parametrize("slug", [s for s in SLUGS if SPOT[s]["track"]])
@@ -148,3 +161,58 @@ def test_bot_flags_agree_with_the_bar(slug):
     _, _, ans = load(slug)
     for c in ans["bot"]["candidates"]:
         assert c["above_noise_bar"] == (c["stacked_snr"] > ans["noise_bar_sigma"])
+
+
+# ------------------------------------------------------------------ exposures (phase 2)
+EXPOSURE_SLUGS = [s for s in SLUGS if os.path.exists(os.path.join(FIELDS, s, "exposures.json"))]
+
+
+def test_some_spot_has_exposures():
+    assert EXPOSURE_SLUGS, "no spot was exported with exposures"
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_has_flag_matches_files(slug):
+    field, _, _ = load(slug)
+    present = os.path.exists(os.path.join(FIELDS, slug, "exposures.u16"))
+    assert field["has"]["exposures"] == present == (slug in EXPOSURE_SLUGS)
+    if field["data"]["precision"] == "png8":
+        assert not present
+
+
+@pytest.mark.parametrize("slug", EXPOSURE_SLUGS)
+def test_exposures_layout(slug):
+    field, _, _ = load(slug)
+    w, h = field["size"]
+    planes, info = ew.read_exposures(os.path.join(FIELDS, slug))
+    assert info["size"] == [w, h] and info["count"] == len(info["exposures"])
+    assert os.path.getsize(os.path.join(FIELDS, slug, "exposures.u16")) == 2 * info["count"] * h * w
+    assert [e["k"] for e in info["exposures"]] == list(range(info["count"]))
+    for fr in field["frames"]:
+        mine = [e for e in info["exposures"] if e["frame"] == fr["i"]]
+        assert len(mine) == fr["n_bands"]
+        assert sorted({e["detector"] for e in mine}) == fr["detectors"]
+        assert all(abs(e["mjd"] - fr["mjd"]) < 0.02 for e in mine)       # within one burst
+    for e in info["exposures"]:
+        assert e["scale"] <= e["noise"] / 2 * 1.0001 and e["noise"] > 0
+        grid = e["wavelength_um"]
+        assert len(grid) == 8 and all(len(row) == 8 for row in grid)
+        vals = [v for row in grid for v in row if v is not None]
+        assert vals and all(0.7 < v < 5.1 for v in vals)                 # SPHEREx: 0.75-5.0 um
+        assert max(vals) - min(vals) < 0.6          # one detector position, a narrow range
+        assert np.isfinite(planes[e["k"]]).mean() > 0.2
+
+
+@pytest.mark.parametrize("slug", EXPOSURE_SLUGS)
+def test_exposures_rebuild_the_frames(slug):
+    """Merging a frame's exposures the documented way gives back frames.u16."""
+    field, frames, _ = load(slug)
+    planes, info = ew.read_exposures(os.path.join(FIELDS, slug))
+    for fr in field["frames"]:
+        ks = [e["k"] for e in info["exposures"] if e["frame"] == fr["i"]]
+        rebuilt = ew.rebuild_frame([planes[k] for k in ks],
+                                   [info["exposures"][k]["noise"] for k in ks])
+        both = np.isfinite(rebuilt) & np.isfinite(frames[fr["i"] - 1])
+        assert both.sum() > 0.8 * np.isfinite(frames[fr["i"] - 1]).sum()
+        err = np.abs(rebuilt - frames[fr["i"] - 1])[both]
+        assert np.median(err) < 0.1 and np.percentile(err, 99) < 2.0     # in noise sigmas

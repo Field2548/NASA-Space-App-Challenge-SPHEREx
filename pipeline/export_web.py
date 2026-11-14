@@ -179,8 +179,11 @@ def frames_from_png(folder, fov):
     2 sigma), upscaled by an integer factor with nearest neighbour. So: take every factor-th
     pixel to get the native grid back, then undo the stretch. The white point is not stored;
     _solve_stretch recovers it from the sky noise. Values are clipped to [-1 sigma, white],
-    pixels black in every frame become "no data", and there are only about 250 levels:
-    "preview quality"."""
+    one large always-black patch at the border becomes "no data" (_uncovered), and there are
+    only about 250 levels:
+    "preview quality". The picture is exact all the same: drawing these values with the
+    returned white point gives back the preview's gray levels. Only the S/N numbers are
+    approximate (see _solve_stretch)."""
     _repo_imports()
     from astropy.coordinates import SkyCoord
     from astropy.time import Time
@@ -201,28 +204,49 @@ def frames_from_png(folder, fov):
     white = float(SOFT_SIGMA * np.sinh(asinh_a) + BLACK_SIGMA)
     frames = BLACK_SIGMA + SOFT_SIGMA * np.sinh((levels + 0.5) / 255 * asinh_a)
     frames[levels == 0] = BLACK_SIGMA
-    # motion_frames blanks the same uncovered pixels in every frame; a covered pixel is black
-    # (below -1 sigma) in all frames only by rare chance (0.16^N), so "always black" = no data
-    frames[:, (levels == 0).all(axis=0)] = np.nan
+    frames[:, _uncovered(levels)] = np.nan
     frames[levels == 255] = white
     mjds = [float(Time(m["utc"]).mjd) for m in meta]
     return frames, wcs, mjds, 1.6, white
 
 
+def _uncovered(levels, min_fraction=0.05):
+    """Which pixels of 8-bit previews are "no data" rather than just dark. motion_frames blanks
+    the pixels not covered by every frame, and the previews draw them black in all frames.
+    Dark sky is black in all frames too (below the -1 sigma black point), and in the crowded
+    Cygnus field such real dark patches reach 260 pixels. Coverage gaps come from detector
+    edges: one large patch at the border (2100 pixels on Eros). So only border patches larger
+    than 5% of the picture count as no data. A smaller gap is missed and reads as -1 sigma;
+    no valid pixel of the five ready spots is thrown away (checked against the FITS)."""
+    from scipy import ndimage
+    always_black = (levels == 0).all(axis=0)
+    labels, count = ndimage.label(always_black)
+    out = np.zeros_like(always_black)
+    for i in range(1, count + 1):
+        patch = labels == i
+        on_border = patch[0].any() or patch[-1].any() or patch[:, 0].any() or patch[:, -1].any()
+        if on_border and patch.sum() >= min_fraction * always_black.size:
+            out |= patch
+    return out
+
+
 def _solve_stretch(levels):
     """asinh(a) of the stretch behind 8-bit preview levels, a = (white - black) / soft.
     The stretch maps S/N v to gray = asinh((v - black) / soft) / asinh(a). Sky pixels have
-    noise sigma 1 by construction (frames are in noise units), so the gap between the 25th
-    and 75th percentile of the sky is 1.349 in S/N. Find the asinh(a) that makes it so."""
-    sky = levels[(levels > 0) & (levels < 255)]
-    lo, hi = ((np.percentile(sky, q) + 0.5) / 255 for q in (25, 75))
+    noise sigma 1 by construction (frames are in noise units), so the 25th percentile of the
+    sky sits 0.6745 below its median in S/N. Find the asinh(a) that makes it so. Only the lower
+    half of the distribution is used because stars fill the upper half in crowded fields.
+    Measured against FITS on the five ready spots: sky values within 0.09 sigma (median),
+    sources within about 20%; the worst case is the crowded Cygnus field."""
+    sky = levels[:, ~_uncovered(levels)]
+    lo, hi = ((np.percentile(sky, q) + 0.5) / 255 for q in (25, 50))
 
-    def gap(asinh_a):          # interquartile range in S/N for this guess; grows with asinh_a
+    def gap(asinh_a):          # quartile-to-median distance in S/N; grows with asinh_a
         return SOFT_SIGMA * (np.sinh(hi * asinh_a) - np.sinh(lo * asinh_a))
     a0, a1 = 0.5, 12.0
     for _ in range(60):
         mid = (a0 + a1) / 2
-        a0, a1 = (mid, a1) if gap(mid) < 1.349 else (a0, mid)
+        a0, a1 = (mid, a1) if gap(mid) < 0.6745 else (a0, mid)
     return (a0 + a1) / 2
 
 
@@ -287,6 +311,136 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
             "bot": {"source": "shift_stack.py", "candidates": cands}}
 
 
+def fits_sky_grid(wcs, shape):
+    """Sky position of every pixel of the FITS-order (bottom-up) grid, as the repo scripts use."""
+    yy, xx = np.mgrid[0:shape[0], 0:shape[1]]
+    return wcs.pixel_to_world(xx, yy)
+
+
+def wavelength_map(path, in_wcs, wcs, shape, cells=8):
+    """Coarse wavelength map of one cutout on our grid: cells x cells values in microns, rows
+    top-down, at the centres of equal cells (field-schema.md section 7). Uses the spectral WCS
+    (key 'W'), exactly as download.wavelength_at does. None where the cutout has no pixel.
+    Also returns the bandwidth at the centre of the spot."""
+    from astropy.io import fits
+    from astropy.wcs import WCS
+    h, w = shape
+    cx = (np.arange(cells) + 0.5) * w / cells - 0.5                 # top-down grid pixels
+    cy = (np.arange(cells) + 0.5) * h / cells - 0.5
+    gx, gy = np.meshgrid(np.append(cx, (w - 1) / 2), np.append(cy, (h - 1) / 2))
+    sky = wcs.pixel_to_world(gx, h - 1 - gy)                        # back to FITS row order
+    px, py = in_wcs.world_to_pixel(sky)
+    with fits.open(path) as hdul:
+        hdr = hdul["IMAGE"].header
+        ny, nx = hdul["IMAGE"].data.shape
+        spectral = WCS(header=hdr, fobj=hdul, key="W")
+        spectral.sip = None           # SIP must be off for the spectral WCS (IRSA tutorial)
+        wl, bw = spectral.pixel_to_world(px, py)
+    wl, bw = wl.to_value("um"), bw.to_value("um")
+    inside = (px >= -0.5) & (px <= nx - 0.5) & (py >= -0.5) & (py <= ny - 0.5) & np.isfinite(wl)
+    grid = [[round(float(wl[j, i]), 4) if inside[j, i] else None for i in range(cells)]
+            for j in range(cells)]
+    centre_bw = round(float(bw[cells, cells]), 4) if inside[cells, cells] else None
+    return grid, centre_bw
+
+
+def quantize_plane(plane, noise):
+    """One exposure plane -> (u16 array, scale, offset, clipped). Linear, as the contract says.
+    The step never exceeds noise / 2 (so rounding adds under 2% to the noise); if the range is
+    too wide for that, the brightest pixels are clipped to 65534 and 'clipped' is True."""
+    lo, hi = float(np.nanmin(plane)), float(np.nanmax(plane))
+    offset = float(np.floor(lo * 1e4) / 1e4)
+    scale = max((hi - offset) / (NODATA - 1), 1e-9)
+    clipped = scale > noise / 2
+    if clipped:
+        scale = noise / 2
+    scale = float(f"{scale:.6g}") if clipped else float(np.ceil(scale * 1e7) / 1e7)
+    q = np.clip(np.rint((plane - offset) / scale), 0, NODATA - 1)
+    return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), scale, offset, bool(clipped)
+
+
+def export_exposures(folder, sky, out_dir):
+    """Every single exposure behind the frames, on the frames' grid (field-schema.md section 7).
+    folder: a motion_* folder with frames.csv and its downloaded cutouts in images/.
+    sky: the FITS-order sky grid (fits_sky_grid). Writes out_dir/exposures.u16 and
+    exposures.json; returns the JSON as a dict.
+    Reuses clean_band (zodi and background removed, MJy/sr) and resample unchanged, and keeps
+    the same planes build_frame keeps (more than 20% of the spot covered)."""
+    _repo_imports()
+    from astropy.io import fits
+    from astropy.table import Table
+    from astropy.time import Time
+    from motion_frames import noise_of
+    from spectral_bands import clean_band, resample, unique_images
+    from astropy.coordinates import SkyCoord
+    from spectral_bands import grid_wcs
+    h, w = sky.shape
+    ra, dec = folder_center(folder)
+    wcs, _ = grid_wcs(SkyCoord(ra, dec, unit="deg"), round(h * PIXEL_ARCSEC / 3600, 1))
+    urls = {}
+    cache = os.path.join(folder, "sia_results.ecsv")
+    if os.path.exists(cache):
+        urls = {(i["obs_id"], i["detector"]): i["url"] for i in unique_images(Table.read(cache))}
+    planes, items = [], []
+    for m in read_frames_csv(folder):
+        for name in m["files"]:
+            path = os.path.join(folder, "images", name)
+            img, in_wcs, _ = clean_band(path)
+            plane = resample(img, in_wcs, sky)
+            if not np.isfinite(plane).mean() > 0.2:
+                continue                                  # build_frame skips these too
+            noise = float(noise_of(plane))
+            obs_id, det = name[:-5].rsplit("_D", 1)
+            date_obs = str(fits.getheader(path, "IMAGE")["DATE-OBS"])
+            q, scale, offset, clipped = quantize_plane(plane[::-1], noise)   # rows top-down
+            grid, bandwidth = wavelength_map(path, in_wcs, wcs, (h, w))
+            mjd = float(Time(date_obs).mjd)
+            items.append({"k": len(items), "frame": m["i"], "mjd": round(mjd, 6),
+                          "utc": date_obs[:19], "detector": int(det), "obs_id": obs_id,
+                          "file": name, "source": urls.get((obs_id, int(det))),
+                          "scale": scale, "offset": offset, "noise": float(f"{noise:.5g}"),
+                          "clipped": clipped, "bandwidth_um": bandwidth, "wavelength_um": grid})
+            planes.append(q)
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "exposures.u16"), "wb") as f:
+        f.write(np.array(planes, dtype="<u2").tobytes())
+    info = {"file": "exposures.u16", "size": [w, h], "count": len(items), "units": "MJy/sr",
+            "nodata": NODATA, "wavelength_grid": 8, "exposures": items}
+    with open(os.path.join(out_dir, "exposures.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(info, f, separators=(",", ":"))
+        f.write("\n")
+    return info
+
+
+def read_exposures(spot_dir):
+    """Inverse of export_exposures: (planes K x H x W in MJy/sr with NaN, the JSON dict)."""
+    with open(os.path.join(spot_dir, "exposures.json"), encoding="utf-8") as f:
+        info = json.load(f)
+    w, h = info["size"]
+    q = np.fromfile(os.path.join(spot_dir, info["file"]), dtype="<u2").reshape(info["count"], h, w)
+    planes = np.array([np.where(q[e["k"]] == NODATA, np.nan, q[e["k"]] * e["scale"] + e["offset"])
+                       for e in info["exposures"]])
+    return planes, info
+
+
+def rebuild_frame(planes, noises):
+    """Reference for the browser's wavelength switch: merge exposure planes into one frame the
+    way motion_frames.build_frame does (each plane in noise units, 3-sigma-clipped mean of 3 or
+    more, plain mean of fewer, then divided by the frame's own noise). Rows stay as given."""
+    _repo_imports()
+    from astropy.stats import sigma_clip
+    from motion_frames import noise_of
+    sn = [p / n for p, n in zip(planes, noises)]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        if len(sn) >= 3:
+            frame = sigma_clip(np.array(sn), sigma=3, axis=0, cenfunc="median",
+                               stdfunc="mad_std", masked=True).mean(axis=0).filled(np.nan)
+        else:
+            frame = np.nanmean(sn, axis=0)
+    return frame / noise_of(frame)
+
+
 def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None, kind="asteroid",
                  fov=0.2, noise_bar=None, nothing_moves=False, answers_dir=None):
     """Export one spot. out_dir is web/public/fields; the answer key goes to answers_dir
@@ -329,6 +483,15 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
         "psf_fwhm_px": round(fwhm, 3),
         "has": {"exposures": False, "spectrum": False},
     }
+    images = os.path.join(folder, "images")
+    if precision == "float" and all(os.path.exists(os.path.join(images, name))
+                                    for m in meta for name in m["files"]):
+        export_exposures(folder, fits_sky_grid(wcs, (h, w)), spot)
+        field["has"]["exposures"] = True
+    else:                                    # no cutouts: drop stale files, hide the feature
+        for name in ("exposures.u16", "exposures.json"):
+            if os.path.exists(os.path.join(spot, name)):
+                os.remove(os.path.join(spot, name))
     write_json(os.path.join(spot, "field.json"), field)
     update_index(out_dir, {"slug": slug, "title": title, "ra": ra, "dec": dec, "fov_deg": fov,
                            "difficulty": difficulty, "kind": kind,

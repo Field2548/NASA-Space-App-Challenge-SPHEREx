@@ -2,7 +2,7 @@
  "slug": "hektor",
  "nothing_moves": false,
  "noise_bar_sigma": 6.4,
- "t_ref_mjd": 61034.33363,
+ "t_ref_mjd": 61034.33364,
  "objects": [
   {
    "id": "624",
@@ -15,35 +15,35 @@
      "x": 94.83,
      "y": 21.13,
      "in_grid": true,
-     "snr": 184.7
+     "snr": 250.2
     },
     {
      "frame": 2,
      "x": 59.39,
      "y": 58.41,
      "in_grid": true,
-     "snr": 129.5
+     "snr": 172.4
     },
     {
      "frame": 3,
      "x": 54.0,
      "y": 64.17,
      "in_grid": true,
-     "snr": 107.2
+     "snr": 143.3
     },
     {
      "frame": 4,
      "x": 48.83,
      "y": 69.7,
      "in_grid": true,
-     "snr": 146.8
+     "snr": 195.6
     },
     {
      "frame": 5,
      "x": 38.07,
      "y": 81.29,
      "in_grid": true,
-     "snr": 143.7
+     "snr": 193.4
     }
    ],
    "vx_px_per_day": -39.916,

@@ -2,7 +2,7 @@
  "slug": "cygnus",
  "nothing_moves": true,
  "noise_bar_sigma": 8.4,
- "t_ref_mjd": 61176.263759,
+ "t_ref_mjd": 61176.263763,
  "objects": [],
  "bot": {
   "source": "shift_stack.py",

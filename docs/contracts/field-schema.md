@@ -122,24 +122,37 @@ Never import this from client code and never copy it under `public/`.
 
 ## 7. `exposures.u16` + `exposures.json` (phase 2, optional)
 
-`exposures.u16`: `K x H x W` little-endian Uint16, rows top-down, `65535` = no data. Each exposure has its **own** `scale` and `offset`; values are surface brightness in MJy/sr after zodiacal-light and background subtraction: `MJy/sr = value * scale + offset`.
+`exposures.u16`: `K x H x W` little-endian Uint16, rows top-down, `65535` = no data. Each exposure has its **own** `scale` and `offset`; values are surface brightness in MJy/sr after zodiacal-light and background subtraction: `MJy/sr = value * scale + offset`. Written only for `precision: "float"` spots whose cutouts were available (`has.exposures`). About 1 MB for a 119 px spot.
 
 ```json
 {
-  "file": "exposures.u16", "size": [119, 119], "count": 32, "units": "MJy/sr", "nodata": 65535,
+  "file": "exposures.u16", "size": [119, 119], "count": 34, "units": "MJy/sr", "nodata": 65535,
   "wavelength_grid": 8,
   "exposures": [
-    { "k": 0, "frame": 1, "mjd": 60865.7521, "utc": "2025-07-09T18:02:59", "detector": 3,
-      "obs_id": "2025W28_1B_0502_1", "file": "2025W28_1B_0502_1_D3.fits", "source": "IRSA/S3 path of the file",
-      "scale": 0.0004, "offset": -2.1, "noise": 0.031,
-      "wavelength_um": [[1.71, 1.71, 1.72, 1.72, 1.73, 1.73, 1.74, 1.74]] } ]
+    { "k": 0, "frame": 1, "mjd": 60865.750596, "utc": "2025-07-09T18:00:51", "detector": 3,
+      "obs_id": "2025W28_1B_0502_1", "file": "2025W28_1B_0502_1_D3.fits",
+      "source": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/...",
+      "scale": 0.0006442, "offset": -0.3108, "noise": 0.012676, "clipped": false,
+      "bandwidth_um": 0.0537,
+      "wavelength_um": [[null, null, null, 2.1357, 2.1328, 2.1299, 2.127, 2.1241]] } ]
 }
 ```
 
-- `k` is the plane index in `exposures.u16`. `frame` is the frame number (from 1) this exposure belongs to.
+- `k` is the plane index in `exposures.u16`. `frame` is the frame number (from 1) this exposure belongs to. Exposures are listed frame by frame; a frame has `n_bands` of them.
+- `mjd` / `utc` is the start of the exposure (`DATE-OBS`). `source` is the full IRSA image the cutout came from (provenance), or `null`.
 - `noise` is the sigma-clipped standard deviation of the plane, in MJy/sr.
-- `wavelength_um` is an 8 x 8 grid (8 rows top-down, each 8 columns): the wavelength seen at the centre of each of 8 x 8 equal cells of the spot. Cell `(cx, cy)` is centred on pixel `((cx + 0.5) * W / 8 - 0.5, (cy + 0.5) * H / 8 - 0.5)`. Interpolate bilinearly. `null` = no data there.
-- Not written for `png8` spots (`has.exposures` is false).
+- `scale` is at most `noise / 2`. If the plane's range is too wide for that, the brightest pixels are clipped to `65534` and `clipped` is `true` (their real value is higher).
+- `wavelength_um` is an 8 x 8 grid (8 rows top-down, each 8 columns): the wavelength seen at the centre of each of 8 x 8 equal cells of the spot. Cell `(cx, cy)` is centred on pixel `((cx + 0.5) * W / 8 - 0.5, (cy + 0.5) * H / 8 - 0.5)`. Interpolate bilinearly. `null` = the exposure does not cover that cell. `bandwidth_um` is the band width at the centre of the spot (`null` if not covered).
+
+**Rebuilding a frame from exposures** (what the wavelength switch does; reference code is `rebuild_frame` in `pipeline/export_web.py`, the same maths as `build_frame` in `motion_frames.py`):
+
+1. Pick the exposures of one frame that pass the filter (detector or wavelength).
+2. Turn each plane into noise units: `plane / noise`.
+3. Per pixel: with 3 or more planes, a 3-sigma-clipped mean (centre = median, spread = 1.4826 x median absolute deviation, repeat until nothing more is clipped); with 1 or 2 planes, the plain mean ignoring NaN (show the "fewer than 3" notice: cosmic rays are not removed).
+4. Divide the result by its own noise (sigma-clipped standard deviation, 2.5 sigma, 5 rounds).
+5. Blank every pixel that is NaN in any of the frames shown, then use one shared stretch.
+
+With all exposures of a frame selected, this reproduces `frames.u16` to a median of about 0.03 sigma (tested in `pipeline/tests`).
 
 ## 8. `spectrum/index.json` + tiles (phase 3, optional)
 
