@@ -22,6 +22,15 @@ Your job in one line: create the web app from nothing and build everything a pla
 - [ ] Empty routes: `/`, `/tutorial`, `/play`, `/embed`, `/about`, `/credits`. First Vercel **preview** deploy (HUMAN links project; until then local only, say so on the board).
 - [ ] `docs/credits/game.csv`: Next.js, React, Orbitron, JetBrains Mono, lucide-react, vitest, Playwright.
 
+## Adopted from research (docs/research/*.md)
+
+- Blink starts paused, max 3 fps, play/pause plus numbered frame buttons; per-frame strip always visible so one-frame artifacts are obvious.
+- Marking allows "not visible in this frame"; marks must fit straight-line motion before Submit is enabled.
+- Tutorial includes a false-positive gallery: cosmic ray (one frame only), static star (same place every frame), bad frame (flag, do not report).
+- Field guide one click away at all times; tutorial levels replayable.
+- Asinh knee stored as one named constant and tested against astropy `AsinhStretch` output.
+- Canvas: `role="img"` with a live `aria-label`, an `aria-live` readout, arrow keys step frames.
+
 ## Phase 1 (04:00 - 08:00): MVP safety-net demo
 
 - [ ] `lib/coords.ts` (`parseCoordinates`, `formatRA`, `formatDec`) with vitest for every format in BP 8.3 and bad input.
