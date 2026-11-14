@@ -363,10 +363,25 @@ def quantize_plane(plane, noise):
     return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), scale, offset, bool(clipped)
 
 
-def export_exposures(folder, sky, out_dir):
+def grid_for_shape(ra, dec, shape):
+    """The north-up grid (spectral_bands.grid_wcs) that has exactly this (height, width).
+    grid_wcs takes a field of view and returns 2 * half + 1 pixels, so pass the field of view
+    that makes half = (height - 1) / 2. Only odd, square grids exist in this project."""
+    _repo_imports()
+    from astropy.coordinates import SkyCoord
+    from spectral_bands import grid_wcs
+    h, w = shape
+    wcs, got = grid_wcs(SkyCoord(ra, dec, unit="deg"), (h - 1) * PIXEL_ARCSEC / 3600)
+    if tuple(got) != (h, w):
+        raise ValueError(f"no centred grid of {w}x{h} pixels; pass wcs")
+    return wcs
+
+
+def export_exposures(folder, sky, out_dir, wcs=None):
     """Every single exposure behind the frames, on the frames' grid (field-schema.md section 7).
     folder: a motion_* folder with frames.csv and its downloaded cutouts in images/.
-    sky: the FITS-order sky grid (fits_sky_grid). Writes out_dir/exposures.u16 and
+    sky: the FITS-order sky grid (fits_sky_grid). wcs: the frames' own WCS (pass it; it is
+    rebuilt from the grid size when omitted). Writes out_dir/exposures.u16 and
     exposures.json; returns the JSON as a dict.
     Reuses clean_band (zodi and background removed, MJy/sr) and resample unchanged, and keeps
     the same planes build_frame keeps (more than 20% of the spot covered)."""
@@ -376,11 +391,10 @@ def export_exposures(folder, sky, out_dir):
     from astropy.time import Time
     from motion_frames import noise_of
     from spectral_bands import clean_band, resample, unique_images
-    from astropy.coordinates import SkyCoord
-    from spectral_bands import grid_wcs
     h, w = sky.shape
     ra, dec = folder_center(folder)
-    wcs, _ = grid_wcs(SkyCoord(ra, dec, unit="deg"), round(h * PIXEL_ARCSEC / 3600, 1))
+    if wcs is None:
+        wcs = grid_for_shape(ra, dec, (h, w))
     urls = {}
     cache = os.path.join(folder, "sia_results.ecsv")
     if os.path.exists(cache):
@@ -494,7 +508,7 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     images = os.path.join(folder, "images")
     if precision == "float" and all(os.path.exists(os.path.join(images, name))
                                     for m in meta for name in m["files"]):
-        export_exposures(folder, fits_sky_grid(wcs, (h, w)), spot)
+        export_exposures(folder, fits_sky_grid(wcs, (h, w)), spot, wcs=wcs)
         field["has"]["exposures"] = True
     else:                                    # no cutouts: drop stale files, hide the feature
         for name in ("exposures.u16", "exposures.json"):

@@ -241,3 +241,65 @@ def test_public_guard_refuses_answers_under_public(tmp_path):
         ew.export_field(str(tmp_path / "x"), "x", "t", "easy",
                         str(tmp_path / "web" / "public" / "fields"),
                         answers_dir=str(tmp_path / "web" / "public" / "answers"))
+
+
+# ------------------------------------------------------------------ sample (no FITS needed)
+SAMPLE_PATH = os.path.join(HERE, "ref", "fits_sample.json")
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_committed_frames_match_fits_sample(slug):
+    """Like test_export_equals_fits_within_half_a_step, but reads only the committed sample
+    (ref/fits_sample.json, made by make_fits_sample.py from frames.fits). Never opens frames.fits."""
+    with open(SAMPLE_PATH, encoding="utf-8") as f:
+        sample = json.load(f)[slug]
+    field, frames, _ = load(slug)
+    assert list(frames.shape) == sample["shape"]
+    flat = frames.reshape(-1)
+    idx = np.array(sample["index"])
+    got = flat[idx]
+    want = np.array([np.nan if v is None else v for v in sample["value"]], dtype=float)
+    assert np.array_equal(np.isnan(want), np.isnan(got))
+    ok = ~np.isnan(want)
+    assert np.all(np.abs(got[ok] - want[ok]) <= field["data"]["scale"] / 2 + 1e-6)
+
+
+# ------------------------------------------------------------------ metadata and leaks
+@pytest.mark.parametrize("slug", SLUGS)
+def test_frame_metadata_matches_frames_csv(slug):
+    field, _, _ = load(slug)
+    rows = ew.read_frames_csv(os.path.join(ROOT, SPOT[slug]["folder"]))
+    assert len(rows) == len(field["frames"])
+    for k, row in enumerate(rows):
+        fr = field["frames"][k]
+        assert fr["n_bands"] == row["n_bands"]
+        assert fr["detectors"] == row["detectors"]
+        assert abs(fr["hours_since_prev"] - row["hours_since_prev"]) <= 0.011
+
+
+ANSWER_KEYS = {"positions", "candidates", "objects", "bot", "noise_bar_sigma", "nothing_moves",
+               "t_ref_mjd", "above_noise_bar", "stacked_snr", "reveal"}
+
+
+def _all_keys(obj):
+    """Every dictionary key anywhere in a parsed JSON value."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield k
+            yield from _all_keys(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _all_keys(v)
+
+
+def test_no_answer_data_in_any_public_file():
+    public = os.path.join(ROOT, "web", "public")
+    for root, _, files in os.walk(public):
+        for name in files:
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(root, name)
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            leaked = sorted(set(_all_keys(data)) & ANSWER_KEYS)
+            assert not leaked, f"{os.path.relpath(path, ROOT)} has answer key(s): {leaked}"
