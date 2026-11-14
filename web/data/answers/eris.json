@@ -1,0 +1,90 @@
+{
+ "slug": "eris",
+ "nothing_moves": false,
+ "noise_bar_sigma": 5.9,
+ "t_ref_mjd": 61049.563358,
+ "objects": [
+  {
+   "id": "136199",
+   "name": "136199 Eris (2003 UB313)",
+   "kind": "dwarf-planet",
+   "source": "JPL Horizons",
+   "positions": [
+    {
+     "frame": 1,
+     "x": 27.98,
+     "y": 30.55,
+     "in_grid": true,
+     "snr": 3.1
+    },
+    {
+     "frame": 2,
+     "x": 29.06,
+     "y": 29.2,
+     "in_grid": true,
+     "snr": 3.7
+    },
+    {
+     "frame": 3,
+     "x": 30.01,
+     "y": 27.79,
+     "in_grid": true,
+     "snr": 2.7
+    },
+    {
+     "frame": 4,
+     "x": 31.12,
+     "y": 25.7,
+     "in_grid": true,
+     "snr": 2.4
+    },
+    {
+     "frame": 5,
+     "x": 31.79,
+     "y": 24.07,
+     "in_grid": true,
+     "snr": 7.8
+    }
+   ],
+   "vx_px_per_day": 0.736,
+   "vy_px_per_day": -1.259
+  }
+ ],
+ "bot": {
+  "source": "shift_stack.py",
+  "candidates": [
+   {
+    "rank": 1,
+    "x": 30,
+    "y": 28,
+    "vx_px_per_day": 0.663,
+    "vy_px_per_day": -1.245,
+    "stacked_snr": 6.86,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     2.2,
+     3.0,
+     2.9,
+     3.4,
+     3.8
+    ]
+   },
+   {
+    "rank": 2,
+    "x": 43,
+    "y": 32,
+    "vx_px_per_day": -3.99,
+    "vy_px_per_day": -2.602,
+    "stacked_snr": 6.24,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     4.4,
+     1.9,
+     3.5,
+     0.7,
+     3.8
+    ]
+   }
+  ]
+ }
+}
