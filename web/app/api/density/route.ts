@@ -1,4 +1,4 @@
-// GET /api/density?layer=finds|checked&order=&who=me|all  Contract: docs/contracts/api.md section 8.
+// GET /api/density?layer=finds|checked&order=&who=me|others|all  Contract: docs/contracts/api.md section 8.
 // HEALPix NESTED cell counts. No database (or a database that fails): source "none", no cells.
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -10,14 +10,14 @@ import { rateLimit } from "@/lib/server/rateLimit";
 const Query = z.object({
   layer: z.enum(["finds", "checked"]),
   order: z.coerce.number().int().min(0).max(12).default(4),
-  who: z.enum(["me", "all"]).default("all"),
+  who: z.enum(["me", "others", "all"]).default("all"),
 });
 
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
     rateLimit(request, "density", 60);
     const q = parse(Query, queryObject(request));
-    if (q.who === "me" && !(await userFromRequest(request))) {
+    if (q.who !== "all" && !(await userFromRequest(request))) {
       throw new ApiFail("unauthorized", "Log in to see your own layer.");
     }
     const empty = { layer: q.layer, order: q.order, who: q.who, source: "none" as const, max: 0, cells: [] };
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (!sb) return NextResponse.json(empty);
     try {
       const { data, error } = await sb
-        .rpc("density", { p_layer: q.layer, p_order: q.order, p_mine: q.who === "me" })
+        .rpc("density", { p_layer: q.layer, p_order: q.order, p_who: q.who })
         .abortSignal(AbortSignal.timeout(5000));
       if (error || !Array.isArray(data)) return NextResponse.json(empty);
       const cells = (data as { ipix: number | string; n: number | string }[])

@@ -1,12 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { statusLabel } from "@/lib/statusLabel";
 
 type Status = "green" | "amber" | "red";
-type Service = { id: string; name: string; status: Status; ms: number; http: number | null; message: string };
-type Report = { checked_at: string; overall: Status; services: Service[] };
+type Service = {
+  id: string;
+  name: string;
+  status: Status;
+  ms: number;
+  http: number | null;
+  message: string;
+  configured?: boolean;
+};
+type Report = { checked_at: string; overall: Status; services: Service[]; warnings?: string[] };
 
-const WORD: Record<Status, string> = { green: "Working", amber: "Slow", red: "Not answering" };
 const COLOR: Record<Status, string> = { green: "var(--cyan)", amber: "var(--amber)", red: "var(--magenta)" };
 
 export function StatusList() {
@@ -45,6 +53,15 @@ export function StatusList() {
         {failed && "Could not reach the status check. Try again in a moment."}
         {report && !failed && `Last checked ${new Date(report.checked_at).toLocaleTimeString()}.`}
       </div>
+      {report?.warnings?.length ? (
+        <div role="status" style={{ display: "grid", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
+          {report.warnings.map((w) => (
+            <p key={w} style={{ margin: 0, color: "var(--amber)" }}>
+              {w}
+            </p>
+          ))}
+        </div>
+      ) : null}
       {report && (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "var(--space-2)" }}>
           {report.services.map((s) => (
@@ -72,12 +89,16 @@ export function StatusList() {
               />
               <div>
                 <div>
-                  {s.name} <strong style={{ color: COLOR[s.status] }}>{WORD[s.status]}</strong>
+                  {s.name} <strong style={{ color: COLOR[s.status] }}>{statusLabel(s)}</strong>
                 </div>
                 <div style={{ color: "var(--text-dim)", fontSize: 13 }}>{s.message}</div>
               </div>
               <div style={{ color: "var(--text-dim)", fontSize: 13, textAlign: "right" }}>
-                {s.http === null && s.status === "red" ? "no answer" : `${s.ms} ms`}
+                {s.configured === false
+                  ? null
+                  : s.http === null && s.status === "red"
+                    ? "no answer"
+                    : `${s.ms} ms`}
               </div>
             </li>
           ))}

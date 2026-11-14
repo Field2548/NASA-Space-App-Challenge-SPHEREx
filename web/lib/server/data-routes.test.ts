@@ -139,6 +139,23 @@ describe("GET /api/density", () => {
     const withToken = await density(get("/api/density?layer=finds&who=me", { authorization: "Bearer abc" }));
     expect(withToken.status).toBe(401);
   });
+  it("who=others without a login is 401, like who=me", async () => {
+    const res = await density(get("/api/density?layer=finds&who=others"));
+    expect(res.status).toBe(401);
+    expect((await res.json()).error.code).toBe("unauthorized");
+    const withToken = await density(get("/api/density?layer=checked&who=others", { authorization: "Bearer abc" }));
+    expect(withToken.status).toBe(401);
+  });
+  it("who=all without a database is the empty shape with who all", async () => {
+    const res = await density(get("/api/density?layer=checked&who=all"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ layer: "checked", order: 4, who: "all", source: "none", max: 0, cells: [] });
+  });
+  it("who=bogus is 400", async () => {
+    const res = await density(get("/api/density?layer=finds&who=bogus"));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("bad_request");
+  });
   it("rejects bad input with 400", async () => {
     for (const url of [
       "/api/density",

@@ -279,6 +279,7 @@ Checks every outside service in parallel, 5 s each, cached 60 s. Always `200`.
 - `id` is one of `irsa_sia`, `irsa_s3`, `cds_sesame`, `cds_hips`, `simbad_tap`, `gaia_tap`, `jpl_horizons`, `jpl_sbident`, `supabase`.
 - `status`: `green` (answered under 2 s), `amber` (slow, or not configured), `red` (failed or timed out). `overall` is the worst one, but `supabase` not configured counts as `amber`, never `red`.
 - `warnings` (optional, added in 1.2): problems in our own setup that are not an outside service, as plain sentences for the status page. Absent when there are none. Today the only one is `"UNLOCK_SECRET is not set: finished spots will lock again."`, in production when no secret signs the unlock cookie (section 2). Warnings do not change `overall`.
+- `configured` (optional, added in 1.2): `false` only for `supabase` when no database URL is set (its `status` is then `amber` and clients show "Not connected" with no time); it is omitted for every other service.
 - The `jpl_sbident` probe asks for numbered comets in a 0.01 degree field for a geocentric observer (`xobs=0,0,0,0,0,0`): about 0.7 s. The all-asteroid search of a 0.1 degree field took about 18 s, longer than the 5 s probe.
 
 ## 11. `GET /api/keepalive` and `GET /api/s3range?key=`

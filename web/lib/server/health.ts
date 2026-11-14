@@ -12,6 +12,8 @@ export type ServiceHealth = {
   ms: number;
   http: number | null;
   message: string;
+  /** False only for supabase when no database URL is set. Omitted otherwise (additive, contract 10). */
+  configured?: boolean;
 };
 
 export type HealthReport = {
@@ -148,6 +150,7 @@ const SUPABASE_OFF: ServiceHealth = {
   ms: 0,
   http: null,
   message: "No database is connected. Guest play works; scores are not saved.",
+  configured: false,
 };
 
 const TIMED_OUT = Symbol("timeout");

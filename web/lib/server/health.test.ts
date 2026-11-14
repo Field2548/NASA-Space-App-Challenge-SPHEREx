@@ -95,10 +95,16 @@ describe("checkAll", () => {
     const s = r.services.find((x) => x.id === "supabase")!;
     expect(s.status).toBe("amber");
     expect(s.http).toBeNull();
+    expect(s.configured).toBe(false);
     expect(s.message).toBe("No database is connected. Guest play works; scores are not saved.");
     expect(r.services).toHaveLength(9);
     expect(r.overall).toBe("amber");
     expect(f.mock.calls).toHaveLength(8);
+  });
+
+  it("configured is omitted for every service when supabase is set up", async () => {
+    const r = await checkAll(asFetch(fakeFetch(() => ok())), Date.now, 5000, SB);
+    expect(r.services.every((s) => s.configured === undefined)).toBe(true);
   });
 
   it("a red service beats the supabase amber", async () => {
@@ -161,8 +167,11 @@ describe("GET /api/health", () => {
     expect(Object.keys(body).sort()).toEqual(["checked_at", "overall", "services"]);
     expect(body.overall).toBe("red");
     expect(body.services.map((s: { id: string }) => s.id)).toEqual(IDS);
+    const base = ["http", "id", "message", "ms", "name", "status"];
     for (const s of body.services) {
-      expect(Object.keys(s).sort()).toEqual(["http", "id", "message", "ms", "name", "status"]);
+      // Only the unconfigured supabase row carries the additive `configured` field.
+      expect(Object.keys(s).sort()).toEqual(s.id === "supabase" ? [...base, "configured"].sort() : base);
     }
+    expect(body.services.find((s: { id: string }) => s.id === "supabase").configured).toBe(false);
   });
 });
