@@ -13,3 +13,4 @@ jsdom 31.0.1,jsdom contributors,https://github.com/jsdom/jsdom,MIT,test DOM,2026
 @testing-library/dom 10.4.2,Kent C. Dodds,https://github.com/testing-library/dom-testing-library,MIT,component tests,2026-11-15
 Machado et al. 2009 colour-vision simulation,"Machado, Oliveira, Fernandes",https://doi.org/10.1109/TVCG.2009.113,idea (paper),colour-blind palette check,2026-11-15
 CIEDE2000 colour difference,"Sharma, Wu, Dalal",https://doi.org/10.1002/col.20070,idea (paper),palette distance check,2026-11-15
+@vitest/coverage-v8 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,test coverage,2026-11-15

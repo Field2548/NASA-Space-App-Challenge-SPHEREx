@@ -117,7 +117,7 @@ export interface CheckResponse {
   first_finder: boolean;
   already_found: boolean;
   persisted: boolean;
-  /** True only after a correct verdict (known, bot_match, nothing_correct); a wrong answer leaves the spot locked. */
+  /** True after a correct verdict (known, bot_match, nothing_correct) or when the spot was already open (practice); a wrong answer on a locked spot leaves it locked. */
   unlocked: boolean;
   /** The spot was already open for this player: judged, but 0 points. */
   practice?: boolean;
