@@ -69,7 +69,7 @@ need from GAME: confirm u16 layout in docs/contracts/field-schema.md
 **3.3 Pull requests = delivery.**
 - Work on your own branch (`web-data`, `web-game`, `web-server`). Commit small and often, push after every commit.
 - Never push straight to `web`; it changes only through `gh pr merge --squash`. This avoids rejected pushes when two agents land at once.
-- Open a PR into `web` at every milestone. In the PR body paste the summary line of your local test run (pytest, vitest, `next build`); there is no CI, so this is the green check. Merge only after the reviewer approves (`gh pr review --approve`), or after 20 minutes of silence with that test line present (then comment "merging, no review").
+- Open a PR into `web` at every milestone, and at least every 2 hours (a slice is fine). CI (`.github/workflows/web.yml`: lint, typecheck, vitest, `next build` on `web/`) runs on every PR; Python changes paste their pytest summary line in the PR body. Red CI never merges. Merge when CI is green and the reviewer approved (`gh pr review --approve`), or CI is green and 20 minutes passed with no review (then comment "merging, no review").
 - Review pairs: DATA reviews GAME, GAME reviews SERVER, SERVER reviews DATA. Add the reviewer with `gh pr edit --add-reviewer <login>` and tag their role on the board.
 - Review means: run it, read the diff for contract breaks, then `gh pr review --approve` or `--request-changes -b "..."`. Do not rewrite their code; request a change.
 
@@ -78,6 +78,8 @@ need from GAME: confirm u16 layout in docs/contracts/field-schema.md
 scripts/poll.sh <data|game|server>   # read-only: issues to you, ask-human, PRs, board #2, new commits on web
 git pull --rebase origin web         # onto your branch, after committing your work
 ```
+
+**3.4b Blocked and silent.** Blocked more than 15 minutes: post it on the board, take the next item from your own plan, and never stub a file another agent owns. An agent silent on the board for 2 hours: its review-pair partner opens a `blocked` issue and comments on #3 with the default "the partner takes its next item".
 
 **3.5 Contract changes.** Shared formats live in `docs/contracts/`: `field-schema.md`, `api.md`, `types.md`. To change one, open an issue labelled `contract` with the exact before and after, tag the other two agents, wait for both to comment "ok" (or 20 minutes), then change the file and announce on the board. Never change a contract silently.
 
@@ -138,4 +140,4 @@ The owner of a cut item announces the cut on the board so nobody builds against 
 
 ## 9. Definition of done (team)
 
-BP section 19 checklist. Each plan lists its own share. The SERVER agent runs the final checklist on the live URL and posts the result on the board; the human submits.
+BP section 19 checklist. Each plan lists its own share. Before any agent posts "done" (a milestone or its whole plan), it spawns an adversarial subagent that tries to break the work from live state only: re-runs tests and builds, re-reads files, issues and PRs, and loads the URL. It is given paths and claims, never the agent's conclusions. The agent fixes what it finds and posts the subagent's verdict with the commands it ran. The SERVER agent runs the final checklist on the live URL and posts the result on the board; the human submits.
