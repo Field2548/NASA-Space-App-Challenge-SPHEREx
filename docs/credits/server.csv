@@ -1,0 +1,13 @@
+name,author,link,license,used_for,date_checked
+Supabase (hosted Auth and Postgres),Supabase Inc.,https://supabase.com/,service (free plan; terms of service),"login, profiles, finds, visits, spot requests (planned, phase 3)",2026-11-15
+@supabase/supabase-js,Supabase Inc.,https://github.com/supabase/supabase-js,MIT,"database and auth client in web/lib/supabase.ts (planned, phase 3)",2026-11-15
+Vercel,Vercel Inc.,https://vercel.com/,service (Hobby plan; terms of service),"hosting, route handlers, daily cron for /api/keepalive",2026-11-15
+zod,Colin McDonnell,https://github.com/colinhacks/zod,MIT,"input validation on every API route",2026-11-15
+@hscmap/healpix,Koike Michitaro,https://github.com/michitaro/healpix,MIT,"HEALPix NESTED cell maths for the density layers (web/lib/healpix.ts; planned, phase 2)",2026-11-15
+Aladin Lite v3,"Thomas Boch and Matthieu Baumann, CDS, Strasbourg Observatory",https://github.com/cds-astro/aladin-lite,"GPL-3.0 per the build prompt; the npm package.json says LGPL-3.0-or-later (confirm in the licence audit)","sky map viewer (web/components/SkyMap.tsx; planned, phase 2)",2026-11-15
+SPHEREx QR2 colour HiPS (CDS/P/SPHEREx/QR2/color),"CDS, Strasbourg Observatory; data from NASA/JPL-Caltech SPHEREx via IRSA",https://alasky.cds.unistra.fr/,ODbL-1.0,"all-sky background of the sky map (planned, phase 2)",2026-11-15
+CDS Sesame name resolver,"CDS, Strasbourg Observatory",https://cds.unistra.fr/cgi-bin/Sesame,free service; acknowledge CDS,"object name to coordinates in /api/resolve",2026-11-15
+SIMBAD database (TAP),"CDS, Strasbourg Observatory",https://simbad.cds.unistra.fr/simbad/,free service; cite Wenger et al. 2000 and acknowledge CDS,"object names, types and redshifts in /api/info (planned, phase 3)",2026-11-15
+Gaia DR3 (ESA Gaia archive TAP),ESA / Gaia / DPAC,https://gea.esac.esa.int/archive/,Gaia credit and citation guide (ESA/Gaia/DPAC acknowledgment),"star parallaxes and proper motions in /api/info (planned, phase 3)",2026-11-15
+JPL Horizons API,NASA/JPL-Caltech Solar System Dynamics,https://ssd.jpl.nasa.gov/api/horizons.api,public service; credit JPL Solar System Dynamics,"asteroid distances in /api/info and the status page (planned, phase 3)",2026-11-15
+JPL Small-Body Identification API,NASA/JPL-Caltech Solar System Dynamics,https://ssd-api.jpl.nasa.gov/doc/sb_ident.html,public service; credit JPL Solar System Dynamics,"checking quick-look marks against known asteroids (planned, phase 4)",2026-11-15
