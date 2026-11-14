@@ -1,0 +1,16 @@
+{
+  "scope": "all",
+  "slug": null,
+  "source": "snapshot",
+  "updated_at": "2026-11-14T21:32:34.340Z",
+  "rows": [
+    {
+      "rank": 1,
+      "name": "Shift-and-stack bot",
+      "score": 1750,
+      "accuracy": 0.5,
+      "is_bot": true,
+      "is_me": false
+    }
+  ]
+}
