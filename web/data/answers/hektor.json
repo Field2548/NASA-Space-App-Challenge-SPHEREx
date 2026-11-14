@@ -1,0 +1,218 @@
+{
+ "slug": "hektor",
+ "nothing_moves": false,
+ "noise_bar_sigma": 6.4,
+ "t_ref_mjd": 61034.33364,
+ "objects": [
+  {
+   "id": "624",
+   "name": "624 Hektor (A907 CF)",
+   "kind": "asteroid",
+   "source": "JPL Horizons",
+   "positions": [
+    {
+     "frame": 1,
+     "x": 94.83,
+     "y": 21.13,
+     "in_grid": true,
+     "snr": 250.2
+    },
+    {
+     "frame": 2,
+     "x": 59.39,
+     "y": 58.41,
+     "in_grid": true,
+     "snr": 172.4
+    },
+    {
+     "frame": 3,
+     "x": 54.0,
+     "y": 64.17,
+     "in_grid": true,
+     "snr": 143.3
+    },
+    {
+     "frame": 4,
+     "x": 48.83,
+     "y": 69.7,
+     "in_grid": true,
+     "snr": 195.6
+    },
+    {
+     "frame": 5,
+     "x": 38.07,
+     "y": 81.29,
+     "in_grid": true,
+     "snr": 193.4
+    }
+   ],
+   "vx_px_per_day": -39.916,
+   "vy_px_per_day": 42.241
+  }
+ ],
+ "bot": {
+  "source": "shift_stack.py",
+  "candidates": [
+   {
+    "rank": 1,
+    "x": 58,
+    "y": 60,
+    "vx_px_per_day": -40.351,
+    "vy_px_per_day": 43.859,
+    "stacked_snr": 8.94,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     138.5,
+     166.4,
+     50.7,
+     22.4,
+     4.4
+    ]
+   },
+   {
+    "rank": 2,
+    "x": 53,
+    "y": 84,
+    "vx_px_per_day": 52.282,
+    "vy_px_per_day": 3.859,
+    "stacked_snr": 6.8,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     2.3,
+     4.2,
+     3.7,
+     0.0,
+     3.6
+    ]
+   },
+   {
+    "rank": 3,
+    "x": 7,
+    "y": 35,
+    "vx_px_per_day": -1.754,
+    "vy_px_per_day": -55.791,
+    "stacked_snr": 6.55,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     2.7,
+     3.8,
+     1.2,
+     5.2,
+     2.9
+    ]
+   },
+   {
+    "rank": 4,
+    "x": 33,
+    "y": 101,
+    "vx_px_per_day": 45.265,
+    "vy_px_per_day": 13.684,
+    "stacked_snr": 6.25,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     0.0,
+     4.4,
+     5.3,
+     4.1,
+     0.5
+    ]
+   },
+   {
+    "rank": 5,
+    "x": 79,
+    "y": 31,
+    "vx_px_per_day": -34.736,
+    "vy_px_per_day": -36.844,
+    "stacked_snr": 6.24,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     2.7,
+     4.4,
+     1.8,
+     3.2,
+     2.2
+    ]
+   },
+   {
+    "rank": 6,
+    "x": 37,
+    "y": 43,
+    "vx_px_per_day": -53.684,
+    "vy_px_per_day": -8.773,
+    "stacked_snr": 6.19,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     2.5,
+     4.0,
+     3.6,
+     2.1,
+     1.7
+    ]
+   },
+   {
+    "rank": 7,
+    "x": 100,
+    "y": 94,
+    "vx_px_per_day": -19.298,
+    "vy_px_per_day": 36.14,
+    "stacked_snr": 6.16,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     3.8,
+     3.8,
+     2.4,
+     0.6,
+     3.1
+    ]
+   },
+   {
+    "rank": 8,
+    "x": 99,
+    "y": 8,
+    "vx_px_per_day": 5.264,
+    "vy_px_per_day": -14.387,
+    "stacked_snr": 6.13,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     138.5,
+     1.6,
+     1.4,
+     2.7,
+     3.9
+    ]
+   },
+   {
+    "rank": 9,
+    "x": 46,
+    "y": 32,
+    "vx_px_per_day": 51.581,
+    "vy_px_per_day": -52.984,
+    "stacked_snr": 6.12,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     2.6,
+     2.0,
+     5.1,
+     2.0,
+     3.0
+    ]
+   },
+   {
+    "rank": 10,
+    "x": 99,
+    "y": 83,
+    "vx_px_per_day": 1.054,
+    "vy_px_per_day": 48.07,
+    "stacked_snr": 6.07,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     4.0,
+     0.7,
+     5.3,
+     3.6,
+     1.3
+    ]
+   }
+  ]
+ }
+}
