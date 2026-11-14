@@ -9,8 +9,8 @@ board=2
 git fetch -q origin
 echo "== open issues to:$me"
 gh issue list --state open --label "to:$me"
-echo "== open asks to the human (check for answers)"
-gh issue list --state open --label "ask-human"
+echo "== human decisions #3, latest (a [HUMAN] comment overrides a default)"
+gh issue view 3 --comments | tail -n 20
 echo "== open PRs (review yours per the review pairs)"
 gh pr list --state open
 echo "== TEAM BOARD #$board, latest"

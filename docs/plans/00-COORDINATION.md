@@ -15,7 +15,7 @@ Source of truth for every detail: `docs/BUILD_PROMPT.md` (the full build prompt)
 | `PLAN-3-server-map.md` | **SERVER** | `web-server` | Supabase, all API routes, scoring, auth, scoreboard, sky map (Aladin), density layers, Inspect popup, status page, request queue, Vercel config and production deploy |
 | `PLAN-H-human-reserved.md` | **HUMAN** | n/a | Reserved for the human teammate: accounts, secrets, laptop data runs, approvals, submission. Agents never do these; they ask for them (section 5) |
 
-Integration branch: `web` (already on origin, made from `origin/Film`, which holds the Python pipeline, CLAUDE.md, `data/motion_*`). Agent branches use a dash (`web-game`), never a slash: git cannot hold `web/game` next to an existing `web` branch. Each agent runs on its own machine with its own GitHub account. Never push to `main` and never deploy to production without the human saying yes in an `ask-human` issue (3.6).
+Integration branch: `web` (already on origin, made from `origin/Film`, which holds the Python pipeline, CLAUDE.md, `data/motion_*`). Agent branches use a dash (`web-game`), never a slash: git cannot hold `web/game` next to an existing `web` branch. Each agent runs on its own machine with its own GitHub account. Never push to `main` and never deploy to production without the human saying yes in issue #3 (3.6).
 
 ## 2. File ownership (avoids merge conflicts)
 
@@ -81,7 +81,7 @@ git pull --rebase origin web         # onto your branch, after committing your w
 
 **3.5 Contract changes.** Shared formats live in `docs/contracts/`: `field-schema.md`, `api.md`, `types.md`. To change one, open an issue labelled `contract` with the exact before and after, tag the other two agents, wait for both to comment "ok" (or 20 minutes), then change the file and announce on the board. Never change a contract silently.
 
-**3.6 Human questions.** Batch them. Open one issue labelled `ask-human`, `to:human` with a checklist; the human answers in that issue (ticks plus a `[HUMAN]` comment) and closes it. Keep working on things that do not need the answer. Things that always need a yes: first production deploy, push to `main`, deleting anything, changing a Python function signature, loading the SPIFF pickle.
+**3.6 Human questions.** The humans are offline overnight, so agents run fully unattended. Every human decision is batched in issue **#3**, each with a default that is in effect until a `[HUMAN]` comment there overrides it. Never wait for an answer and never open another `ask-human` issue: a new question goes as one comment on #3 stating the default you are applying, then you carry on with it. Poll #3 for overrides. Only the gated items in #3 (production deploy, push to `main`, deletions, Python signature changes) stay undone until a yes. Loading the SPIFF pickle also needs a yes (default no).
 
 ## 4. Contracts to publish in the first 40 minutes (unblocks everyone)
 
