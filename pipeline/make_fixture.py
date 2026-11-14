@@ -8,6 +8,7 @@ before (and without) real data. See docs/contracts/field-schema.md section 10.
 per frame. Deterministic (seed 42): running it again rewrites identical files.
 This is NOT sky data and is never shown as a real spot.
 """
+import json
 import os
 import sys
 
@@ -72,10 +73,17 @@ def main():
         "has": {"exposures": False, "spectrum": False},
     }
     write_json(os.path.join(spot, "field.json"), field)
-    update_index(os.path.dirname(spot), {
-        "slug": "fixture", "title": field["title"], "ra": ra, "dec": dec,
-        "fov_deg": field["fov_deg"], "difficulty": "easy", "kind": "fixture",
-        "thumbnail": "fixture/thumbs/1.webp"})
+    # the fixture is listed in index.json only while no real spot has been exported
+    index = os.path.join(os.path.dirname(spot), "index.json")
+    real = False
+    if os.path.exists(index):
+        with open(index, encoding="utf-8") as f:
+            real = any(e["slug"] != "fixture" for e in json.load(f))
+    if not real:
+        update_index(os.path.dirname(spot), {
+            "slug": "fixture", "title": field["title"], "ra": ra, "dec": dec,
+            "fov_deg": field["fov_deg"], "difficulty": "easy", "kind": "fixture",
+            "thumbnail": "fixture/thumbs/1.webp"})
 
     t_ref = float(np.mean(mjds))
     vx, vy = MOVER["dx"] / STEP_DAYS, MOVER["dy"] / STEP_DAYS

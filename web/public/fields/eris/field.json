@@ -1,0 +1,116 @@
+{
+ "slug": "eris",
+ "title": "(136199) Eris",
+ "kind": "dwarf-planet",
+ "difficulty": "boss",
+ "ra": 26.3271,
+ "dec": -0.4338,
+ "fov_deg": 0.1,
+ "pixel_arcsec": 6.15,
+ "size": [
+  59,
+  59
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   26.3271,
+   -0.4338
+  ],
+  "crpix": [
+   30.0,
+   30.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 61047.05341,
+   "utc": "2026-01-07T01:16:55",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 61048.204827,
+   "utc": "2026-01-08T04:54:57",
+   "hours_since_prev": 27.63,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 61049.358593,
+   "utc": "2026-01-09T08:36:22",
+   "hours_since_prev": 27.69,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61050.988521,
+   "utc": "2026-01-10T23:43:28",
+   "hours_since_prev": 39.12,
+   "n_bands": 6,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61052.211442,
+   "utc": "2026-01-12T05:04:29",
+   "hours_since_prev": 29.35,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0876,
+  "offset": -5.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 294.289
+ },
+ "psf_fwhm_px": 1.647,
+ "has": {
+  "exposures": false,
+  "spectrum": false
+ }
+}

@@ -1,0 +1,55 @@
+{
+ "slug": "eros",
+ "nothing_moves": false,
+ "noise_bar_sigma": null,
+ "t_ref_mjd": 60866.214098,
+ "objects": [
+  {
+   "id": "433",
+   "name": "433 Eros (A898 PA)",
+   "kind": "asteroid",
+   "source": "JPL Horizons",
+   "positions": [
+    {
+     "frame": 1,
+     "x": 83.56,
+     "y": 78.71,
+     "in_grid": true,
+     "snr": 721.2
+    },
+    {
+     "frame": 2,
+     "x": 54.03,
+     "y": 54.46,
+     "in_grid": true,
+     "snr": 582.3
+    },
+    {
+     "frame": 3,
+     "x": 39.52,
+     "y": 42.53,
+     "in_grid": true,
+     "snr": 760.2
+    },
+    {
+     "frame": 4,
+     "x": -33.96,
+     "y": -18.0,
+     "in_grid": false
+    },
+    {
+     "frame": 5,
+     "x": -224.59,
+     "y": -176.17,
+     "in_grid": false
+    }
+   ],
+   "vx_px_per_day": -216.124,
+   "vy_px_per_day": -178.821
+  }
+ ],
+ "bot": {
+  "source": "shift_stack.py",
+  "candidates": []
+ }
+}

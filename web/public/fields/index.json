@@ -1,12 +1,52 @@
 [
  {
-  "slug": "fixture",
-  "title": "Fixture (synthetic test spot)",
-  "ra": 150.0,
-  "dec": 2.0,
-  "fov_deg": 0.0547,
+  "slug": "eros",
+  "title": "(433) Eros",
+  "ra": 13.2004,
+  "dec": 14.38,
+  "fov_deg": 0.2,
   "difficulty": "easy",
-  "kind": "fixture",
-  "thumbnail": "fixture/thumbs/1.webp"
+  "kind": "asteroid",
+  "thumbnail": "eros/thumbs/1.webp"
+ },
+ {
+  "slug": "hektor",
+  "title": "(624) Hektor",
+  "ra": 184.3049,
+  "dec": -6.3773,
+  "fov_deg": 0.2,
+  "difficulty": "medium",
+  "kind": "asteroid",
+  "thumbnail": "hektor/thumbs/1.webp"
+ },
+ {
+  "slug": "makemake",
+  "title": "(136472) Makemake",
+  "ra": 200.0075,
+  "dec": 21.523,
+  "fov_deg": 0.1,
+  "difficulty": "hard",
+  "kind": "dwarf-planet",
+  "thumbnail": "makemake/thumbs/1.webp"
+ },
+ {
+  "slug": "eris",
+  "title": "(136199) Eris",
+  "ra": 26.3271,
+  "dec": -0.4338,
+  "fov_deg": 0.1,
+  "difficulty": "boss",
+  "kind": "dwarf-planet",
+  "thumbnail": "eris/thumbs/1.webp"
+ },
+ {
+  "slug": "cygnus",
+  "title": "Cygnus control field",
+  "ra": 304.6935,
+  "dec": 42.4437,
+  "fov_deg": 0.2,
+  "difficulty": "control",
+  "kind": "control",
+  "thumbnail": "cygnus/thumbs/1.webp"
  }
 ]

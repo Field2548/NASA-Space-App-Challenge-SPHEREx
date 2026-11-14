@@ -1,0 +1,172 @@
+{
+ "slug": "cygnus",
+ "nothing_moves": true,
+ "noise_bar_sigma": 8.4,
+ "t_ref_mjd": 61176.263759,
+ "objects": [],
+ "bot": {
+  "source": "shift_stack.py",
+  "candidates": [
+   {
+    "rank": 1,
+    "x": 13,
+    "y": 35,
+    "vx_px_per_day": 8.954,
+    "vy_px_per_day": -6.497,
+    "stacked_snr": 7.95,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     6.4,
+     6.7,
+     3.8,
+     1.9,
+     4.2
+    ]
+   },
+   {
+    "rank": 2,
+    "x": 16,
+    "y": 83,
+    "vx_px_per_day": -8.245,
+    "vy_px_per_day": -1.232,
+    "stacked_snr": 7.67,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     6.2,
+     4.4,
+     0.0,
+     9.9,
+     3.3
+    ]
+   },
+   {
+    "rank": 3,
+    "x": 63,
+    "y": 103,
+    "vx_px_per_day": -0.172,
+    "vy_px_per_day": -1.583,
+    "stacked_snr": 7.55,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     4.6,
+     10.1,
+     0.9,
+     17.7,
+     17.1
+    ]
+   },
+   {
+    "rank": 4,
+    "x": 27,
+    "y": 77,
+    "vx_px_per_day": 7.199,
+    "vy_px_per_day": -9.305,
+    "stacked_snr": 7.54,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     12.2,
+     4.4,
+     3.1,
+     0.0,
+     7.1
+    ]
+   },
+   {
+    "rank": 5,
+    "x": 41,
+    "y": 57,
+    "vx_px_per_day": 4.391,
+    "vy_px_per_day": 0.523,
+    "stacked_snr": 7.45,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     3.9,
+     4.9,
+     6.6,
+     3.0,
+     1.7
+    ]
+   },
+   {
+    "rank": 6,
+    "x": 79,
+    "y": 60,
+    "vx_px_per_day": 1.232,
+    "vy_px_per_day": -10.007,
+    "stacked_snr": 7.39,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     3.7,
+     3.1,
+     4.0,
+     4.3,
+     1.8
+    ]
+   },
+   {
+    "rank": 7,
+    "x": 51,
+    "y": 88,
+    "vx_px_per_day": -2.98,
+    "vy_px_per_day": -3.338,
+    "stacked_snr": 7.33,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     8.2,
+     21.6,
+     0.4,
+     6.7,
+     6.0
+    ]
+   },
+   {
+    "rank": 8,
+    "x": 72,
+    "y": 63,
+    "vx_px_per_day": -3.682,
+    "vy_px_per_day": -7.901,
+    "stacked_snr": 7.2,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     3.7,
+     3.2,
+     9.3,
+     1.2,
+     4.8
+    ]
+   },
+   {
+    "rank": 9,
+    "x": 46,
+    "y": 79,
+    "vx_px_per_day": 9.305,
+    "vy_px_per_day": -7.199,
+    "stacked_snr": 7.15,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     5.9,
+     5.7,
+     2.3,
+     14.4,
+     0.0
+    ]
+   },
+   {
+    "rank": 10,
+    "x": 78,
+    "y": 21,
+    "vx_px_per_day": 5.444,
+    "vy_px_per_day": 6.139,
+    "stacked_snr": 7.14,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     -0.0,
+     15.6,
+     9.3,
+     6.0,
+     4.4
+    ]
+   }
+  ]
+ }
+}

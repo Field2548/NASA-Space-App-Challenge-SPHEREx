@@ -1,0 +1,116 @@
+{
+ "slug": "makemake",
+ "title": "(136472) Makemake",
+ "kind": "dwarf-planet",
+ "difficulty": "hard",
+ "ra": 200.0075,
+ "dec": 21.523,
+ "fov_deg": 0.1,
+ "pixel_arcsec": 6.15,
+ "size": [
+  59,
+  59
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   200.0075,
+   21.523
+  ],
+  "crpix": [
+   30.0,
+   30.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60825.965704,
+   "utc": "2025-05-30T23:10:37",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60826.441222,
+   "utc": "2025-05-31T10:35:22",
+   "hours_since_prev": 11.41,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 60827.323872,
+   "utc": "2025-06-01T07:46:23",
+   "hours_since_prev": 21.18,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 60827.866697,
+   "utc": "2025-06-01T20:48:03",
+   "hours_since_prev": 13.03,
+   "n_bands": 6,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 60828.682018,
+   "utc": "2025-06-02T16:22:06",
+   "hours_since_prev": 19.57,
+   "n_bands": 4,
+   "detectors": [
+    3,
+    6
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0186,
+  "offset": -4.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 131.481
+ },
+ "psf_fwhm_px": 1.673,
+ "has": {
+  "exposures": false,
+  "spectrum": false
+ }
+}
