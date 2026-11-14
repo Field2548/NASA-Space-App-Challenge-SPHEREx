@@ -75,3 +75,32 @@ All are written in `docs/contracts/api.md`. The owner may overrule them.
 ## People
 
 GAME is @toonzzzrock (branch `web-game`, reviews SERVER). DATA is @Field2548 (branch `claude/great-galileo-8dyj6n`, SERVER reviews DATA; hand-off file `docs/plans/HANDOFF-DATA.md` on that branch). Human decisions: issue #3. Board: issue #2.
+
+## Update 06:30 (read this after the sections above; it overrides them where they differ)
+
+Head of `web-server` after this update: see `git log -1`. Checks by the orchestrator: vitest 366 passed (24 files), tsc, eslint, `next build` clean; CI green on PR #6.
+
+Built since 05:50, all pushed:
+- `spot_reveal` in `/api/check` (issue #10), one shared `isAboveBar` rule, leaderboard 404 for an unknown spot.
+- `/status` shows health warnings and "Not connected"; `/api/density` accepts `who=me|others|all`.
+- `GET /api/info` with the server-enforced lock, from DATA's catalog files (all five spots have one; SIMBAD rows are missing because CDS was down when DATA made them).
+- `Scoreboard.tsx`, `AuthDialog.tsx` (+ `web/lib/auth.ts` guest replay store, key `onion-sky:guest-replay`), `InspectPopup.tsx`.
+- Saving finds in `/api/check` for logged-in players (`web/lib/server/persist.ts`), `POST /api/complete`.
+- `pipeline/process_requests.py` (13 tests pass; never run against a real queue).
+- Reviewed and merged DATA's PR #11.
+
+Checked in a real browser (Chromium, built app, `UNLOCK_SECRET` set), temporary page `/server-demo`:
+- Lock flow end to end: Inspect is `[LOCKED]` in round mode and still locked when the client asks for explore; after a correct Eros answer (`known`, 100 points, `spot_reveal` "(433) Eros") the popup shows Eros at 1.346 AU from Earth, source JPL Horizons. No object name on screen before that.
+- Scoreboard (bot row, tabs, collapse), login dialog with no database, popup drag, arrow keys, corner placement: all pass. No console errors.
+- Coordinate box on `/skymap-demo`: works. **The sky map itself has never been seen**: CDS HiPS answered 404 all night, so only the fallback list was shown.
+
+Small visual defects, not fixed: "SCOREBOARD" appears twice in the open panel; the Inspect title wraps at 380 px; at 900 px height sections F and G need scrolling inside the popup.
+
+Still open, in order:
+1. Adversarial pass over everything built after 04:30 (needs opus or sonnet; budget back at 09:10).
+2. Look at the sky map when `https://alasky.cds.unistra.fr/SPHEREx/color/properties` answers 200 again.
+3. Live SIMBAD, Gaia and JPL lookups in `/api/info` for positions outside ready spots (answers "skipped" today).
+4. Quick-look submit path and `/api/s3range`: both wait on DATA (quick look libs, S3 CORS check).
+5. GAME: approval of PR #6; issue #12 (tracing line, footer slot, where SkyMap, CoordinateBox, Scoreboard, AuthDialog and InspectPopup mount); then delete `/skymap-demo` and `/server-demo`. GAME's own guest store (on `web-game`) and `web/lib/auth.ts` must be reconciled.
+6. Human: Supabase project, Vercel link, `UNLOCK_SECRET` (issue #3 items 1, 2, 13). Then run the migration and `supabase/tests/rls_probe.sql` on the real project; nothing has run on real Supabase.
+7. Phase 5: licence audit (Mamajek table has no stated licence), preview deploy, production deploy after a human yes.
