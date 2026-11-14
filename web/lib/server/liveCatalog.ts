@@ -100,6 +100,44 @@ async function tapRows(url: string, adql: string, fetchImpl: FetchLike, signal: 
 const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const strOrNull = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
 
+/** A SIMBAD row as the service gave it: with its own coordinates and no separation yet. */
+type SimbadFound = Omit<SimbadRow, "sep_arcsec"> & { ra: number; dec: number };
+/** A Gaia row as the service gave it: with its own coordinates and no separation yet. */
+type GaiaFound = Omit<GaiaRow, "sep_arcsec"> & { ra: number; dec: number };
+
+/** SIMBAD objects of the cone, with their coordinates. Throws when SIMBAD does not answer. */
+async function fetchSimbad(ra: number, dec: number, fetchImpl: FetchLike, signal?: AbortSignal): Promise<SimbadFound[]> {
+  const rows = await tapRows(SIMBAD_TAP_URL, simbadAdql(ra, dec), fetchImpl, signal ?? AbortSignal.timeout(LIVE_TIMEOUT_MS));
+  const out: SimbadFound[] = [];
+  for (const r of rows) {
+    const [mainId, otype, spType, , rvz, , , rowRa, rowDec] = r;
+    const name = strOrNull(mainId);
+    const rRa = numOrNull(rowRa);
+    const rDec = numOrNull(rowDec);
+    if (!name || rRa === null || rDec === null) continue;
+    out.push({
+      name,
+      otype: strOrNull(otype),
+      sp_type: strOrNull(spType),
+      z: numOrNull(rvz),
+      ra: rRa,
+      dec: rDec,
+      url: `https://simbad.cds.unistra.fr/simbad/sim-id?Ident=${encodeURIComponent(name)}`,
+    });
+  }
+  return out;
+}
+
+/** The rows with their separation from THIS caller's position, nearest first. */
+function simbadFor(found: SimbadFound[], ra: number, dec: number): SimbadRow[] {
+  return found
+    .map(({ ra: rRa, dec: rDec, ...row }) => ({
+      ...row,
+      sep_arcsec: round(angularSeparationDeg(ra, dec, rRa, rDec) * 3600, 2),
+    }))
+    .sort((a, b) => a.sep_arcsec - b.sep_arcsec);
+}
+
 /** SIMBAD objects within 9 arcsec, nearest first. Throws when SIMBAD does not answer. */
 export async function querySimbad(
   ra: number,
@@ -107,58 +145,57 @@ export async function querySimbad(
   fetchImpl: FetchLike,
   signal?: AbortSignal,
 ): Promise<SimbadRow[]> {
-  const rows = await tapRows(SIMBAD_TAP_URL, simbadAdql(ra, dec), fetchImpl, signal ?? AbortSignal.timeout(LIVE_TIMEOUT_MS));
-  const out: SimbadRow[] = [];
-  for (const r of rows) {
-    const [mainId, otype, spType, , rvz, , , rowRa, rowDec] = r;
-    const name = strOrNull(mainId);
-    const rRa = numOrNull(rowRa);
-    const rDec = numOrNull(rowDec);
-    if (!name || rRa === null || rDec === null) continue;
-    const sepDeg = angularSeparationDeg(ra, dec, rRa, rDec);
-    out.push({
-      name,
-      otype: strOrNull(otype),
-      sp_type: strOrNull(spType),
-      z: numOrNull(rvz),
-      sep_arcsec: round(sepDeg * 3600, 2),
-      url: `https://simbad.cds.unistra.fr/simbad/sim-id?Ident=${encodeURIComponent(name)}`,
-    });
-  }
-  return out.sort((a, b) => a.sep_arcsec - b.sep_arcsec);
+  return simbadFor(await fetchSimbad(ra, dec, fetchImpl, signal), ra, dec);
 }
 
 /**
- * The nearest Gaia DR3 source within 6 arcsec, or null. Throws when Gaia does not answer.
+ * Gaia DR3 sources of the cone, with their coordinates. Throws when Gaia does not answer.
  * source_id arrives as a text string (the query CASTs it); a bare JSON number is refused, because
  * JSON.parse would already have dropped its last digits.
  */
-export async function queryGaia(
-  ra: number,
-  dec: number,
-  fetchImpl: FetchLike,
-  signal?: AbortSignal,
-): Promise<GaiaRow | null> {
+async function fetchGaia(ra: number, dec: number, fetchImpl: FetchLike, signal?: AbortSignal): Promise<GaiaFound[]> {
   const rows = await tapRows(GAIA_TAP_URL, gaiaAdql(ra, dec), fetchImpl, signal ?? AbortSignal.timeout(LIVE_TIMEOUT_MS));
-  let best: GaiaRow | null = null;
+  const out: GaiaFound[] = [];
   for (const r of rows) {
     const [sourceId, rowRa, rowDec, plx, plxErr, pmra, pmdec, g] = r;
     if (typeof sourceId !== "string" || !/^\d+$/.test(sourceId)) throw new Error("Gaia source_id is not text");
-    if (numOrNull(rowRa) === null || numOrNull(rowDec) === null) continue;
-    const sep = angularSeparationDeg(ra, dec, rowRa as number, rowDec as number) * 3600;
-    if (sep > GAIA_RADIUS_ARCSEC) continue;
-    if (best && sep >= best.sep_arcsec) continue;
-    best = {
+    const rRa = numOrNull(rowRa);
+    const rDec = numOrNull(rowDec);
+    if (rRa === null || rDec === null) continue;
+    out.push({
       id: `Gaia DR3 ${sourceId}`,
       g_mag: numOrNull(g),
       plx: numOrNull(plx),
       plx_over_err: numOrNull(plxErr),
       pmra: numOrNull(pmra),
       pmdec: numOrNull(pmdec),
-      sep_arcsec: round(sep, 2),
-    };
+      ra: rRa,
+      dec: rDec,
+    });
+  }
+  return out;
+}
+
+/** The nearest source within 6 arcsec of THIS caller's position, or null. */
+function gaiaFor(found: GaiaFound[], ra: number, dec: number): GaiaRow | null {
+  let best: GaiaRow | null = null;
+  for (const { ra: rRa, dec: rDec, ...row } of found) {
+    const sep = angularSeparationDeg(ra, dec, rRa, rDec) * 3600;
+    if (sep > GAIA_RADIUS_ARCSEC) continue;
+    if (best && sep >= best.sep_arcsec) continue;
+    best = { ...row, sep_arcsec: round(sep, 2) };
   }
   return best;
+}
+
+/** The nearest Gaia DR3 source within 6 arcsec, or null. Throws when Gaia does not answer. */
+export async function queryGaia(
+  ra: number,
+  dec: number,
+  fetchImpl: FetchLike,
+  signal?: AbortSignal,
+): Promise<GaiaRow | null> {
+  return gaiaFor(await fetchGaia(ra, dec, fetchImpl, signal), ra, dec);
 }
 
 function round(v: number, digits: number): number {
@@ -194,15 +231,25 @@ async function settle<T>(ms: number, work: (signal: AbortSignal) => Promise<T>):
 
 // ------------------------------------------------------------------ cache
 
-type CacheEntry = { at: number; ttl: number; value: LiveLookup };
+/**
+ * What a lookup keeps: the rows with their OWN coordinates, not separations. Two callers 0.3 arcsec
+ * apart share a cache key, and each gets separations measured from their own position.
+ */
+type Found = {
+  simbad: { status: LiveSourceStatus; rows: SimbadFound[] };
+  gaia: { status: LiveSourceStatus; rows: GaiaFound[] };
+};
+type CacheEntry = { at: number; ttl: number; value: Found };
 const cache = new Map<string, CacheEntry>();
+/** Lookups on their way, by cache key: a second caller for the same key waits for the first. */
+const inFlight = new Map<string, Promise<Found>>();
 
 /** Positions rounded to 1 arcsec (1/3600 deg). */
 function cacheKey(ra: number, dec: number): string {
   return `${Math.round(ra * 3600)}:${Math.round(dec * 3600)}`;
 }
 
-function cacheGet(key: string, now: number): LiveLookup | null {
+function cacheGet(key: string, now: number): Found | null {
   const hit = cache.get(key);
   if (!hit) return null;
   if (now - hit.at < hit.ttl) return hit.value;
@@ -210,7 +257,7 @@ function cacheGet(key: string, now: number): LiveLookup | null {
   return null;
 }
 
-function cacheSet(key: string, now: number, value: LiveLookup): void {
+function cacheSet(key: string, now: number, value: Found): void {
   const failed = value.simbad.status === "timeout" || value.simbad.status === "error" ||
     value.gaia.status === "timeout" || value.gaia.status === "error";
   cache.delete(key);
@@ -224,37 +271,61 @@ function cacheSet(key: string, now: number, value: LiveLookup): void {
 /** For tests. */
 export function clearLiveCache(): void {
   cache.clear();
+  inFlight.clear();
 }
 
 // ------------------------------------------------------------------ the lookup
 
+/** The statuses and rows for one caller's own position. */
+function present(found: Found, ra: number, dec: number): LiveLookup {
+  const simbadRows = found.simbad.status === "ok" ? simbadFor(found.simbad.rows, ra, dec) : [];
+  const gaiaRow = found.gaia.status === "ok" ? gaiaFor(found.gaia.rows, ra, dec) : null;
+  return {
+    simbad: {
+      status: found.simbad.status === "ok" ? (simbadRows.length ? "ok" : "empty") : found.simbad.status,
+      rows: simbadRows,
+    },
+    gaia: {
+      status: found.gaia.status === "ok" ? (gaiaRow ? "ok" : "empty") : found.gaia.status,
+      row: gaiaRow,
+    },
+  };
+}
+
+async function fetchBoth(ra: number, dec: number, deps: LiveDeps): Promise<Found> {
+  const fetchImpl: FetchLike = deps.fetchImpl ?? ((url, init) => fetch(url, init));
+  const timeoutMs = deps.timeoutMs ?? LIVE_TIMEOUT_MS;
+  const [simbad, gaia] = await Promise.all([
+    settle(timeoutMs, (signal) => fetchSimbad(ra, dec, fetchImpl, signal)),
+    settle(timeoutMs, (signal) => fetchGaia(ra, dec, fetchImpl, signal)),
+  ]);
+  return {
+    simbad: simbad.status === "ok" ? { status: "ok", rows: simbad.value } : { status: simbad.status, rows: [] },
+    gaia: gaia.status === "ok" ? { status: "ok", rows: gaia.value } : { status: gaia.status, rows: [] },
+  };
+}
+
 /**
  * SIMBAD and Gaia in parallel, each with its own timeout. Cached by position (1 arcsec): 10 minutes,
- * or 30 seconds when a source failed. Never throws.
+ * or 30 seconds when a source failed. Callers that arrive while a lookup for the same key is on its
+ * way share it (one pair of outbound requests). Separations are measured from each caller's own
+ * position. Never throws.
  */
 export async function lookupLive(ra: number, dec: number, deps: LiveDeps = {}): Promise<LiveLookup> {
   const now = deps.now ?? Date.now;
   const key = cacheKey(ra, dec);
   const hit = cacheGet(key, now());
-  if (hit) return hit;
+  if (hit) return present(hit, ra, dec);
 
-  const fetchImpl: FetchLike = deps.fetchImpl ?? ((url, init) => fetch(url, init));
-  const timeoutMs = deps.timeoutMs ?? LIVE_TIMEOUT_MS;
-  const [simbad, gaia] = await Promise.all([
-    settle(timeoutMs, (signal) => querySimbad(ra, dec, fetchImpl, signal)),
-    settle(timeoutMs, (signal) => queryGaia(ra, dec, fetchImpl, signal)),
-  ]);
-
-  const value: LiveLookup = {
-    simbad:
-      simbad.status === "ok"
-        ? { status: simbad.value.length ? "ok" : "empty", rows: simbad.value }
-        : { status: simbad.status, rows: [] },
-    gaia:
-      gaia.status === "ok"
-        ? { status: gaia.value ? "ok" : "empty", row: gaia.value }
-        : { status: gaia.status, row: null },
-  };
-  cacheSet(key, now(), value);
-  return value;
+  let pending = inFlight.get(key);
+  if (!pending) {
+    pending = fetchBoth(ra, dec, deps)
+      .then((value) => {
+        cacheSet(key, now(), value);
+        return value;
+      })
+      .finally(() => inFlight.delete(key));
+    inFlight.set(key, pending);
+  }
+  return present(await pending, ra, dec);
 }

@@ -88,10 +88,23 @@ export function queryObject(request: Request): Record<string, string> {
   return Object.fromEntries(new URL(request.url).searchParams.entries());
 }
 
-/** Best guess at the caller's address, for the light rate limit only. */
+/**
+ * Best guess at the caller's address, for the light rate limit only.
+ * Order: `x-vercel-forwarded-for` (set by Vercel's edge from the real connection; a client cannot
+ * choose it), then `x-real-ip`, then the LAST entry of `x-forwarded-for`. Each proxy appends the
+ * address it saw to the end of that header, so the last entry is the one added by the nearest
+ * proxy; the first entry is whatever the client wrote, which anyone can change to dodge the limit.
+ * Without any of them (local development): "local".
+ */
 export function clientIp(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0] : request.headers.get("x-real-ip") ?? "local").trim();
+  const first = (v: string | null) => (v ?? "").split(",")[0].trim();
+  const vercel = first(request.headers.get("x-vercel-forwarded-for"));
+  if (vercel) return vercel;
+  const real = (request.headers.get("x-real-ip") ?? "").trim();
+  if (real) return real;
+  const fwd = (request.headers.get("x-forwarded-for") ?? "").split(",");
+  const last = fwd[fwd.length - 1].trim();
+  return last || "local";
 }
 
 /** Next.js's own control-flow error while prerendering (cacheComponents): it must reach Next. */

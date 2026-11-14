@@ -170,6 +170,41 @@ describe("lookupLive: cache", () => {
   });
 });
 
+describe("lookupLive: shared in-flight lookups and per-caller separations", () => {
+  it("two concurrent calls for one cache key make one pair of outbound requests", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { fetchImpl, calls } = fake(
+      async () => (await gate, new Response(JSON.stringify(SIMBAD_OK), { status: 200 })),
+      async () => (await gate, new Response(JSON.stringify(GAIA_OK), { status: 200 })),
+    );
+    const a = lookupLive(RA, DEC, { fetchImpl, now: () => 0 });
+    const b = lookupLive(RA, DEC, { fetchImpl, now: () => 0 });
+    release();
+    const [ra, rb] = await Promise.all([a, b]);
+    expect(calls).toHaveLength(2);
+    expect(rb).toEqual(ra);
+    expect(ra.simbad.status).toBe("ok");
+  });
+
+  it("a different cache key is not held back by an in-flight one", async () => {
+    const { fetchImpl, calls } = fake(json(SIMBAD_OK), json(GAIA_OK));
+    await Promise.all([lookupLive(RA, DEC, { fetchImpl, now: () => 0 }), lookupLive(RA, DEC + 0.01, { fetchImpl, now: () => 0 })]);
+    expect(calls).toHaveLength(4);
+  });
+
+  it("callers 0.3 arcsec apart share a key but each gets separations from their own position", async () => {
+    const { fetchImpl, calls } = fake(json(SIMBAD_OK), json(GAIA_OK));
+    const first = await lookupLive(RA, DEC, { fetchImpl, now: () => 0 });
+    const second = await lookupLive(RA, DEC + 0.3 / 3600, { fetchImpl, now: () => 1000 });
+    expect(calls).toHaveLength(2); // the second came from the cache
+    expect(first.simbad.rows[0].sep_arcsec).toBe(3.6);
+    expect(second.simbad.rows[0].sep_arcsec).toBe(3.3);
+    expect(first.gaia.row?.sep_arcsec).toBe(0);
+    expect(second.gaia.row?.sep_arcsec).toBe(0.3);
+  });
+});
+
 describe("ADQL", () => {
   it("SIMBAD: basic table, 9 arcsec cone, exact text", () => {
     expect(simbadAdql(RA, DEC)).toBe(

@@ -114,3 +114,11 @@ Still open, in order:
 - `pipeline/tests/test_process_requests.py` is in DATA's folder; asked DATA on the board for an ok.
 - CDS (SIMBAD, HiPS) still answered 404 at 06:29. The sky map has still never been seen; the SIMBAD query is untested against the real service.
 - Scratch folders `scratchpad\PR9` (half-installed, a sub-agent could not remove it) and `scratchpad\game` (still a registered git worktree) are left over; harmless to the repo. `git worktree prune` and deleting them needs the owner's ok.
+
+## Update 07:00 (newest)
+
+- A second adversarial review (sonnet) ran over everything built after 04:30. It could not read a ready spot's name, type, distance or title without the signed cookie by any route. It found and a fix batch closed: a lock leak for positions up to ~1.5 px outside a ready picture's edge (live lookup returned stars inside the spot), guest points lost when a guest logs in and replays before `/api/complete`, a replay store that one bad entry blocked, a spoofable and resettable rate limiter, repeat candidates inflating density, request-queue spam, unchecked link schemes. Contract is now 1.3. vitest 466 passed (27 files), tsc, eslint, build clean; the migration runs from scratch in PGlite and `supabase/tests/rls_probe.sql` passes.
+- One change made by the orchestrator after the fix batch, **not covered by a probe**: in `record_find` the 50-rows-per-user-per-spot cap no longer blocks a first correct answer. The migration still runs in PGlite; the "correct answer after 50 wrong ones is saved and paid" case itself was not run.
+- Not reached by the review: `SkyMap`, `CoordinateBox`, `components/skymap/*`, `lib/scoreboard.ts`, `lib/statusLabel.ts`, `lib/server/bot.ts`; a real PostgREST call of the two `density` overloads.
+- `saveGuestSubmission` (web/lib/auth.ts) has no caller: guest answers are not kept until GAME's submit bar calls it (told GAME on PR #9).
+- Accepted known leak (issue #10, all three agents): the slugs `eros`, `hektor`, `makemake`, `eris` name the objects in URLs and file paths. Say so in the deploy notes.

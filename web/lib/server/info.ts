@@ -171,10 +171,34 @@ const bad = (message: string) => new ApiFail("bad_request", message);
 type Located = { slug: string; field: SpotField; x: number; y: number; ra: number; dec: number };
 
 /**
+ * Pixels of guard band around every ready spot's picture (all four sides). Pixel centres sit at
+ * integers, so the picture covers [-0.5, W-0.5). A catalog lookup reaches SIMBAD_RADIUS_ARCSEC
+ * (9 arcsec, 1.46 px) around its position, so a live lookup just outside the picture could return
+ * a star that lies inside the spot. Every position within ceil(radius / pixel) + 1 px of the
+ * picture is therefore treated as inside the spot, and never asked live.
+ */
+export function guardBandPx(pixelArcsec: number): number {
+  return Math.ceil(SIMBAD_RADIUS_ARCSEC / pixelArcsec) + 1;
+}
+
+/** True when pixel (x, y) is on the picture or in its guard band. */
+function inBand(field: SpotField, x: number, y: number): boolean {
+  const [w, h] = field.size;
+  const g = guardBandPx(field.pixel_arcsec);
+  return x >= -0.5 - g && x < w - 0.5 + g && y >= -0.5 - g && y < h - 0.5 + g;
+}
+
+/** The nearest pixel on the picture, for catalog searches of a position in the guard band. */
+function clampToPicture(field: SpotField, x: number, y: number): { x: number; y: number } {
+  const [w, h] = field.size;
+  return { x: Math.min(Math.max(x, 0), w - 1), y: Math.min(Math.max(y, 0), h - 1) };
+}
+
+/**
  * Work out where the call points. A spot plus x, y is used as given (after the 2 px margin
  * check), giving one entry. Otherwise ra, dec is converted into every ready spot's picture and
- * each spot that contains it is returned, in index order. An empty list means the position is
- * outside every ready spot.
+ * each spot whose picture or guard band (see guardBandPx) contains it is returned, in index order.
+ * An empty list means the position is outside every ready spot.
  */
 async function locate(q: InfoQuery, root?: string): Promise<Located[]> {
   if (q.spot !== undefined) {
@@ -199,9 +223,9 @@ async function locate(q: InfoQuery, root?: string): Promise<Located[]> {
   const found: Located[] = [];
   for (const slug of await readySpotSlugs(root)) {
     const field = await readSpotField(slug, root);
-    const [w, h] = field.size;
+    const h = field.size[1];
     const p = skyToPixel(field.wcs as FieldWcs, h, q.ra, q.dec);
-    if (p && p[0] >= 0 && p[0] < w && p[1] >= 0 && p[1] < h) {
+    if (p && inBand(field, p[0], p[1])) {
       found.push({ slug, field, x: p[0], y: p[1], ra: q.ra, dec: q.dec });
     }
   }
@@ -312,8 +336,16 @@ function lockedBody(position: Record<string, number>) {
   return { mode: "round", locked: true, position };
 }
 
-async function exploreReady(loc: Located, root?: string): Promise<Record<string, unknown>> {
-  const [catalog, key] = await Promise.all([readCatalog(loc.slug, root), loadAnswerKey(loc.slug, root)]);
+async function exploreReady(asked: Located, root?: string): Promise<Record<string, unknown>> {
+  const [catalog, key] = await Promise.all([readCatalog(asked.slug, root), loadAnswerKey(asked.slug, root)]);
+  // The catalog is searched at the nearest pixel on the picture (a position in the guard band or
+  // a little outside it is answered like an edge pixel). The answer echoes the position asked.
+  const near = clampToPicture(asked.field, asked.x, asked.y);
+  const [sra, sdec] =
+    near.x === asked.x && near.y === asked.y
+      ? [asked.ra, asked.dec]
+      : pixelToSky(asked.field.wcs as FieldWcs, asked.field.size[1], near.x, near.y);
+  const loc: Located = { ...asked, x: near.x, y: near.y, ra: sra, dec: sdec };
   const simbad = catalog ? simbadNear(catalog, loc.ra, loc.dec) : [];
   const gaia = catalog ? gaiaNear(catalog, loc) : null;
   const solar = catalog ? solarSystemNear(catalog, loc.x, loc.y) : [];
@@ -331,7 +363,7 @@ async function exploreReady(loc: Located, root?: string): Promise<Record<string,
   return {
     mode: "explore",
     locked: false,
-    position: { ra: round(loc.ra, 6), dec: round(loc.dec, 6), x: loc.x, y: loc.y },
+    position: { ra: round(asked.ra, 6), dec: round(asked.dec, 6), x: asked.x, y: asked.y },
     sources,
     simbad,
     gaia,
@@ -357,7 +389,7 @@ export async function answerInfo(
   const hits = await locate(q, root);
 
   if (hits.length === 0) {
-    // Outside every ready spot: explore is always granted, and only then is anything asked live.
+    // Outside every ready spot and its guard band: explore is always granted, and only then is anything asked live.
     // A round answer returns before any network call. JPL is skipped: this lookup has no time.
     const position = { ra: q.ra as number, dec: q.dec as number };
     if (!asked) return lockedBody(position);

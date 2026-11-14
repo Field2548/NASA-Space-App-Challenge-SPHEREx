@@ -134,6 +134,45 @@ describe("guest replay store", () => {
     expect(loadGuestSubmissions()).toEqual([req(2), req(1)]);
   });
 
+  it("keeps ONE entry per spot, the newest, even when the bodies differ", () => {
+    const marks = (x: number) => [{ frame: 1, x, y: 5 }, { frame: 3, x: x + 2, y: 5 }];
+    saveGuestSubmission({ spot: "eros", answer: "nothing" });
+    saveGuestSubmission({ spot: "hektor", answer: "nothing" });
+    saveGuestSubmission({ spot: "eros", answer: "track", marks: marks(10) });
+    saveGuestSubmission({ spot: "eros", answer: "track", marks: marks(20) });
+    expect(loadGuestSubmissions()).toEqual([
+      { spot: "hektor", answer: "nothing" },
+      { spot: "eros", answer: "track", marks: marks(20) },
+    ]);
+  });
+
+  it("silently ignores an invalid entry and keeps what was stored", () => {
+    saveGuestSubmission(req(1));
+    const marks = (n: number) => Array.from({ length: n }, (_, i) => ({ frame: i + 1, x: 1, y: 1 }));
+    const bad: unknown[] = [
+      { spot: "Bad Slug", answer: "nothing" },
+      { spot: "", answer: "nothing" },
+      { spot: "a".repeat(41), answer: "nothing" },
+      { spot: "eros", answer: "maybe" },
+      { spot: "eros", answer: "track" },
+      { spot: "eros", answer: "track", marks: marks(1) },
+      { spot: "eros", answer: "track", marks: marks(33) },
+      { spot: "eros", answer: "track", marks: [{ frame: 1, x: 1, y: 1 }, { frame: 0, x: 1, y: 1 }] },
+      { spot: "eros", answer: "track", marks: [{ frame: 1.5, x: 1, y: 1 }, { frame: 2, x: 1, y: 1 }] },
+      { spot: "eros", answer: "track", marks: [{ frame: 1, x: Infinity, y: 1 }, { frame: 2, x: 1, y: 1 }] },
+      { spot: "eros", answer: "track", marks: [{ frame: 1, x: NaN, y: 1 }, { frame: 2, x: 1, y: 1 }] },
+      { spot: "eros", answer: "track", marks: [{ frame: 1, x: "3", y: 1 }, { frame: 2, x: 1, y: 1 }] },
+      { spot: "eros", answer: "track", marks: [null, { frame: 2, x: 1, y: 1 }] },
+      null,
+      7,
+    ];
+    for (const b of bad) expect(() => saveGuestSubmission(b as CheckRequest)).not.toThrow();
+    expect(loadGuestSubmissions()).toEqual([req(1)]);
+    saveGuestSubmission({ spot: "eros", answer: "track", marks: marks(2) });
+    saveGuestSubmission({ spot: "eros2", answer: "track", marks: marks(32) });
+    expect(loadGuestSubmissions()).toHaveLength(3);
+  });
+
   it("keeps only the newest 20", () => {
     for (let i = 1; i <= 25; i++) saveGuestSubmission(req(i));
     const kept = loadGuestSubmissions();
@@ -146,7 +185,7 @@ describe("guest replay store", () => {
     const track: CheckRequest = {
       spot: "eros",
       answer: "track",
-      marks: [{ frame: 1, x: 84, y: 79 }],
+      marks: [{ frame: 1, x: 84, y: 79 }, { frame: 3, x: 40, y: 43 }],
     };
     saveGuestSubmission(track);
     expect(loadGuestSubmissions()).toEqual([track]);
@@ -215,6 +254,22 @@ describe("moveGuestProgress", () => {
   it("keeps the store and reports nothing moved on 404", async () => {
     saveGuestSubmission(req(1));
     await expect(moveGuestProgress(fakeFetch(404), {})).resolves.toEqual({ moved: 0 });
+    expect(loadGuestSubmissions()).toEqual([req(1)]);
+  });
+
+  it("clears the store on 400: the server will never accept this replay", async () => {
+    saveGuestSubmission(req(1));
+    const f = fakeFetch(400);
+    const result = await moveGuestProgress(f, {});
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(result).toHaveProperty("error");
+    expect(loadGuestSubmissions()).toEqual([]);
+  });
+
+  it.each([401, 429, 503, 500])("keeps the store on HTTP %i (try again later)", async (status) => {
+    saveGuestSubmission(req(1));
+    const result = await moveGuestProgress(fakeFetch(status), {});
+    expect(result).toHaveProperty("error");
     expect(loadGuestSubmissions()).toEqual([req(1)]);
   });
 

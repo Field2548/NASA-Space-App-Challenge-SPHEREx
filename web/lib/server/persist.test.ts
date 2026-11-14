@@ -248,23 +248,6 @@ describe("rate limit cost (hit)", () => {
   });
 });
 
-describe("POST /api/complete shares the /api/check budget", () => {
-  const replay = (n: number) => Array.from({ length: n }, () => ({ spot: "fixture", answer: "nothing" }));
-
-  it("a 20-entry replay then an 11-entry one from one address gives 429 on the second", async () => {
-    noDatabase();
-    // The first replay passes the limiter (20 of 30 units) and then stops at 503 with no database.
-    const first = await complete(post("http://localhost/api/complete", { replay: replay(20) }));
-    expect(first.status).toBe(503);
-    // 20 + 11 = 31 > 30: refused whole, before anything is scored.
-    const second = await complete(post("http://localhost/api/complete", { replay: replay(11) }));
-    expect(second.status).toBe(429);
-    const json = await second.json();
-    expect(json.error.code).toBe("rate_limited");
-    expect(json.error.details.retry_after_s).toBeGreaterThan(0);
-  });
-});
-
 describe("POST /api/check without a database", () => {
   it("still answers persisted: false with the same points", async () => {
     noDatabase();

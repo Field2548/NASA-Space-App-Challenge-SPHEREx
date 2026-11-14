@@ -4,9 +4,12 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/info/route";
-import { answerInfo } from "@/lib/server/info";
+import { answerInfo, guardBandPx } from "@/lib/server/info";
+import { clearLiveCache } from "@/lib/server/liveCatalog";
+import { pixelToSky } from "@/lib/wcs";
+import type { FieldWcs } from "@/lib/types";
 import { resetRateLimit } from "@/lib/server/rateLimit";
 import { encodeUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
 
@@ -229,6 +232,65 @@ describe("GET /api/info: overlapping ready spots", () => {
 
     const both = await answerInfo(req(["alpha", "beta"]), query, overlapRoot);
     expect(both).toMatchObject({ mode: "explore", locked: false, sources: { simbad: "skipped" } });
+  });
+});
+
+describe("GET /api/info: the guard band around a ready spot's picture", () => {
+  const field = readJson("public/fields/eros/field.json");
+  const [W, H] = field.size as [number, number];
+  /** ra/dec of pixel (x, y) on the eros picture. */
+  const skyOf = (x: number, y: number) => {
+    const [ra, dec] = pixelToSky(field.wcs as FieldWcs, H, x, y);
+    return `ra=${ra}&dec=${dec}`;
+  };
+  const fetchSpy = vi.fn(async (): Promise<Response> => {
+    throw new Error("a live lookup was made inside a ready spot's guard band");
+  });
+  beforeEach(() => {
+    fetchSpy.mockClear();
+    clearLiveCache();
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("the band is ceil(9 arcsec / pixel) + 1 px wide (3 px for 6.15 arcsec pixels)", () => {
+    expect(guardBandPx(6.15)).toBe(3);
+  });
+
+  const near: [number, number][] = [
+    [-0.51, 60], [-0.6, 60], [-1.5, 60], [-2, 60],
+    [60, -0.6], [60, -2], [60, H - 0.4], [60, H + 1.4],
+    [W - 0.4, 60], [W + 1.4, 60], [-2, -2], [W + 1.4, H + 1.4],
+  ];
+  it.each(near)("pixel (%f, %f) just outside the picture is locked, with no outbound call", async (x, y) => {
+    const { status, body } = await get(`${skyOf(x, y)}&mode=explore`);
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ mode: "round", locked: true });
+    expect(Object.keys(body).sort()).toEqual(["locked", "mode", "position"]);
+    expect(body.position.x).toBeCloseTo(x, 3);
+    expect(body.position.y).toBeCloseTo(y, 3);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("with the cookie the band is answered from the pre-made catalog, echoing the asked position", async () => {
+    const { body } = await get(`${skyOf(-1.5, 60)}&mode=explore`, ["eros"]);
+    expect(body).toMatchObject({ mode: "explore", locked: false });
+    expect(body.position.x).toBeCloseTo(-1.5, 3);
+    expect(body.sources.jpl).toMatch(/^(premade|empty)$/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("the cookie of another spot does not open the band", async () => {
+    const { body } = await get(`${skyOf(-2, 60)}&mode=explore`, ["hektor"]);
+    expect(body).toMatchObject({ mode: "round", locked: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("a position 10 px outside the picture is live: SIMBAD and Gaia are asked", async () => {
+    fetchSpy.mockImplementation(async () => new Response(JSON.stringify({ metadata: [], data: [] }), { status: 200 }));
+    const { body } = await get(`${skyOf(-10, 60)}&mode=explore`);
+    expect(body).toMatchObject({ mode: "explore", locked: false, sources: { simbad: "empty", gaia: "empty", jpl: "skipped" } });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
 

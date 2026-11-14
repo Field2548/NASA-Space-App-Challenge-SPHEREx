@@ -65,12 +65,22 @@ function storage(): Storage | null {
   }
 }
 
+const SPOT_SLUG = /^[a-z0-9-]{1,40}$/;
+const isFiniteNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** The same shape the server accepts (CheckBody in lib/server/checkResponse.ts), minus its coordinate bounds. */
 function isCheckRequest(value: unknown): value is CheckRequest {
   if (!value || typeof value !== "object") return false;
   const r = value as Record<string, unknown>;
-  if (typeof r.spot !== "string") return false;
+  if (typeof r.spot !== "string" || !SPOT_SLUG.test(r.spot)) return false;
   if (r.answer === "nothing") return true;
-  return r.answer === "track" && Array.isArray(r.marks);
+  if (r.answer !== "track" || !Array.isArray(r.marks)) return false;
+  if (r.marks.length < 2 || r.marks.length > 32) return false;
+  return r.marks.every((m) => {
+    if (!m || typeof m !== "object") return false;
+    const k = m as Record<string, unknown>;
+    return Number.isInteger(k.frame) && (k.frame as number) >= 1 && isFiniteNumber(k.x) && isFiniteNumber(k.y);
+  });
 }
 
 function readList(store: Storage | null): CheckRequest[] {
@@ -85,13 +95,16 @@ function readList(store: Storage | null): CheckRequest[] {
   }
 }
 
-/** Appends a guest's check request. An identical body is replaced; only the newest 20 are kept. */
+/**
+ * Keeps a guest's check request. An invalid one is ignored. The store holds ONE entry per spot,
+ * the newest (a later answer replaces the earlier one), and at most 20 spots (the newest 20).
+ */
 export function saveGuestSubmission(req: CheckRequest): void {
   try {
+    if (!isCheckRequest(req)) return;
     const store = storage();
     if (!store) return;
-    const body = JSON.stringify(req);
-    const kept = readList(store).filter((item) => JSON.stringify(item) !== body);
+    const kept = readList(store).filter((item) => item.spot !== req.spot);
     kept.push(req);
     store.setItem(GUEST_REPLAY_KEY, JSON.stringify(kept.slice(-MAX_GUEST_SUBMISSIONS)));
   } catch {
@@ -112,8 +125,10 @@ export function clearGuestSubmissions(): void {
 }
 
 /**
- * Sends the guest's saved check requests to POST /api/complete. The store is cleared only on
- * HTTP 200. A 404 (route not built yet) keeps the store and reports nothing moved.
+ * Sends the guest's saved check requests to POST /api/complete. The store is cleared on HTTP 200
+ * and on 400 (the server will never accept this replay, so keeping it would fail forever). It is
+ * kept on 401, 429, 503, any other status and a network error, so the player can try again. A 404
+ * (route not built yet) keeps the store and reports nothing moved.
  */
 export async function moveGuestProgress(
   fetchImpl: typeof fetch = fetch,
@@ -137,6 +152,10 @@ export async function moveGuestProgress(
   if (res.status === 200) {
     clearGuestSubmissions();
     return { moved: replay.length };
+  }
+  if (res.status === 400) {
+    clearGuestSubmissions();
+    return { error: "The saved guest progress was not accepted by the server, so it was discarded." };
   }
   return { error: `Could not move guest progress (HTTP ${res.status}). It stays in this browser.` };
 }

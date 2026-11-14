@@ -1,9 +1,16 @@
 # Contract: API routes (owner: SERVER)
 
-Version 1.2, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1.3, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
 Source for behaviour: `docs/BUILD_PROMPT.md` (BP) sections 8.10 to 8.12, 8.14, 8.16, 8.19, 9, 10.
 Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts/field-schema.md` (DATA):
 `x`, `y` are 0-based, top-down, pixel centres at integers; frame numbers start at 1.
+
+**Changes in 1.3** (2026-11-15, after a second adversarial review):
+
+- **Edge guard band** (section 6): a position within `ceil(9 arcsec / pixel_arcsec) + 1` px of a ready spot's picture (3 px for 6.15 arcsec pixels) on any side counts as inside the spot, so the live SIMBAD and Gaia lookups can no longer return a star that lies inside a locked picture.
+- **Practice from visits for logged-in players** (section 3): with a login and a database, `practice` follows saved visits only, never the unlock cookie, so a guest session's cookie no longer costs a new account its points. Guests and no-database calls still use the cookie.
+- **Shared budget charged after login** (section 4): `/api/complete` charges the shared `/api/check` budget only after the 503 and 401 checks, so anonymous calls cannot drain a player's budget. Rate-limit address order and eviction are described in section 1.
+- **Request de-duplication** (section 9): `POST /api/request-spot` returns the existing request when one lies within 0.05 degrees (`200`, `duplicate: true`) and answers `429` when 200 requests are queued. Database: repeated `candidate`/`static` rows are not counted and a player has at most 50 `finds` rows per spot (section 8, migration).
 
 **Changes in 1.2** (2026-11-15, after an independent adversarial review of the SERVER code):
 
@@ -42,7 +49,7 @@ Routes owned by DATA (`/api/quicklook/*`, `/api/overlay`) are listed in section 
 
 - **Login.** Supabase Auth runs in the browser. A logged-in call sends `Authorization: Bearer <supabase access token>`. No header = guest. Guests can call every route; routes that write to the database answer as noted per route.
 - **No database is a normal state** (issue #3 item 1 default). Each route below says what it does without one. Nothing crashes.
-- **Rate limit:** light, per IP, in memory. About 30 calls per minute for `/api/check`, 60 for the read routes. On Vercel each serverless instance counts on its own, so this is best effort only: it slows a runaway loop, it is not a security control.
+- **Rate limit:** light, per IP, in memory. About 30 calls per minute for `/api/check`, 60 for the read routes. The address is `x-vercel-forwarded-for` (first entry), else `x-real-ip`, else the last `x-forwarded-for` entry (added by the nearest proxy; the first entry is written by the client), else `local`. When the in-memory table is full it drops the roughly 10% of addresses whose window ends soonest, never all of them. On Vercel each serverless instance counts on its own, so this is best effort only: it slows a runaway loop, it is not a security control.
 - **Points and verdicts are computed only on the server.** The client never sends points and never reads an answer key. Nothing under `web/data/` is ever served.
 
 ## 2. The spoiler rule: `mode=round|explore`
@@ -65,7 +72,7 @@ Used by `/api/info` (and DATA's `/api/overlay`).
   - Secret, in this order: `UNLOCK_SECRET`; else a key derived from `CRON_SECRET`; else one derived from `SUPABASE_SERVICE_ROLE_KEY`. **Adding or changing any of these invalidates every unlock cookie already handed out** (players see their finished spots locked until their next correct answer). Set `UNLOCK_SECRET` once and leave it.
   - **`UNLOCK_SECRET` is REQUIRED in production.** In production with none of the three set, the server signs nothing: no cookie is set, every cookie reads as empty, `/api/check` answers `"unlocked": false`, the server logs one `console.error`, and `/api/health` carries a warning (section 10). Outside production with none set (local development), a random key per server process is used, so a restart locks spots again.
   - `/embed` inside another site's page does not receive the cookie (`SameSite=Lax`), so embedded views stay locked.
-- **Once a spot is open for this player, it is practice.** Further `/api/check` answers on it are judged as usual but earn **0 points**, with `"practice": true` (section 3).
+- **Once a spot is open for this player, it is practice.** Further `/api/check` answers on it are judged as usual but earn **0 points**, with `"practice": true` (section 3); who counts as "open" for points is decided there.
 - **What the lock does and does not stop:** it prevents spoilers and casual cheating, but a determined player with two browsers can still look an answer up in one and submit it in the other.
 - The client switches a spot's UI from locked to unlocked after `/api/check` answered with `"unlocked": true`.
 - The lock is tested on the JSON, not on loose substrings: a locked response has exactly the keys `mode`, `locked`, `position`, and its text contains neither `Eros` nor `433`.
@@ -147,13 +154,15 @@ Other keys:
 | `already_found` | this player already has this find in this spot (same find key, below); no points the second time |
 | `persisted` | `true` if a row was written to `finds`. `false` for guests and with no database: the client then keeps the result in localStorage. |
 | `unlocked` | `true` when the spot's spoiler lock is now off for this player: after a correct answer, or when it was already open. `false` after a wrong answer, and in production without `UNLOCK_SECRET` (section 2). A correct answer also sets the signed `unlock` cookie. |
-| `practice` | `true` when the spot was already open for this player before this call (their cookie covers it). The answer is judged but earns 0 points. Also `true` for a logged-in player with a saved visit to the spot (section 2). Always present. |
+| `practice` | `true` when the spot was already open for this player before this call. The answer is judged but earns 0 points. Always present. Who counts as open: see the practice rule below. |
 | `reveal` | where to open Inspect as the reward (answer-key position of the found object). Present only for `known`. |
 | `track` | the server's fit: `x0, y0` at the first marked frame's time, `vx, vy` in px/day, `rms` in px. Absent for `answer: "nothing"`. |
 | `noise_bar_sigma` | the spot's noise bar, or `null` when no bot search was run. Never show a bot match without it. |
 | `spot_reveal` | `{ title, kind, difficulty }`: the spot's real title, sent once the spot is open (`unlocked` or `practice` is `true`), never on a wrong answer to a locked spot. Absent until DATA's answer keys carry a `reveal` block. |
 
 **Find key** (server only, never sent): what "the same find" means in a spot, so one thing scores once. `object:<id>` for a known object however it was reached, `bot:<rank>` for a bot candidate that is no known object, `nothing` for `nothing_correct`; none for wrong answers. The route passes it to `record_find(p_find_key)`, which decides `already_found` and the first finder per find key.
+
+**Practice rule.** For a logged-in player with a database, `practice` is true only when they have a saved visit to the spot (`hasVisit`); the unlock cookie lifts the spoiler lock but never costs points, so a spot a guest session unlocked before sign-up still scores once for the new account. For a guest, or with no database, `practice` is true when the signed cookie covers the spot.
 
 Points (BP 8.10): easy 100, medium 250, hard 500, boss 1000, expert 750; first finder +50 percent, rounded, for `known` only.
 SERVER decisions where BP is silent, object within 20 minutes on the board if you disagree:
@@ -174,8 +183,8 @@ Mark spots as checked and move guest progress into an account. Login required (`
 ```
 
 - `replay` holds the guest's saved `/api/check` request bodies (1 to 20). The server checks each again and saves them, so guest points are also computed on the server.
-- Replayed entries are **not** practice, even though the guest's cookie already covers those spots: that is the point of moving guest progress. `record_find`'s `already_found` (per find key) still stops anything from scoring twice on the account.
-- Each replayed entry costs one unit of the same per-address `/api/check` budget (30 a minute), so a replay of n entries uses n units, and a replay that would exceed the budget is refused whole with `429` before anything is scored.
+- Practice for a replayed entry is true only when the account had a saved visit to the spot before the replay started, or an earlier entry of the same replay already answered that spot correctly; the cookie is never used. `record_find`'s `already_found` (per find key) still stops anything from scoring twice on the account.
+- Order of checks: body parse, this route's own limit (5 calls a minute), `503` (no database), `401` (no login), and only then the shared `/api/check` budget: each replayed entry costs one unit of the per-address 30 a minute, so a replay of n entries uses n units, and a replay that would exceed the budget is refused whole with `429` before anything is scored. Calls that fail with 503 or 401 therefore never charge the `/api/check` budget.
 - Response: `{ "results": [ <one /api/check response per entry> ], "total_points": 350 }`.
 
 ## 5. `GET /api/resolve?name=`
@@ -197,6 +206,7 @@ Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need 
 - Ready spot: send `spot`, `x`, `y`. The server reads `web/data/catalog/<slug>.json` (no network).
 - Anywhere else (sky map, quick look): send `ra`, `dec` in degrees. The server asks SIMBAD TAP and Gaia TAP live, in parallel, 8 s each. Partial results are fine. Cached by position rounded to 1 arcsec, for 10 minutes (30 seconds when a source failed).
 - Live lookups are SIMBAD and Gaia only. JPL is `skipped` for a position without a time, since there is nothing to ask. A round answer outside ready spots makes no network call.
+- **Guard band.** The picture covers pixel coordinates `-0.5 <= x < W-0.5` (centres at integers). A position within `ceil(9 arcsec / pixel_arcsec) + 1` px (3 px for 6.15 arcsec pixels) of the picture on any of the four sides is treated as inside that ready spot: it is answered locked unless the cookie covers the spot, and then from the pre-made catalog at the nearest picture pixel (the response echoes the position asked). No live lookup is ever made for a position inside any ready spot's band, because a 9 arcsec SIMBAD cone (1.46 px) there could return a star inside the locked picture.
 - Radii (BP 8.16): SIMBAD objects within 9 arcsec, nearest Gaia source within 6 arcsec, solar-system objects within 2 px at any frame time.
 
 `mode=explore` response:
@@ -260,6 +270,7 @@ HEALPix NESTED cell counts for the sky map. `order` is an integer 0 to 12 (defau
 `cells` is a list of `[ipix, count]`, only cells with count above 0. With no database: `source: "none"`, `cells: []`, status 200.
 
 - **Where a find is placed (privacy of answers):** a find on a ready spot is stored with the **spot centre** as `ra`, `dec`, `hpx12`, never the mover's position, so the Finds layer cannot point at an answer. Quick-look candidates store the marked position.
+- A repeat by the same player of a `candidate` or `static` verdict on the same spot is not `counted`, and a player has at most 50 `finds` rows per spot: past that, `record_find` inserts nothing and reports `already_found: true` with 0 points.
 - The Finds layer counts only `counted` rows of kind `known`, `bot_match`, `candidate`. Quick-look rows are not counted (section 3), so for now quick-look candidates do not appear in it; their marked position is kept for a later layer. The Checked layer counts one visit per player per spot, saved with the first correct answer there.
 - The route calls the `density` RPC **with the caller's token**, never with the service role (the function uses `auth.uid()` for `me` and `others`). The database function is `density(p_layer, p_order, p_who)` with `p_who` = `'me' | 'others' | 'all'`; the 1.1 form `density(p_layer, p_order, p_mine boolean)` still works as a thin wrapper (`p_mine` true = `me`).
 
@@ -267,6 +278,11 @@ HEALPix NESTED cell counts for the sky map. `order` is an integer 0 to 12 (defau
 
 `POST` body `{ "ra": 133.795, "dec": -7.245, "fov": 0.2 }` (`0 ≤ ra < 360`, `-90 ≤ dec ≤ 90`, `0.05 ≤ fov ≤ 0.5` degrees). Guests may ask.
 Response `201`: `{ "id": 17, "status": "queued" }`. With no database: `503 db_unavailable`.
+
+De-duplication and the queue limit (database function `request_spot(p_user, p_ra, p_dec, p_fov)`, service role only):
+
+- A request within 0.05 degrees (a box: dec difference, and RA difference times cos(dec)) of one that is `queued`, `processing` or `done` inserts nothing and answers `200 { "id": 9, "status": "processing", "duplicate": true }` with the existing row.
+- With 200 requests already `queued` a new one is refused: `429 rate_limited` with a plain message. Duplicates are still answered when the queue is full.
 
 `GET` lists the queue for `/requests`, newest first, at most 100 (a SERVER addition to BP 8.14, which only asks for the page):
 `{ "requests": [ { "id": 17, "ra": 133.795, "dec": -7.245, "fov": 0.2, "status": "queued", "created_at": "2026-11-15T09:30:00Z" } ] }`.
