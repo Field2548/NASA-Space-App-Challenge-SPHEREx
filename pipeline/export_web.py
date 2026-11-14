@@ -442,9 +442,11 @@ def rebuild_frame(planes, noises):
 
 
 def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None, kind="asteroid",
-                 fov=0.2, noise_bar=None, nothing_moves=False, answers_dir=None):
+                 fov=0.2, noise_bar=None, nothing_moves=False, answers_dir=None, bands=None):
     """Export one spot. out_dir is web/public/fields; the answer key goes to answers_dir
-    (default web/data/answers next to it, never under public/). Returns field.json as a dict."""
+    (default web/data/answers next to it, never under public/). bands: a data/bands_<slug>
+    folder; when it holds cube.fits the spectrum tiles are written (section 8).
+    Returns field.json as a dict."""
     out_dir = os.path.abspath(out_dir)
     answers_dir = answers_dir or os.path.join(os.path.dirname(os.path.dirname(out_dir)),
                                               "data", "answers")
@@ -492,6 +494,14 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
         for name in ("exposures.u16", "exposures.json"):
             if os.path.exists(os.path.join(spot, name)):
                 os.remove(os.path.join(spot, name))
+    if bands and os.path.exists(os.path.join(bands, "cube.fits")):
+        from spectrum_tiles import check_cube_grid, export_spectrum_tiles
+        check_cube_grid(bands, [w, h], field["wcs"]["crval"], field["wcs"]["crpix"])
+        export_spectrum_tiles(bands, spot)
+        field["has"]["spectrum"] = True
+    elif os.path.isdir(os.path.join(spot, "spectrum")):      # no cube: drop stale tiles
+        import shutil
+        shutil.rmtree(os.path.join(spot, "spectrum"))
     write_json(os.path.join(spot, "field.json"), field)
     update_index(out_dir, {"slug": slug, "title": title, "ra": ra, "dec": dec, "fov_deg": fov,
                            "difficulty": difficulty, "kind": kind,
@@ -521,6 +531,8 @@ def parse_args():
     p.add_argument("--star", help="reserved for star targets")
     p.add_argument("--noise-bar", type=float, help="the bot search's noise bar (sigma)")
     p.add_argument("--nothing-moves", action="store_true", help="control spot")
+    p.add_argument("--bands", help="a data/bands_* folder (cube.fits) for the spectrum tiles; "
+                                   "--all uses data/bands_<slug> when it exists")
     p.add_argument("--out", default=os.path.join(ROOT, "web", "public", "fields"))
     return p.parse_args()
 
@@ -532,15 +544,17 @@ def main():
     elif a.folder and a.slug and a.title and a.difficulty:
         jobs = [{"slug": a.slug, "folder": a.folder, "title": a.title, "kind": a.kind,
                  "difficulty": a.difficulty, "fov": a.fov, "track": a.track,
-                 "noise_bar": a.noise_bar, "nothing_moves": a.nothing_moves}]
+                 "noise_bar": a.noise_bar, "nothing_moves": a.nothing_moves, "bands": a.bands}]
     else:
         raise SystemExit("give FOLDER --slug --title --difficulty, or --all")
     for j in jobs:
-        f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out,
+        bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all else None)
+        f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out, bands=bands,
                          track=j.get("track"), kind=j["kind"], fov=j["fov"],
                          noise_bar=j.get("noise_bar"), nothing_moves=j.get("nothing_moves", False))
         print(f"{j['slug']}: {len(f['frames'])} frames {f['size'][0]}x{f['size'][1]}, "
-              f"{f['data']['precision']}, scale {f['data']['scale']}, white {f['stretch']['white']}")
+              f"{f['data']['precision']}, scale {f['data']['scale']}, white {f['stretch']['white']}"
+              + (", spectrum" if f["has"]["spectrum"] else ""))
     if a.all:
         # real spots have landed: the index lists them in game order, without the fixture
         with open(os.path.join(a.out, "index.json"), encoding="utf-8") as f:
