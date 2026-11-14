@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { InfoExplore } from "@/lib/inspectPopup";
 import type { CheckResponse, Field } from "@/lib/types";
 import { timeColors } from "@/lib/palettes";
 import { blackToSlider } from "./BrightnessSlider";
@@ -42,12 +43,29 @@ vi.mock("./WavelengthSwitch", async (importActual) => {
 beforeEach(() => {
   mockCanvas();
   wlMock.fail = false;
+  info.reply = { mode: "round", locked: true };
+  // jsdom has no ResizeObserver; InspectPopup measures itself with one.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+// What the stubbed GET /api/info answers (the server, not the client, decides the lock).
+const info = vi.hoisted(() => ({ reply: {} as InfoExplore }));
+const board = { scope: "spot", slug: null, source: "db", updated_at: "2026-01-01T00:00:00Z", rows: [], me: null };
+const infoCalls = () =>
+  (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/info"));
+const boardCalls = () =>
+  (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/leaderboard"));
 
 function stubFetch(ok: boolean, over: Partial<Field> = {}) {
   const field = makeField({ slug: "fixture", ...over }, 3, 4, 2);
@@ -56,6 +74,8 @@ function stubFetch(ok: boolean, over: Partial<Field> = {}) {
     "fetch",
     vi.fn(async (url: string) => {
       if (!ok) return new Response("nope", { status: 404 });
+      if (url.startsWith("/api/info")) return new Response(JSON.stringify(info.reply), { status: 200 });
+      if (url.startsWith("/api/leaderboard")) return new Response(JSON.stringify(board), { status: 200 });
       if (url.endsWith("field.json")) return new Response(JSON.stringify(field), { status: 200 });
       return new Response(bytes, { status: 200 });
     }),
@@ -227,7 +247,7 @@ describe("PlayScreen tools", () => {
     const html = document.body.innerHTML;
     expect(html).not.toMatch(/\b(Eros|Hektor|Makemake|Eris)\b/i);
     const text = document.body.textContent ?? "";
-    for (const p of ["more tools", "wavelength switch", "vision picker", "coordinate box", "others' work", "scoreboard", "not drawn yet"]) {
+    for (const p of ["more tools", "wavelength switch", "vision picker", "coordinate box", "others' work", "not drawn yet"]) {
       expect(text.toLowerCase()).not.toContain(p);
     }
     for (const s of ["image-tools", "wavelength", "color-vision", "coordinate-box", "show-work", "scoreboard", "overlays"]) {
@@ -362,7 +382,7 @@ describe("PlayScreen round mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("(1) Revealed Rock");
-    expect(screen.getByTestId("inspect-object").textContent).toBe("(1) Revealed Rock");
+    expect(screen.getByRole("dialog", { name: "INSPECT // px 1,1" })).toBeTruthy();
   });
 
   it("keeps the title hidden after a wrong verdict that leaves the spot locked", async () => {
@@ -401,26 +421,83 @@ describe("PlayScreen round mode", () => {
     fireEvent.click(canvas, { clientX: 15, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: /Inspect off/ }));
     fireEvent.click(canvas, { clientX: 25, clientY: 15 });
-    const region = screen.getByRole("region", { name: "Inspect pixel 2, 1" });
-    expect(region.textContent).toContain("RA");
-    expect(screen.queryByTestId("inspect-object")).toBeNull();
+    const popup = screen.getByRole("dialog", { name: "INSPECT // px 2,1" });
+    expect(popup.textContent).toContain("RA");
+    expect((await screen.findAllByText(/\[LOCKED\]/)).length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toContain("433 Eros");
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
-    expect(screen.getByRole("region", { name: /Inspect pixel/ })).toBeTruthy();
-    expect(screen.queryByTestId("inspect-object")).toBeNull();
+    expect(screen.getByRole("dialog", { name: /INSPECT/ })).toBeTruthy();
+    expect((await screen.findAllByText(/\[LOCKED\]/)).length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toContain("433 Eros");
+    expect(infoCalls().length).toBeGreaterThan(0);
+    expect(infoCalls().every((u) => u.includes("mode=round"))).toBe(true);
   });
 
-  it("an unlocked verdict with reveal opens Inspect on the object with its name", async () => {
+  it("an unlocked verdict with reveal opens Inspect on the object; the popup refetches the unlocked facts", async () => {
     const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
     fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    // Inspect is already open on the reveal pixel (1, 1) while locked; only a remount refetches it.
+    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.click(canvas, { clientX: 15, clientY: 15 });
+    expect((await screen.findAllByText(/\[LOCKED\]/)).length).toBeGreaterThan(0);
+    info.reply = { mode: "round", locked: false, sources: { jpl: "ok" }, solar_system: [{ name: "433 Eros", r_au: 1.2 }] };
+    const before = infoCalls().length;
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
-    expect(screen.getByRole("region", { name: "Inspect pixel 1, 1" })).toBeTruthy();
-    expect(screen.getByTestId("inspect-object").textContent).toBe("433 Eros");
+    expect(screen.getByRole("dialog", { name: "INSPECT // px 1,1" })).toBeTruthy();
+    expect((await screen.findAllByText(/433 Eros/)).length).toBeGreaterThan(0);
+    expect(infoCalls().length).toBeGreaterThan(before);
+    expect(infoCalls().every((u) => u.includes("mode=round"))).toBe(true);
+  });
+
+  it("anchors the popup at the inspected pixel's centre on screen", async () => {
+    const canvas = await loadGame();
+    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.click(canvas, { clientX: 25, clientY: 15 });
+    // 40 x 20 px canvas over a 4 x 2 grid: pixel (2, 1) has its centre at (25, 15). placePopup puts
+    // the 380 x 480 panel 12 px right of that point in jsdom's 1024 x 768 window.
+    const popup = screen.getByRole("dialog", { name: "INSPECT // px 2,1" });
+    expect([popup.style.left, popup.style.top]).toEqual(["37px", "15px"]);
+    fireEvent.click(within(popup).getByRole("button", { name: /Close/i }));
+    expect(screen.queryByRole("dialog", { name: /INSPECT/ })).toBeNull();
+  });
+
+  it("bumps the scoreboard on every verdict", async () => {
+    const wrong: CheckResponse = { ...known, verdict: { kind: "candidate", points: 0, message: "No." }, unlocked: false, reveal: undefined };
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(wrong), { status: 200 })) as unknown as typeof fetch });
+    expect(screen.getByRole("button", { name: /Scoreboard/ })).toBeTruthy();
+    await vi.waitFor(() => expect(boardCalls().length).toBeGreaterThan(0));
+    expect(boardCalls()[0]).toContain("scope=spot");
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    for (let n = 1; n <= 2; n++) {
+      const before = boardCalls().length;
+      fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+      await screen.findByTestId("verdict");
+      await vi.waitFor(() => expect(boardCalls().length).toBeGreaterThan(before));
+    }
+  });
+
+  it("Log in / Sign up opens the sign-in dialog", async () => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+    await loadGame();
+    expect(document.querySelector("dialog")).toBeNull();
+    const login = screen.getByRole("button", { name: "Log in / Sign up" }) as HTMLButtonElement;
+    expect(login.disabled).toBe(false);
+    fireEvent.click(login);
+    expect(document.querySelector("dialog")?.open).toBe(true);
+  });
+
+  it("the tutorial shows no scoreboard", async () => {
+    await loadGame({ showTitle: true, objectName: "433 Eros" });
+    expect(screen.getByRole("complementary", { name: "Scoreboard panel" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
   });
 
   it("the tutorial's Inspect names the object from the start", async () => {

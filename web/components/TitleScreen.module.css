@@ -1,6 +1,6 @@
 .screen {
   position: relative;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--site-footer-h, 0px));
   display: grid;
   place-items: center;
   overflow: hidden;

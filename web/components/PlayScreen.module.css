@@ -1,7 +1,7 @@
 .screen {
   display: grid;
   grid-template-rows: 48px 1fr;
-  height: 100vh;
+  height: calc(100vh - var(--site-footer-h, 0px));
   min-height: 600px;
 }
 
@@ -113,26 +113,6 @@
   padding: var(--space-1) var(--space-2);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.footer {
-  margin-top: auto;
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-}
-
-.statusLight {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.statusLight span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-dim);
 }
 
 .center {

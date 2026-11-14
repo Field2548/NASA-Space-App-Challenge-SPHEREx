@@ -1,12 +1,12 @@
-// Title screen `/` (BP 8.13): "PRESS START" feel over an ASCII starfield, three buttons.
+// Title screen `/` (BP 8.13): "PRESS START" feel over an ASCII starfield; Start training, Skip
+// to game, Explore the sky (/map) and Log in (AuthDialog). About and Credits sit in the site footer.
 // Server-safe: the starfield comes from a fixed seed (same HTML on server and client), the
 // twinkle is CSS only and stops under prefers-reduced-motion.
 
 import Link from "next/link";
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
+import LoginButton from "./LoginButton";
 import styles from "./TitleScreen.module.css";
-
-export const LOGIN_TOOLTIP = "Accounts are coming soon. You can play as a guest; progress stays in this browser.";
 
 type Cell = { ch: string; tw: 0 | 1 | 2 | 3 };
 
@@ -64,18 +64,11 @@ export default function TitleScreen() {
           <Link href="/play?spot=eros" className={styles.button}>
             Skip to game
           </Link>
-          <span className={styles.loginWrap} title={LOGIN_TOOLTIP}>
-            <button type="button" disabled aria-describedby="login-note" className={styles.button}>
-              Log in
-            </button>
-            <span id="login-note" className="sr-only">
-              {LOGIN_TOOLTIP}
-            </span>
-          </span>
+          <Link href="/map" className={styles.button}>
+            Explore the sky
+          </Link>
+          <LoginButton className={styles.button} />
         </nav>
-        <p className={styles.links}>
-          <Link href="/about">About</Link> · <Link href="/credits">Credits</Link>
-        </p>
       </div>
     </main>
   );

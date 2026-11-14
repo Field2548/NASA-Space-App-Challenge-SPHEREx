@@ -2,7 +2,8 @@
 // /play field mode (BP 8.1 at 1440 x 900): top bar, left tool panel, centre viewport, right
 // scoreboard panel, bottom timeline. Loads a spot from field.json + frames.u16; a missing or
 // broken spot shows an ASCII empty state. Players never see placeholders: parts not built yet
-// (scoreboard, coordinate box, show-work) render nothing until a real component exists.
+// (coordinate box, show-work) render nothing until a real component exists. The right panel holds
+// SERVER's Scoreboard (refreshKey bumps on every verdict); "Log in / Sign up" opens AuthDialog.
 //
 // Keyboard marking: focus the viewer, arrows move a crosshair (Shift = 10 px), Enter marks
 // (or inspects in Inspect mode). Tutorial hooks: data-tutorial-target on the parts a coach mark
@@ -11,8 +12,9 @@
 // Round mode (default): the heading is the sky position, never the title or slug, until a
 // verdict arrives; Tutorial passes showTitle.
 //
-// Inspect shows InspectPanel for the clicked pixel; the object name appears only after an
-// unlocked verdict with `reveal`, or from the start when showTitle is set (tutorial).
+// Inspect on /play opens SERVER's InspectPopup in "round" mode; /api/info keeps names locked
+// until an unlocked verdict. The tutorial (showTitle) keeps InspectPanel, which names the object
+// from the tutorial's own copy (InspectPopup has no name prop).
 //
 // Tools: `tools` lists the parts shown (ALL_TOOLS on /play). The tutorial passes a growing set
 // so parts unlock one by one; a hidden tool also ignores its keyboard shortcut. "Known
@@ -22,7 +24,7 @@
 // Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools? }
 
 import Link from "next/link";
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
@@ -31,7 +33,10 @@ import { type BlinkMode, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import InspectPanel from "./InspectPanel";
+import { InspectPopup } from "./InspectPopup";
+import LoginButton from "./LoginButton";
 import styles from "./PlayScreen.module.css";
+import { Scoreboard } from "./Scoreboard";
 import SubmitBar from "./SubmitBar";
 import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
 import VisionPicker from "./VisionPicker";
@@ -142,9 +147,7 @@ export default function PlayScreen({ spot, loading = false, ...hooks }: PlayScre
           <span>{PROJECT_NAME}</span>
         </Link>
         <div data-slot="auth" className={styles.auth}>
-          <button type="button" disabled title="Coming soon">
-            Log in / Sign up
-          </button>
+          <LoginButton label="Log in / Sign up" />
         </div>
       </header>
       {loading ? (
@@ -223,7 +226,10 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [black, setBlack] = useState(field.stretch.black_sigma);
   const fit = useMemo(() => fitScale(W, H, 900, 560), [W, H]);
   const [scale, setScale] = useState(fit);
-  const [inspected, setInspected] = useState<[number, number] | null>(null);
+  // Inspected pixel plus its screen point (InspectPopup opens beside it).
+  const [inspected, setInspected] = useState<{ x: number; y: number; click: { x: number; y: number } } | null>(null);
+  const [verdicts, setVerdicts] = useState(0); // Scoreboard.refreshKey: bumps on every verdict
+  const viewerRef = useRef<HTMLDivElement>(null);
   const [scoreOpen, setScoreOpen] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
@@ -264,9 +270,17 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
 
   const k = Math.min(Math.max(0, blink.index), Math.max(0, frames.length - 1));
   const meta = field.frames[k];
+  /** Open Inspect on pixel (x, y); the popup's anchor is that pixel's centre on screen. */
+  const inspectAt = (x: number, y: number) => {
+    const canvas = viewerRef.current?.querySelector('[data-testid="field-canvas"]');
+    const r = canvas?.getBoundingClientRect();
+    const click = r && r.width > 0 && r.height > 0 ? { x: r.left + ((x + 0.5) * r.width) / W, y: r.top + ((y + 0.5) * r.height) / H } : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    setInspected({ x, y, click });
+  };
+
   const markAt = (x: number, y: number) => {
     if (!meta) return;
-    if (mode === "inspect") setInspected([x, y]);
+    if (mode === "inspect") inspectAt(x, y);
     else placeMark({ frame: meta.i, x, y, tDays: meta.mjd - field.frames[0].mjd });
   };
 
@@ -293,9 +307,10 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     if (res.unlocked) setVerdictIn(true);
     if (res.unlocked) setRevealTitle(res.spot_reveal?.title ?? res.verdict.object_name ?? field.title);
     if (res.unlocked && res.reveal) setRevealName(res.spot_reveal?.title ?? res.verdict.object_name ?? null);
+    setVerdicts((v) => v + 1);
     emit("submitted", marks);
     if (res.reveal && canInspect) {
-      setInspected([Math.round(res.reveal.x), Math.round(res.reveal.y)]);
+      inspectAt(Math.round(res.reveal.x), Math.round(res.reveal.y));
       if (mode !== "inspect") {
         setMode("inspect");
         emit("inspect-opened", marks, true);
@@ -394,13 +409,6 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
           </section>
         )}
-        <footer className={styles.footer}>
-          <Link href="/status" className={styles.statusLight} data-slot="status-light">
-            <span aria-hidden="true" />
-            Status
-          </Link>
-          <Link href="/credits">Credits</Link>
-        </footer>
       </aside>
 
       <main className={styles.center}>
@@ -411,6 +419,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
         </div>
         <div className={styles.viewer}>
           <div
+            ref={viewerRef}
             className={styles.kbd}
             tabIndex={0}
             role="group"
@@ -432,26 +441,41 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               marks={marks}
               onMark={placeMark}
               mode={mode}
-              onInspect={(x, y) => setInspected([x, y])}
+              onInspect={inspectAt}
               overlay={overlay}
               overlayFrames={onionRangeFrames(onionRange)}
               crosshair={pointer ? null : cursor}
               brightness={black}
               scale={scale}
               inspectSlot={
-                mode === "inspect" && inspected ? (
+                // Tutorial only: InspectPopup takes no name, and the tutorial names its object from its own copy.
+                showTitle && mode === "inspect" && inspected ? (
                   <InspectPanel
                     field={field}
                     frames={shownFrames}
                     frameIndex={k}
-                    x={inspected[0]}
-                    y={inspected[1]}
-                    objectName={revealName ?? (showTitle ? (objectName ?? null) : null)}
+                    x={inspected.x}
+                    y={inspected.y}
+                    objectName={revealName ?? objectName ?? null}
                   />
                 ) : null
               }
             />
           </div>
+          {!showTitle && mode === "inspect" && inspected && (
+            // Round mode always: the server keeps names locked until an unlocked verdict. The key
+            // remounts the popup once the spot unlocks so it refetches the unlocked facts.
+            <InspectPopup
+              key={verdictIn ? "unlocked" : "locked"}
+              field={field}
+              frames={shownFrames}
+              x={inspected.x}
+              y={inspected.y}
+              click={inspected.click}
+              mode="round"
+              onClose={() => setInspected(null)}
+            />
+          )}
           <p id={statusId} className={styles.kbdStatus} aria-live="polite">
             {notice ? <span className={styles.notice}>{notice}</span> : null}
             {cursor ? ` Crosshair x ${cursor[0]} y ${cursor[1]}.` : ""}
@@ -485,6 +509,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
                   Clear marks
                 </button>
               </section>
+              {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
+              {!showTitle && <Scoreboard slug={spot} refreshKey={verdicts} />}
             </>
           )}
         </aside>
