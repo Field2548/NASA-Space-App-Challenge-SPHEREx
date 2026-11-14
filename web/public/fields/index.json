@@ -1,0 +1,12 @@
+[
+ {
+  "slug": "fixture",
+  "title": "Fixture (synthetic test spot)",
+  "ra": 150.0,
+  "dec": 2.0,
+  "fov_deg": 0.0547,
+  "difficulty": "easy",
+  "kind": "fixture",
+  "thumbnail": "fixture/thumbs/1.webp"
+ }
+]

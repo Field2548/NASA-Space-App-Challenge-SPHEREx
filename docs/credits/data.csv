@@ -1,0 +1,4 @@
+name,author,link,license,used_for,date_checked
+NumPy,NumPy Developers,https://numpy.org/,BSD-3-Clause,"array maths in the export pipeline (pipeline/)",2026-11-15
+Pillow,Jeffrey A. Clark and contributors,https://python-pillow.org/,MIT-CMU,"writing WebP thumbnails and reading PNG previews (pipeline/)",2026-11-15
+pytest,pytest-dev team,https://pytest.org/,MIT,"tests for the export pipeline (development only)",2026-11-15
