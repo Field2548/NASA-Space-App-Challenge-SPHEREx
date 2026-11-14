@@ -224,6 +224,11 @@ Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need 
 - `r_au`, `delta_au` are present only when JPL Horizons gave them (ready-spot objects). Never estimated.
 - The server returns catalog values only. Distances in light-years, light-minutes or from redshift are worked out in the popup with DATA's `parallaxDistance` and `redshiftDistance` (BP 8.16 rules), so each number keeps its source.
 - A spot with no catalog file yet answers `sources: { "simbad": "skipped", ... }` and empty lists, not an error.
+- **Built against the real `web/data/catalog/<slug>.json` (1.2 addendum, SERVER):** the files differ from the field-schema section 9 draft in these ways, and the server follows the real files:
+  - A top-level `sources` block (`sources.simbad`, `sources.gaia`, `sources.jpl`). A source block that the file marks `"unavailable"` (SIMBAD, in every file so far: CDS was down) answers `error`. A source the file lacks answers `skipped`. Otherwise `premade` when the file has something near the pixel, `empty` when the file has the source and nothing is near. A `"timeout"` status answers `timeout`.
+  - `objects[]` has `id`, `name`, `source` (no `kind`, no `positions`). Its `r_au` and `delta_au` are one value per frame; the entry takes the value for its frame. The per-frame pixel positions come from `asteroids[]`, matched by name.
+  - `stars[].xy` is one `[x, y]` per frame. A Gaia distance uses the smallest pixel distance over the frames, times `pixel_arcsec` from `field.json`. A star without `xy` uses its sky position.
+  - `spot_reveal` comes from the answer key's `reveal` block, as above. Nothing on the sky-map (outside-spot) path reads a catalog file.
 
 ## 7. `GET /api/leaderboard?scope=spot|all&slug=`
 
