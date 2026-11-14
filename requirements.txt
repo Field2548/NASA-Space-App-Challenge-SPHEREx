@@ -1,0 +1,9 @@
+# Tested with Python 3.14 and these versions
+numpy>=2.5
+scipy>=1.18
+matplotlib>=3.11
+pillow>=13.0
+requests>=2.34
+astropy>=8.0
+astroquery>=0.4.11
+photutils>=3.1

@@ -1,0 +1,10 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Downloaded SPHEREx data (re-downloadable by the scripts; ~4 MB per cutout)
+*.fits
+*.part
+data/**/cutouts/
+data/**/images/
