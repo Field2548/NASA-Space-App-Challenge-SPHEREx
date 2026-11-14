@@ -3,6 +3,7 @@
 // Pure functions plus one tile loader (field-schema.md section 8). Never invent a value: return null.
 
 import { FIELDS_BASE } from "./fields";
+import { scatterInflation } from "./spectra";
 import type { Field, Spectrum } from "./types";
 
 // ---------------------------------------------------------------------------------------------
@@ -297,13 +298,17 @@ export function measureFeature(spec: Spectrum, def: FeatureDef): { depthSigma: n
 /**
  * Possible ice dips (H2O 3.0, CO2 4.27, CO 4.67 um) and PAH glow (3.3 um), each only when >= 3 sigma
  * (dip below or bump above the continuum). Empty when nothing qualifies. Never an amount.
+ * Significance uses the errors inflated by the spectrum's own band-to-band scatter
+ * (scatterInflation in spectra.ts): with the cube's sky-noise errors alone, the pixel-phase scatter
+ * of bright stars produced "features" at hundreds of sigma on real Eros-field stars.
  */
 export function findFeatures(spec: Spectrum): { feature: FeatureName; sigma: number }[] {
   const out: { feature: FeatureName; sigma: number }[] = [];
+  const k = scatterInflation(spec);
   for (const def of FEATURES) {
     const m = measureFeature(spec, def);
     if (!m) continue;
-    const s = def.kind === "dip" ? m.depthSigma : -m.depthSigma;
+    const s = (def.kind === "dip" ? m.depthSigma : -m.depthSigma) / k;
     if (s >= FEATURE_MIN_SIGMA) out.push({ feature: def.feature, sigma: s });
   }
   return out;

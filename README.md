@@ -155,7 +155,7 @@ We used Claude Code (Anthropic's coding assistant) to help write the code in thi
 
 - The Python tools and the science behind them were written by the team with Claude Code. The repo history shows this: many commit messages carry a `Co-Authored-By: Claude` line.
 - The website was built by three Claude Code agent sessions, called DATA, GAME and SERVER. They worked on separate branches and talked to each other only through GitHub issues and pull requests, following the plans in `docs/plans/`.
-- People kept the jobs that need a person: accounts, secrets, approvals, running things on the laptop that holds the SPHEREx downloads, and the final submission.
+- People kept the jobs that need a person: accounts, secrets, approvals, and the final submission.
 - Every outside idea, dataset, library, font and icon is credited in `CREDITS.md`. Other teams' projects were read for ideas only. The code is our own.
 - No AI-generated images or video are used. Every picture on the site is real SPHEREx data, or is drawn in code (CSS and SVG).
 

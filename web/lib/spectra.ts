@@ -362,6 +362,38 @@ function usable(spec: Spectrum): { wl: number; f: number; e: number }[] {
   return out;
 }
 
+/**
+ * Error inflation factor from the spectrum's own band-to-band scatter (>= 1).
+ * Why: the cube's bands come from single images taken months apart, so a point source falls on a
+ * different pixel phase in each band; on Eros-field stars this makes about 25 percent band-to-band
+ * scatter while `noise` (sky noise) is far smaller. For each interior band in wavelength order,
+ * r = f_i - (f_{i-1} + f_{i+1}) / 2 with expected sigma sqrt(e_i^2 + (e_{i-1}^2 + e_{i+1}^2) / 4);
+ * the factor is the robust std (1.4826 x MAD) of r / sigma, floored at 1. A smooth curve or a broad
+ * feature spanning several bands barely changes it; robust statistics ignore a few spikes.
+ * Returns 1 with fewer than 8 usable bands.
+ */
+export function scatterInflation(spec: Spectrum): number {
+  const pts = usable(spec)
+    .filter((p) => Number.isFinite(p.e))
+    .sort((a, b) => a.wl - b.wl);
+  if (pts.length < 8) return 1;
+  const z: number[] = [];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const r = pts[i].f - (pts[i - 1].f + pts[i + 1].f) / 2;
+    const s = Math.sqrt(pts[i].e ** 2 + (pts[i - 1].e ** 2 + pts[i + 1].e ** 2) / 4);
+    z.push(r / s);
+  }
+  const m = median(z);
+  const mad = median(z.map((v) => Math.abs(v - m)));
+  return Math.max(1, 1.4826 * mad); // 1.4826: MAD -> Gaussian sigma
+}
+
+/** The same spectrum with every error multiplied by scatterInflation(spec). */
+export function withInflatedErrors<S extends Spectrum>(spec: S): S {
+  const k = scatterInflation(spec);
+  return k === 1 ? spec : { ...spec, err: spec.err.map((e) => e * k) };
+}
+
 /** Hot-star rule (BP 8.16 C.4): near-infrared barely changes above about 5000 K. */
 export const HOT_LIMIT_K = 5000;
 /** Temperature search range for the fit, K. Below 300 K there is almost no signal at 0.75 to 5 um; above 50000 K the curve is pure Rayleigh-Jeans. */
@@ -556,13 +588,17 @@ function matchOne(pts: { wl: number; f: number; e: number }[], ref: Reference): 
  * shared bands, resample the reference to the measured wavelengths (linear), chi-square with the
  * measured errors. Null unless the target has S/N >= 5 in at least 20 bands, or fewer than 2
  * references could be compared. `quality` comes from the best reduced chi-square.
+ * `opts.inflateErrors` (default false, i.e. the measured errors as BP 8.16 says) multiplies the
+ * errors by scatterInflation() for the chi-square only (the S/N gate always uses measured errors).
+ * Without it, real cube pixels of bright stars almost always come out "poor" (see scatterInflation).
  */
 export function matchReferences(
   spec: Spectrum,
   refs: Reference[],
+  opts: { inflateErrors?: boolean } = {},
 ): { best: Match; runnerUp: Match; quality: "good" | "rough" | "poor" } | null {
   if (bandsAboveSnr(spec) < MATCH_MIN_BANDS) return null;
-  const pts = usable(spec).filter((p) => Number.isFinite(p.e));
+  const pts = usable(opts.inflateErrors ? withInflatedErrors(spec) : spec).filter((p) => Number.isFinite(p.e));
   const ms = refs.map((r) => matchOne(pts, r)).filter((m): m is Match => m !== null);
   if (ms.length < 2) return null;
   ms.sort((a, b) => a.redChi2 - b.redChi2);

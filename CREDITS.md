@@ -10,7 +10,7 @@ We read these projects for ideas; all code here is our own.
 
 > This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology.
 
-**SPHEREx data products (Quick Release 2)**
+**SPHEREx level 2 spectral images (Data Release 1 and Quick Release 3), served by IRSA**
 
 > This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration.
 
@@ -18,11 +18,12 @@ We read these projects for ideas; all code here is our own.
 
 | Name | Author | Link | License | Used for | Checked |
 | --- | --- | --- | --- | --- | --- |
+| AWS Open Data hosting of IRSA data (bucket nasa-irsa-spherex) | Amazon Web Services Open Data Sponsorship Program; data from NASA/IPAC IRSA | https://irsa.ipac.caltech.edu/cloud_access/ | Public service, read without credentials. IRSA's cloud access page says the files are hosted through the AWS Open Data Sponsorship Program. No official citation sentence could be fetched (registry.opendata.aws is blocked here): take the 'How to cite' wording from the dataset's page on the Registry of Open Data on AWS (linked from the IRSA cloud access page) and add it here. | quick look: partial (byte-range) downloads of SPHEREx files from the public nasa-irsa-spherex bucket | 2026-11-14 |
 | JPL Horizons | Solar System Dynamics Group, Jet Propulsion Laboratory | https://ssd.jpl.nasa.gov/horizons/ | Public NASA/JPL service | positions of known objects (Eros, Hektor, Makemake, Eris) in each frame for the answer keys | 2026-11-15 |
 | Mamajek dwarf colour and effective temperature table (Pecaut & Mamajek 2013) | Eric Mamajek | https://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt | No license stated in the file (header read 2026-11-14). The author asks users to cite Pecaut & Mamajek (2013, ApJS 208, 9) and to email him if the table is used in research. | spectral type to temperature, columns SpT and Teff only, in web/public/ref/spt_teff.json | 2026-11-14 |
 | Molecule band ranges (reference data) | The team (DATA agent), from docs/BUILD_PROMPT.md section 8.16 | https://github.com/Field2548/NASA-Space-App-Challenge-SPHEREx | GPL-3.0, our own work (see LICENSE); centres come from the build prompt, widths are display choices flagged in the file | shaded molecule bands in the Inspect spectrum chart (web/public/ref/molecule_bands.json) | 2026-11-14 |
 | NASA/IPAC Infrared Science Archive (IRSA) | Caltech/IPAC for NASA | https://irsa.ipac.caltech.edu/ack.html | Service. Required acknowledgement: "This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology." | image search (SIA), cutout downloads, quick look | 2026-11-15 |
-| SPHEREx data products (Quick Release 2) | NASA / JPL / Caltech; served by IRSA | https://irsa.ipac.caltech.edu/Missions/spherex.html | Public NASA data. Required acknowledgement: "This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration." | every image, frame and spectrum on the site | 2026-11-15 |
+| SPHEREx level 2 spectral images (Data Release 1 and Quick Release 3), served by IRSA | NASA / JPL / Caltech; served by IRSA | https://irsa.ipac.caltech.edu/Missions/spherex.html | Public NASA data. Please cite the IRSA DOIs: 10.26131/IRSA678 (DR1 Spectral Images) and 10.26131/IRSA662 (QR3). Required acknowledgement: "This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration." | every image, frame and spectrum on the site: DR1 images for Eros, Hektor, Makemake and Eris; QR3 images for Cygnus | 2026-11-15 |
 
 ## Software libraries
 

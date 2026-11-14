@@ -77,7 +77,7 @@ IDEAS = [
 #   ("grep", [dirs], "regex")        required once source files in those dirs mention it
 # Features that do not exist yet are therefore not demanded yet.
 REQUIRED = [
-    ("SPHEREx data products", r"spherex data", ("always",)),
+    ("SPHEREx data products", r"spherex.*(data|images?)", ("always",)),
     ("NASA/IPAC Infrared Science Archive (SIA, cutouts, TAP)", r"\birsa\b", ("always",)),
     ("JPL Horizons", r"horizons", ("always",)),
     ("Astropy", r"^astropy", ("always",)),
