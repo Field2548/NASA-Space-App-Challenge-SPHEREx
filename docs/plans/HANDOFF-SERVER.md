@@ -40,14 +40,16 @@ Both are committed in df32079 and pushed; CI on PR #6 is the independent check. 
 
 ## In progress when this was written
 
-- Sub-agent: `/api/health`, `/status` page, `web/components/StatusBadge.tsx`, `web/lib/server/health.ts`. Files may exist uncommitted in the working tree. Verify, then commit.
+- `/api/health`, `/status`, `StatusBadge.tsx` are committed (130 vitest pass, build ok). `StatusBadge` is not in the layout yet: ask GAME for a footer slot.
 - Sub-agent (opus): adversarial review of the contract, the SQL migration, scoring, the unlock cookie and `/api/check`. Its findings are not applied yet. If its report is lost, run the review again.
 
 ## Known problems and caveats
 
 - **SQL migration has never been run.** `supabase/migrations/20261115000000_init.sql` was written with no Postgres available. Run it on a real Supabase project (or local Postgres) before trusting it. Watch for ambiguous column names in `record_find`.
 - **No Supabase project yet** (issue #3 item 1). Everything must keep working with no database.
-- **Local `node_modules` in `web/` may be broken** on the first machine (vitest failed to load every file at 04:23 after npm commands ran while a build was running). Fix: `npm ci`.
+- **Run vitest from a path with an upper-case drive letter** (`D:NASASpaceAppChallengeweb`, or `cd /D/NASASpaceAppChallenge/web` in Git Bash). From `d:...` every test file fails to load with "Cannot read properties of undefined (reading 'config')". The code is fine: 130 tests pass from `D:`.
+- **Build log noise:** `next build` prints `[api] unexpected error ... NEXT_PRERENDER_INTERRUPTED` for the GET routes, because `handle()` in `web/lib/server/http.ts` catches Next's prerender bail-out. The build succeeds and the routes are dynamic; `handle` should rethrow that error.
+- **Status page, real run at 04:30:** CDS HiPS and SIMBAD answered 404 for every path and JPL sb_ident timed out, so their probe URLs are not confirmed against a healthy service. `/status` was not looked at in a browser.
 - **Windows npm rewrites `package-lock.json`** and drops optional Linux packages, which breaks `npm ci` in CI. After adding a dependency, check `git diff --stat origin/web -- web/package-lock.json`: it should be a few lines. If it is hundreds, restore the lock from `origin/web` and add only the new entries.
 - **Bot candidates that may be noise:** Hektor ranks 2 and 3 and Eris rank 2 are just above their noise bars and score full points as `bot_match`. Raised with DATA in the PR #5 review; no answer yet.
 - **Aladin Lite licence:** npm says LGPL-3.0-or-later, the build prompt says GPL-3.0. Settle it in the licence audit.
