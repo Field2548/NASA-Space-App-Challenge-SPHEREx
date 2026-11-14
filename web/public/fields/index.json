@@ -1,52 +1,52 @@
 [
  {
   "slug": "eros",
-  "title": "(433) Eros",
+  "title": "Field in Pisces",
   "ra": 13.2004,
   "dec": 14.38,
   "fov_deg": 0.2,
   "difficulty": "easy",
-  "kind": "asteroid",
+  "kind": "spot",
   "thumbnail": "eros/thumbs/1.webp"
  },
  {
   "slug": "hektor",
-  "title": "(624) Hektor",
+  "title": "Field in Virgo",
   "ra": 184.3049,
   "dec": -6.3773,
   "fov_deg": 0.2,
   "difficulty": "medium",
-  "kind": "asteroid",
+  "kind": "spot",
   "thumbnail": "hektor/thumbs/1.webp"
  },
  {
   "slug": "makemake",
-  "title": "(136472) Makemake",
+  "title": "Field in Coma Berenices",
   "ra": 200.0075,
   "dec": 21.523,
   "fov_deg": 0.1,
   "difficulty": "hard",
-  "kind": "dwarf-planet",
+  "kind": "spot",
   "thumbnail": "makemake/thumbs/1.webp"
  },
  {
   "slug": "eris",
-  "title": "(136199) Eris",
+  "title": "Field in Cetus",
   "ra": 26.3271,
   "dec": -0.4338,
   "fov_deg": 0.1,
   "difficulty": "boss",
-  "kind": "dwarf-planet",
+  "kind": "spot",
   "thumbnail": "eris/thumbs/1.webp"
  },
  {
   "slug": "cygnus",
-  "title": "Cygnus control field",
+  "title": "Field in Cygnus",
   "ra": 304.6935,
   "dec": 42.4437,
   "fov_deg": 0.2,
-  "difficulty": "control",
-  "kind": "control",
+  "difficulty": "medium",
+  "kind": "spot",
   "thumbnail": "cygnus/thumbs/1.webp"
  }
 ]

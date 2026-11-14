@@ -21,7 +21,8 @@
      3.8,
      1.9,
      4.2
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 2,
@@ -37,7 +38,8 @@
      0.0,
      9.9,
      3.3
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 3,
@@ -53,7 +55,8 @@
      0.9,
      17.7,
      17.1
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 4,
@@ -69,7 +72,8 @@
      3.1,
      0.0,
      7.1
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 5,
@@ -85,7 +89,8 @@
      6.6,
      3.0,
      1.7
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 6,
@@ -101,7 +106,8 @@
      4.0,
      4.3,
      1.8
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 7,
@@ -117,7 +123,8 @@
      0.4,
      6.7,
      6.0
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 8,
@@ -133,7 +140,8 @@
      9.3,
      1.2,
      4.8
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 9,
@@ -149,7 +157,8 @@
      2.3,
      14.4,
      0.0
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 10,
@@ -165,8 +174,14 @@
      9.3,
      6.0,
      4.4
-    ]
+    ],
+    "status": "unconfirmed"
    }
   ]
+ },
+ "reveal": {
+  "title": "Cygnus control field",
+  "kind": "control",
+  "difficulty": "control"
  }
 }

@@ -39,6 +39,7 @@ def test_committed_fixture_matches_the_script():
     assert np.nanmax(np.abs(src - frames)) <= field["data"]["scale"] / 2 + 1e-9
     assert np.isnan(frames[:, 31, 31]).all()          # the no-data pixel
     assert len(field["thumbs"]) == len(field["frames"]) == 4
+    assert all(isinstance(v, float) for v in field["wcs"]["crpix"])
     for t in field["thumbs"]:
         assert os.path.exists(os.path.join(SPOT, t))
 
@@ -56,3 +57,6 @@ def test_answer_key_points_at_the_mover():
         dt = fr["mjd"] - ans["t_ref_mjd"]
         assert abs(c["x"] + c["vx_px_per_day"] * dt - p["x"]) < 1e-6
         assert abs(c["y"] + c["vy_px_per_day"] * dt - p["y"]) < 1e-6
+    assert c["status"] == "known"
+    assert c["object_id"] == "fixture-1"
+    assert c["near_object_frames"] == [1, 2, 3, 4]

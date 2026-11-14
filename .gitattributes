@@ -1,0 +1,7 @@
+# Raw pixel data and images: never convert line endings, never merge as text.
+*.u16 binary
+*.webp binary
+*.png binary
+*.gif binary
+*.ico binary
+*.fits binary

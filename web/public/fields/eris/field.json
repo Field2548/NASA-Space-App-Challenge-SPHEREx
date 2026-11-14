@@ -1,7 +1,7 @@
 {
  "slug": "eris",
- "title": "(136199) Eris",
- "kind": "dwarf-planet",
+ "title": "Field in Cetus",
+ "kind": "spot",
  "difficulty": "boss",
  "ra": 26.3271,
  "dec": -0.4338,
@@ -34,7 +34,7 @@
   {
    "i": 1,
    "mjd": 61047.05341,
-   "utc": "2026-01-07T01:16:55",
+   "utc": "2026-01-07T01:16:54",
    "hours_since_prev": 0,
    "n_bands": 8,
    "detectors": [
@@ -78,7 +78,7 @@
   {
    "i": 5,
    "mjd": 61052.211442,
-   "utc": "2026-01-12T05:04:29",
+   "utc": "2026-01-12T05:04:28",
    "hours_since_prev": 29.35,
    "n_bands": 8,
    "detectors": [
@@ -111,6 +111,6 @@
  "psf_fwhm_px": 1.647,
  "has": {
   "exposures": true,
-  "spectrum": false
+  "spectrum": true
  }
 }
