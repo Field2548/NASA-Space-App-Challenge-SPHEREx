@@ -1,25 +1,5 @@
 [
  {
-  "slug": "eris",
-  "title": "(136199) Eris",
-  "ra": 26.3271,
-  "dec": -0.4338,
-  "fov_deg": 0.1,
-  "difficulty": "boss",
-  "kind": "dwarf-planet",
-  "thumbnail": "eris/thumbs/1.webp"
- },
- {
-  "slug": "cygnus",
-  "title": "Cygnus control field",
-  "ra": 304.6935,
-  "dec": 42.4437,
-  "fov_deg": 0.2,
-  "difficulty": "control",
-  "kind": "control",
-  "thumbnail": "cygnus/thumbs/1.webp"
- },
- {
   "slug": "eros",
   "title": "(433) Eros",
   "ra": 13.2004,
@@ -48,5 +28,25 @@
   "difficulty": "hard",
   "kind": "dwarf-planet",
   "thumbnail": "makemake/thumbs/1.webp"
+ },
+ {
+  "slug": "eris",
+  "title": "(136199) Eris",
+  "ra": 26.3271,
+  "dec": -0.4338,
+  "fov_deg": 0.1,
+  "difficulty": "boss",
+  "kind": "dwarf-planet",
+  "thumbnail": "eris/thumbs/1.webp"
+ },
+ {
+  "slug": "cygnus",
+  "title": "Cygnus control field",
+  "ra": 304.6935,
+  "dec": 42.4437,
+  "fov_deg": 0.2,
+  "difficulty": "control",
+  "kind": "control",
+  "thumbnail": "cygnus/thumbs/1.webp"
  }
 ]

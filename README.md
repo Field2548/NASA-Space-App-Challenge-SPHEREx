@@ -131,3 +131,38 @@ Margins are small (Eris beats the bar by 1σ), and crowded fields have a higher 
 - Use `DATE-OBS` for when a frame was observed. The `DATE` header is when IRSA wrote the file.
 - SPHEREx data: [IRSA SPHEREx](https://irsa.ipac.caltech.edu/Missions/spherex.html).
   Based on IRSA's [SPHEREx tutorial](https://caltech-ipac.github.io/irsa-tutorials/spherex-intro/).
+
+## Website
+
+The `web/` folder holds a public web game built for the 2026 NASA Space Apps Challenge. Players look at real SPHEREx images of the same patch of sky taken at different times and try to spot the objects that moved: asteroids, dwarf planets and nearby stars. It has a short tutorial, image tools, colour-blind modes, a timeline, a sky map and an Inspect pop-up that shows what can honestly be said about a clicked spot. The public URL will be added here at deploy time.
+
+To run it on your own computer:
+
+```bash
+cd web && npm ci && npm run dev
+```
+
+Then open http://localhost:3000. The sky patches the site shows are made by the Python tools in this repo. To rebuild them (the SPHEREx files must already be downloaded, see the scripts above):
+
+```bash
+python pipeline/export_web.py --all        # the five ready spots, as files for the site
+python pipeline/catalog_facts.py --all     # names and facts of known objects near each spot
+```
+
+## How we used AI
+
+We used Claude Code (Anthropic's coding assistant) to help write the code in this repo.
+
+- The Python tools and the science behind them were written by the team with Claude Code. The repo history shows this: many commit messages carry a `Co-Authored-By: Claude` line.
+- The website was built by three Claude Code agent sessions, called DATA, GAME and SERVER. They worked on separate branches and talked to each other only through GitHub issues and pull requests, following the plans in `docs/plans/`.
+- People kept the jobs that need a person: accounts, secrets, approvals, running things on the laptop that holds the SPHEREx downloads, and the final submission.
+- Every outside idea, dataset, library, font and icon is credited in `CREDITS.md`. Other teams' projects were read for ideas only. The code is our own.
+- No AI-generated images or video are used. Every picture on the site is real SPHEREx data, or is drawn in code (CSS and SVG).
+
+## Acknowledgments
+
+This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration.
+
+This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology.
+
+Every dataset, service, library, font and idea we used is listed in [`CREDITS.md`](CREDITS.md) with its author, link and license. This project is licensed under GPL-3.0, see [`LICENSE`](LICENSE).
