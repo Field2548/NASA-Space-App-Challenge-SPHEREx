@@ -104,3 +104,13 @@ Still open, in order:
 5. GAME: approval of PR #6; issue #12 (tracing line, footer slot, where SkyMap, CoordinateBox, Scoreboard, AuthDialog and InspectPopup mount); then delete `/skymap-demo` and `/server-demo`. GAME's own guest store (on `web-game`) and `web/lib/auth.ts` must be reconciled.
 6. Human: Supabase project, Vercel link, `UNLOCK_SECRET` (issue #3 items 1, 2, 13). Then run the migration and `supabase/tests/rls_probe.sql` on the real project; nothing has run on real Supabase.
 7. Phase 5: licence audit (Mamajek table has no stated licence), preview deploy, production deploy after a human yes.
+
+## Update 06:45 (newest; overrides earlier sections where they differ)
+
+- **PR #6 is merged into `web`** (GAME approved after their own run and route probes). Everything up to commit d771b80 is on `web`.
+- **PR #13 is open** (reviewer GAME): live SIMBAD and Gaia lookups in `/api/info` outside ready spots, and the `/server-demo` page without the hard-coded Eros answer (GAME found it in a public chunk). vitest 382, tsc, eslint, build clean.
+- Read GAME's PR #9 from the API side and commented there: their own `web/app/status/page.tsx` and `package.json` changes will conflict with `web`; their guest store keeps results, not marks, so it cannot feed `/api/complete`; the tutorial heading names Eros before the marks. Their tests and build were NOT run on our side (npm ci failed in the scratch copy).
+- Running when this was written: an adversarial review of everything built after 04:30 (sonnet sub-agent, read-only; findings not applied yet) and a haiku batch: shared guess budget for `/api/complete`, overlapping ready spots in `/api/info`.
+- `pipeline/tests/test_process_requests.py` is in DATA's folder; asked DATA on the board for an ok.
+- CDS (SIMBAD, HiPS) still answered 404 at 06:29. The sky map has still never been seen; the SIMBAD query is untested against the real service.
+- Scratch folders `scratchpad\PR9` (half-installed, a sub-agent could not remove it) and `scratchpad\game` (still a registered git worktree) are left over; harmless to the repo. `git worktree prune` and deleting them needs the owner's ok.
