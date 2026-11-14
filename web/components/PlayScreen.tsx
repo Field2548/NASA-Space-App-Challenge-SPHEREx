@@ -1,8 +1,8 @@
 "use client";
 // /play field mode (BP 8.1 at 1440 x 900): top bar, left tool panel, centre viewport, right
 // scoreboard panel, bottom timeline. Loads a spot from field.json + frames.u16; a missing or
-// broken spot shows an ASCII empty state. Empty, named slots (data-slot="...") are left for
-// the parts other batches build: Submit, "Nothing moved here", scoreboard, auth, sky map, etc.
+// broken spot shows an ASCII empty state. Players never see placeholders: parts not built yet
+// (scoreboard, coordinate box, show-work) render nothing until a real component exists.
 //
 // Keyboard marking: focus the viewer, arrows move a crosshair (Shift = 10 px), Enter marks
 // (or inspects in Inspect mode). Tutorial hooks: data-tutorial-target on the parts a coach mark
@@ -15,7 +15,9 @@
 // unlocked verdict with `reveal`, or from the start when showTitle is set (tutorial).
 //
 // Tools: `tools` lists the parts shown (ALL_TOOLS on /play). The tutorial passes a growing set
-// so parts unlock one by one; a hidden tool also ignores its keyboard shortcut.
+// so parts unlock one by one; a hidden tool also ignores its keyboard shortcut. "Known
+// asteroids" draws nothing yet, so it shows only when the caller passes `tools` with "overlays"
+// (the tutorial's overlay step), never with the /play default.
 //
 // Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools? }
 
@@ -24,7 +26,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
-import type { CheckResponse, Field, Mark } from "@/lib/types";
+import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { type BlinkMode, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
@@ -32,6 +34,8 @@ import InspectPanel from "./InspectPanel";
 import styles from "./PlayScreen.module.css";
 import SubmitBar from "./SubmitBar";
 import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
+import VisionPicker from "./VisionPicker";
+import WavelengthSwitch, { useWavelengthFrames, type WavelengthSelection } from "./WavelengthSwitch";
 
 type Loaded = { spot: string; field: Field; frames: Float32Array[] } | { spot: string; error: string };
 
@@ -176,14 +180,6 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   );
 }
 
-function Slot({ name, label }: { name: string; label: string }) {
-  return (
-    <div className={styles.slot} data-slot={name}>
-      {label}
-    </div>
-  );
-}
-
 /** Crosshair step for an arrow key, or null for other keys. */
 export function arrowStep(key: string, big: boolean): [number, number] | null {
   const d = big ? 10 : 1;
@@ -196,8 +192,25 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools = ALL_TOOLS }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp }: GameProps) {
+  const tools = toolsProp ?? ALL_TOOLS;
+  const showOverlays = toolsProp?.has("overlays") ?? false;
   const [W, H] = field.size;
+  const [vision, setVision] = useState<Vision>("normal");
+  const [wavelength, setWavelength] = useState<WavelengthSelection>("all");
+  // The exposures (up to ~1 MB) are fetched only once a band other than "all" is picked.
+  const wlField = useMemo<Field>(
+    () => (wavelength === "all" ? { ...field, has: { ...field.has, exposures: false } } : field),
+    [field, wavelength],
+  );
+  const wl = useWavelengthFrames(wlField, wavelength);
+  // Frames shown: the originals for "all" or until the rebuild is ready. A frame with no
+  // exposure on the chosen detectors becomes a blank (NaN) plane so indices stay aligned.
+  const shownFrames = useMemo(() => {
+    if (wavelength === "all" || !wl.frames) return frames;
+    const blank = new Float32Array(W * H).fill(NaN);
+    return wl.frames.map((f) => f ?? blank);
+  }, [wavelength, wl.frames, frames, W, H]);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [rawMode, setMode] = useState<ViewerMode>("mark");
   const canInspect = tools.has("inspect");
@@ -293,7 +306,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (e.key === "i" || e.key === "I") toggleInspect();
       else if (e.key === "Escape") pause();
     };
@@ -338,18 +351,22 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             >
               Color by time
             </button>
-            <Slot name="image-tools" label="more tools" />
           </section>
         )}
-        {tools.has("wavelength") && (
+        {tools.has("wavelength") && field.has?.exposures === true && (
           <section className="panel" data-part="PNL-03 // WAVELENGTH">
-            <Slot name="wavelength" label="wavelength switch" />
+            <WavelengthSwitch field={field} value={wavelength} onChange={setWavelength} fewerThanThree={wl.fewerThanThree} />
+            {wavelength !== "all" && !wl.frames && (
+              <p className={styles.small} role="status" data-testid="wavelength-status">
+                {wl.loading ? "Loading the single exposures…" : "Could not rebuild these bands; showing all bands."}
+              </p>
+            )}
           </section>
         )}
-        {tools.has("overlays") && (
+        {showOverlays && (
           <section className="panel" data-part="PNL-04 // OVERLAYS">
-            <div className={styles.slot} data-slot="overlays">
-              {/* Placeholder until DATA ships the overlays: the toggle works, nothing is drawn yet. */}
+            <div data-slot="overlays">
+              {/* Tutorial only until DATA ships the overlays: the toggle works, nothing is drawn yet. */}
               <button
                 type="button"
                 aria-pressed={knownOverlay}
@@ -369,7 +386,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
         )}
         {tools.has("color-vision") && (
           <section className="panel" data-part="PNL-05 // COLOR VISION">
-            <Slot name="color-vision" label="vision picker" />
+            <VisionPicker value={vision} onChange={setVision} />
           </section>
         )}
         {tools.has("brightness") && (
@@ -388,11 +405,9 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
 
       <main className={styles.center}>
         <div className={styles.viewportTop}>
-          {tools.has("coordinates") && <Slot name="coordinate-box" label="coordinate box" />}
           <h1 className={styles.title} data-testid="field-title">
             {showTitle ? (objectName ?? field.title) : verdictIn ? (revealTitle ?? field.title) : field.title || neutralTitle(field)}
           </h1>
-          {tools.has("show-work") && <Slot name="show-work" label="show my / others' work" />}
         </div>
         <div className={styles.viewer}>
           <div
@@ -411,7 +426,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           >
             <FieldViewer
               field={field}
-              frames={frames}
+              frames={shownFrames}
+              vision={vision}
               frameIndex={blink.index}
               marks={marks}
               onMark={placeMark}
@@ -426,7 +442,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
                 mode === "inspect" && inspected ? (
                   <InspectPanel
                     field={field}
-                    frames={frames}
+                    frames={shownFrames}
                     frameIndex={k}
                     x={inspected[0]}
                     y={inspected[1]}
@@ -469,9 +485,6 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
                   Clear marks
                 </button>
               </section>
-              <section className="panel" data-part="PNL-08 // SCOREBOARD">
-                <Slot name="scoreboard" label="scoreboard" />
-              </section>
             </>
           )}
         </aside>
@@ -480,7 +493,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
       <footer className={styles.bottom} data-tutorial-target="timeline">
         <Timeline
           field={field}
-          frames={frames}
+          frames={shownFrames}
+          vision={vision}
           index={blink.index}
           onIndexChange={(i) => {
             blink.setIndex(i);

@@ -7,7 +7,8 @@
 //   field: Field; frames: Float32Array[] (decoded S/N)
 //   index: number; onIndexChange(i: number): void      array index (0-based)
 //   marks?: Mark[]                                      shown on Track 2
-//   colors?: RGB[]                                      time colours (default Okabe-Ito)
+//   colors?: RGB[]                                      time colours (default timeColors(n, vision))
+//   vision?: Vision                                     colour-vision mode for the default colours
 //   brightness?: number                                 black point for the fallback thumbnails (S/N)
 //   playing?: boolean; onTogglePlay?(): void            blink control (from useBlink)
 //   reducedMotion?: boolean                             shows that auto-play is off
@@ -26,7 +27,7 @@
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { loadThumbs } from "@/lib/fields";
 import { makeSharedStretch, toImageData } from "@/lib/imaging";
-import type { Field, Mark, RGB } from "@/lib/types";
+import type { Field, Mark, RGB, Vision } from "@/lib/types";
 import type { BlinkMode } from "@/lib/useBlink";
 import { timeColors } from "@/lib/palettes";
 import { formatGap, rgbCss, stretchPoints } from "./FieldViewer";
@@ -45,6 +46,7 @@ export interface TimelineProps {
   onIndexChange(i: number): void;
   marks?: Mark[];
   colors?: RGB[];
+  vision?: Vision;
   brightness?: number;
   playing?: boolean;
   onTogglePlay?(): void;
@@ -144,7 +146,8 @@ export default function Timeline(props: TimelineProps) {
   const { loopMode, onLoopModeChange, realSpacing = false, onRealSpacingChange, onOnionRangeChange } = props;
   const [W, H] = field.size;
   const n = frames.length;
-  const colors = useMemo(() => props.colors ?? timeColors(n, "normal"),[props.colors, n]);
+  const vision = props.vision ?? "normal";
+  const colors = useMemo(() => props.colors ?? timeColors(n, vision), [props.colors, n, vision]);
   const black = props.brightness ?? field.stretch.black_sigma;
 
   const [loaded, setLoaded] = useState<{ field: Field; list: ImageBitmap[] } | null>(null);

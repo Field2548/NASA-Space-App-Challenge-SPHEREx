@@ -22,7 +22,7 @@ describe("brightness mapping", () => {
   it("orders landmarks from faint to bright", () => {
     const pos = LANDMARKS.map((m) => blackToSlider(m.snr));
     expect(pos).toEqual([...pos].sort((a, b) => a - b));
-    expect(LANDMARKS.map((m) => m.name)).toEqual(["Eris", "Makemake", "Hektor", "Eros"]);
+    expect(LANDMARKS.map((m) => m.name)).toEqual(["faintest mover", "faint mover", "asteroid", "bright asteroid"]);
   });
 });
 
@@ -36,10 +36,15 @@ describe("BrightnessSlider", () => {
     rerender(<BrightnessSlider value={150} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(onChange).toHaveBeenLastCalledWith(-1);
-    expect(screen.getByText("Hektor")).toBeTruthy();
-    expect(screen.getByText("Hektor: S/N ~150")).toBeTruthy();
-    expect(screen.getByText("Eris: S/N ~2–4, needs Follow & stack")).toBeTruthy();
+    expect(screen.getByText("asteroid")).toBeTruthy();
+    expect(screen.getByText("Asteroid in a crowded field: S/N ~140–250")).toBeTruthy();
+    expect(screen.getByText("Faintest distant mover: S/N ~2–4, needs Follow & stack")).toBeTruthy();
     expect(screen.getByText(/Fainter/)).toBeTruthy();
+  });
+
+  it("names no object in its text or attributes", () => {
+    const { container } = render(<BrightnessSlider value={-1} onChange={() => {}} />);
+    expect(container.innerHTML).not.toMatch(/\b(Eros|Hektor|Makemake|Eris)\b/i);
   });
 });
 
@@ -64,10 +69,12 @@ describe("BrightnessSlider png8", () => {
 
   it("uses the exact landmark texts", () => {
     expect(LANDMARKS.map((m) => m.text)).toEqual([
-      "Eris: S/N ~2–4, needs Follow & stack",
-      "Makemake: S/N ~2–12",
-      "Hektor: S/N ~150",
-      "Eros: very bright",
+      "Faintest distant mover: S/N ~2–4, needs Follow & stack",
+      "Faint distant mover: S/N ~2–12",
+      "Asteroid in a crowded field: S/N ~140–250",
+      "Bright asteroid: very bright",
     ]);
+    // README single-frame S/N: Eris 2.2-3.8, Makemake 2.0-12.1, Hektor 140-250; marks sit inside.
+    expect(LANDMARKS.map((m) => m.snr)).toEqual([3, 5, 190, 1000]);
   });
 });

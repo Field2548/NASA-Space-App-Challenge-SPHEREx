@@ -1,7 +1,8 @@
 "use client";
 // Submit and "Nothing moved here" (BP 8.10, api.md section 3). Submit is gated by validateMarks
 // only; the server decides `static` (it tests `known` first), so isStatic is a soft hint here.
-// Any failure of /api/check (route missing, network, 5xx) shows a calm note and keeps the marks.
+// A failure of /api/check keeps the marks. With no JSON error (route missing, network, bare 5xx)
+// it shows a calm offline note; a JSON error code (not_found, rate_limited, ...) shows its message.
 //
 // Props:
 //   spot: string                       spot slug sent to /api/check
@@ -10,7 +11,7 @@
 //   onResult?(res: CheckResponse)      after a verdict (PlayScreen opens Inspect on `reveal`)
 
 import { useState } from "react";
-import { ApiCallError, nothingRequest, submitCheck, toCheckRequest } from "@/lib/check";
+import { ApiCallError, CHECK_URL, nothingRequest, submitCheck, toCheckRequest } from "@/lib/check";
 import { recordFind } from "@/lib/guest";
 import { fitTrack, isStatic, validateMarks } from "@/lib/marks";
 import type { CheckRequest, CheckResponse, Mark, VerdictKind } from "@/lib/types";
@@ -45,13 +46,22 @@ type State =
   | { s: "done"; res: CheckResponse }
   | { s: "error"; text: string };
 
-/** Player-facing text for a failed check. */
+export const NOT_FOUND_TEXT = "The server does not know this spot.";
+
+/**
+ * Player-facing text for a failed check. lib/check invents two errors when the server sent no
+ * JSON error: a network failure (status 0) and `internal` with "POST /api/check failed: N"
+ * (a non-JSON 404 or 5xx). Only those, and a missing verdict, mean checking is offline; any
+ * JSON error code from the server is shown plainly.
+ */
 export function errorText(e: unknown): string {
-  if (e instanceof ApiCallError) {
-    if (e.code === "bad_request") return e.message || "The checker could not read these marks.";
-    if (e.code === "rate_limited") return "Too many checks in a row. Wait a moment, then try again.";
-  }
-  return OFFLINE_TEXT;
+  if (!(e instanceof ApiCallError) || e.status === 0) return OFFLINE_TEXT;
+  if (e.code === "internal" && e.message === `POST ${CHECK_URL} failed: ${e.status}`) return OFFLINE_TEXT;
+  if (e.code === "upstream_failed" && e.message === "Unreadable response from /api/check") return OFFLINE_TEXT;
+  if (e.code === "not_found") return NOT_FOUND_TEXT;
+  if (e.code === "rate_limited") return "Too many checks in a row. Wait a moment, then try again.";
+  if (e.code === "bad_request") return e.message || "The checker could not read these marks.";
+  return e.message || OFFLINE_TEXT;
 }
 
 export default function SubmitBar({ spot, marks, fetcher, onResult }: SubmitBarProps) {

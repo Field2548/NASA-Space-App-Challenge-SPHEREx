@@ -2,7 +2,9 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CheckResponse, Field } from "@/lib/types";
+import { timeColors } from "@/lib/palettes";
 import { blackToSlider } from "./BrightnessSlider";
+import { rgbCss } from "./FieldViewer";
 import { findTarget } from "./CoachMark";
 import PlayScreen, { neutralTitle, upsertMark } from "./PlayScreen";
 import { makeField, mockCanvas } from "./testFixtures";
@@ -15,8 +17,31 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Band rebuild stand-in: plane 0 reads 7.5 everywhere, frame 1 has no exposure on the band.
+const wlMock = vi.hoisted(() => ({ fail: false }));
+vi.mock("./WavelengthSwitch", async (importActual) => {
+  const actual = await importActual<typeof import("./WavelengthSwitch")>();
+  return {
+    ...actual,
+    useWavelengthFrames: (field: Field) => {
+      const available = field.has?.exposures === true;
+      const ok = available && !wlMock.fail;
+      const plane = new Float32Array(field.size[0] * field.size[1]).fill(7.5);
+      return {
+        frames: ok ? field.frames.map((_, i) => (i === 1 ? null : plane)) : null,
+        planesPerFrame: [],
+        fewerThanThree: false,
+        loading: false,
+        error: available && wlMock.fail ? "GET exposures.json failed: 404" : null,
+        available,
+      };
+    },
+  };
+});
+
 beforeEach(() => {
   mockCanvas();
+  wlMock.fail = false;
 });
 afterEach(() => {
   cleanup();
@@ -71,7 +96,7 @@ describe("PlayScreen", () => {
     vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 40, height: 20 } as DOMRect);
     fireEvent.click(canvas, { clientX: 35, clientY: 15 });
     expect(screen.getByText("1 mark in 3 frames. Mark the mover in at least 2 frames.")).toBeTruthy();
-    for (const s of ["submit", "nothing-moved", "scoreboard", "auth", "coordinate-box"]) {
+    for (const s of ["submit", "nothing-moved", "auth"]) {
       expect(document.querySelector(`[data-slot="${s}"]`)).not.toBeNull();
     }
     fireEvent.keyDown(window, { key: "i" });
@@ -181,12 +206,102 @@ describe("PlayScreen wiring", () => {
 const ALLOWED_AT_LEVEL_0 = ["Log in / Sign up", "Zoom in", "Zoom out", "Previous frame", "Play blink", "Next frame"];
 
 describe("PlayScreen tools", () => {
-  it("shows every tool by default", async () => {
+  it("shows every built tool by default, but not the undrawn Known asteroids toggle", async () => {
     await loadGame();
-    for (const name of [/Inspect off/, "Color by time", "Known asteroids", "Submit", /Blink order/]) {
+    for (const name of [/Inspect off/, "Color by time", "Submit", /Blink order/]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     expect(screen.getByRole("slider", { name: "Onion range end" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Colour vision" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Known asteroids" })).toBeNull();
+  });
+
+  it("shows Known asteroids only when tools explicitly include overlays", async () => {
+    await loadGame({ tools: new Set(["overlays"]) });
+    expect(screen.getByRole("button", { name: "Known asteroids" })).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Colour vision" })).toBeNull();
+  });
+
+  it("shows no placeholder and names no object in round mode", async () => {
+    await loadGame();
+    const html = document.body.innerHTML;
+    expect(html).not.toMatch(/\b(Eros|Hektor|Makemake|Eris)\b/i);
+    const text = document.body.textContent ?? "";
+    for (const p of ["more tools", "wavelength switch", "vision picker", "coordinate box", "others' work", "scoreboard", "not drawn yet"]) {
+      expect(text.toLowerCase()).not.toContain(p);
+    }
+    for (const s of ["image-tools", "wavelength", "color-vision", "coordinate-box", "show-work", "scoreboard", "overlays"]) {
+      expect(document.querySelector(`[data-slot="${s}"]`)).toBeNull();
+    }
+    expect(document.querySelectorAll("h1")).toHaveLength(1);
+  });
+
+  it("passes the chosen colour vision to the FieldViewer mark colours", async () => {
+    const canvas = await loadGame();
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    const stroke = () => document.querySelector("svg [data-frame] circle")?.getAttribute("stroke");
+    expect(stroke()).toBe(rgbCss(timeColors(3, "normal")[0]));
+    fireEvent.change(screen.getByRole("combobox", { name: "Colour vision" }), { target: { value: "mono" } });
+    expect(stroke()).toBe(rgbCss(timeColors(3, "mono")[0]));
+    fireEvent.change(screen.getByRole("combobox", { name: "Colour vision" }), { target: { value: "tritan" } });
+    expect(stroke()).toBe(rgbCss(timeColors(3, "tritan")[0]));
+    expect(stroke()).not.toBe(rgbCss(timeColors(3, "normal")[0]));
+  });
+
+  it("renders the wavelength switch only for a field with exposures", async () => {
+    await loadGame();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    cleanup();
+    await loadGame({}, { has: { exposures: true } });
+    expect(screen.getByRole("radiogroup")).toBeTruthy();
+  });
+
+  it("shows the rebuilt band frames in the viewer, blank where a frame has no exposure", async () => {
+    const canvas = await loadGame({}, { has: { exposures: true } });
+    const readout = () => screen.getByTestId("hover-readout").textContent ?? "";
+    fireEvent.pointerMove(canvas, { clientX: 5, clientY: 5 });
+    const original = readout();
+    expect(original).not.toContain("S/N 7.5");
+    const enabled = screen.getAllByRole("radio").filter((b) => !(b as HTMLButtonElement).disabled && b.textContent !== "All");
+    fireEvent.click(enabled[0]);
+    expect(readout()).toContain("S/N 7.5");
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    expect(readout()).toContain("S/N no data");
+    fireEvent.click(screen.getByRole("radio", { name: "All" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous frame" }));
+    expect(readout()).toBe(original);
+  });
+
+  it("says so when a band cannot be rebuilt, and keeps the original frames", async () => {
+    wlMock.fail = true;
+    const canvas = await loadGame({}, { has: { exposures: true } });
+    fireEvent.pointerMove(canvas, { clientX: 5, clientY: 5 });
+    const original = screen.getByTestId("hover-readout").textContent;
+    const enabled = screen.getAllByRole("radio").filter((b) => !(b as HTMLButtonElement).disabled && b.textContent !== "All");
+    fireEvent.click(enabled[0]);
+    expect(screen.getByTestId("wavelength-status").textContent).toMatch(/showing all bands/);
+    expect(screen.getByTestId("hover-readout").textContent).toBe(original);
+  });
+
+  it("keeps the marks on screen and shows not_found plainly", async () => {
+    const fetcher = vi.fn(
+      async () => new Response(JSON.stringify({ error: { code: "not_found", message: "no" } }), { status: 404 }),
+    );
+    const canvas = await loadGame({ fetcher: fetcher as unknown as typeof fetch });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 25, clientY: 5 });
+    expect(document.querySelectorAll("svg [data-frame]")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("The server does not know this spot.")).toBeTruthy();
+    expect(document.querySelectorAll("svg [data-frame]")).toHaveLength(2);
+  });
+
+  it("never names the spot slug in the DOM", async () => {
+    stubFetch(true, { slug: "zzslugzz" });
+    render(<PlayScreen spot="zzslugzz" />);
+    await screen.findByTestId("field-canvas");
+    expect(document.body.innerHTML).not.toContain("zzslugzz");
   });
 
   it("with no tools shows only the viewer, Play and Next frame; clicks and I do nothing", async () => {

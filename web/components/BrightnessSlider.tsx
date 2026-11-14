@@ -28,12 +28,15 @@ export function blackToSlider(black: number): number {
   return (Math.log10(b + BRIGHTNESS_SHIFT) - U_MIN) / (U_MAX - U_MIN);
 }
 
-/** Real objects the team measured (README), placed at their S/N. */
+/**
+ * Real objects the team measured, placed at their single-frame S/N (README shift-and-stack
+ * table). Described, never named: the slider is on /play, where names would give rounds away.
+ */
 export const LANDMARKS: { name: string; text: string; snr: number }[] = [
-  { name: "Eris", text: "Eris: S/N ~2–4, needs Follow & stack", snr: 3 },
-  { name: "Makemake", text: "Makemake: S/N ~2–12", snr: 5 },
-  { name: "Hektor", text: "Hektor: S/N ~150", snr: 150 },
-  { name: "Eros", text: "Eros: very bright", snr: 1000 },
+  { name: "faintest mover", text: "Faintest distant mover: S/N ~2–4, needs Follow & stack", snr: 3 },
+  { name: "faint mover", text: "Faint distant mover: S/N ~2–12", snr: 5 },
+  { name: "asteroid", text: "Asteroid in a crowded field: S/N ~140–250", snr: 190 },
+  { name: "bright asteroid", text: "Bright asteroid: very bright", snr: 1000 },
 ];
 
 export interface BrightnessSliderProps {

@@ -26,7 +26,7 @@ export const ABOUT_SECTIONS: AboutSection[] = [
       "Asteroid (433) Eros is bright and easy to see. Its dots show clearly with Color by time.",
       "Makemake is a faint dwarf planet. We found it blind with shift and stack at 7.9 sigma, which beats a noise bar of 6.4 sigma. Its position matched JPL's prediction.",
       "Eris is much fainter. We found it blind at 6.9 sigma, against a noise bar of 5.9 sigma. That margin is small, only about 1 sigma. We report it as a narrow result, not a sure one.",
-      "In the empty Cygnus field, where no moving objects are expected, nothing rose above the noise bar at 8.4 sigma. That is the result we wanted from a control field.",
+      "In an empty control field, where no moving objects are expected, nothing rose above the noise bar at 8.4 sigma. That is the result we wanted from a control field.",
       "Some ideas did not help. We tested each idea on fake stars added to real pictures. A matched filter lowered their signal, so it is off by default. Denoising with random-matrix methods removed many faint sources. Taking the brightest value from each band kept cosmic-ray hits as fake dots.",
     ],
   },

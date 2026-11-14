@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadGuest, resetGuest } from "@/lib/guest";
 import type { CheckResponse, Mark } from "@/lib/types";
-import SubmitBar, { OFFLINE_TEXT, STATIC_HINT } from "./SubmitBar";
+import { ApiCallError } from "@/lib/check";
+import SubmitBar, { errorText, NOT_FOUND_TEXT, OFFLINE_TEXT, STATIC_HINT } from "./SubmitBar";
 
 const two: Mark[] = [
   { frame: 1, x: 50, y: 60, tDays: 0 },
@@ -71,6 +72,33 @@ describe("SubmitBar", () => {
     });
     render(<SubmitBar spot="eros" marks={two} fetcher={fetcher as unknown as typeof fetch} />);
     fireEvent.click(screen.getByRole("button", { name: "Nothing moved here" }));
+    expect(await screen.findByText(OFFLINE_TEXT)).toBeTruthy();
+  });
+
+  it("shows the server's not_found message, not the offline text", async () => {
+    const body = { error: { code: "not_found", message: "Unknown spot: eros" } };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(body), { status: 404, headers: { "content-type": "application/json" } }));
+    render(<SubmitBar spot="eros" marks={two} fetcher={fetcher as unknown as typeof fetch} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText(NOT_FOUND_TEXT)).toBeTruthy();
+    expect(screen.queryByText(OFFLINE_TEXT)).toBeNull();
+    expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("maps errors: JSON codes show their message, bare 5xx and network show offline", () => {
+    expect(errorText(new ApiCallError("not_found", "x", 404))).toBe(NOT_FOUND_TEXT);
+    expect(errorText(new ApiCallError("db_unavailable", "The database is resting.", 503))).toBe("The database is resting.");
+    expect(errorText(new ApiCallError("rate_limited", "slow", 429))).toMatch(/Too many checks/);
+    expect(errorText(new ApiCallError("internal", "POST /api/check failed: 503", 503))).toBe(OFFLINE_TEXT);
+    expect(errorText(new ApiCallError("internal", "POST /api/check failed: 404", 404))).toBe(OFFLINE_TEXT);
+    expect(errorText(new ApiCallError("upstream_failed", "Failed to fetch"))).toBe(OFFLINE_TEXT);
+    expect(errorText(new Error("no verdict"))).toBe(OFFLINE_TEXT);
+  });
+
+  it("shows the offline text on a bare 503", async () => {
+    const fetcher = vi.fn(async () => new Response("down", { status: 503 }));
+    render(<SubmitBar spot="eros" marks={two} fetcher={fetcher as unknown as typeof fetch} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByText(OFFLINE_TEXT)).toBeTruthy();
   });
 
