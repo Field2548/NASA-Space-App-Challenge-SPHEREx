@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { responseBody } from "@/lib/server/checkResponse";
 import {
   botCandidateObject,
   checkSubmission,
@@ -360,7 +361,8 @@ describe("the real spots", () => {
     it.runIf(have(slug))(`${slug}: "nothing moved" is wrong`, async () => {
       const r = await checkSubmission(slug, { answer: "nothing" }, root);
       expect(r.verdict.kind).toBe("nothing_wrong");
-      expect(JSON.stringify(r)).not.toContain(name);
+      // What the player receives for a wrong answer on a locked spot must not name the object.
+      expect(JSON.stringify(responseBody(r, { unlocked: false, practice: false }))).not.toContain(name);
     });
   }
   it.runIf(have("eris"))("eris: two neighbouring frames still count as known, not static", async () => {
