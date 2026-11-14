@@ -8,3 +8,8 @@ zod 4.6.7,Colin McDonnell,https://github.com/colinhacks/zod,MIT,input validation
 vitest 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,unit tests,2026-11-15
 Playwright 1.65.1,Microsoft,https://github.com/microsoft/playwright,Apache-2.0,end-to-end tests,2026-11-15
 jsdom 31.0.1,jsdom contributors,https://github.com/jsdom/jsdom,MIT,test DOM,2026-11-15
+@testing-library/react 16.3.3,Kent C. Dodds,https://github.com/testing-library/react-testing-library,MIT,component tests,2026-11-15
+@testing-library/user-event 14.6.10,Giorgio Polvara,https://github.com/testing-library/user-event,MIT,component tests,2026-11-15
+@testing-library/dom 10.4.2,Kent C. Dodds,https://github.com/testing-library/dom-testing-library,MIT,component tests,2026-11-15
+Machado et al. 2009 colour-vision simulation,"Machado, Oliveira, Fernandes",https://doi.org/10.1109/TVCG.2009.113,idea (paper),colour-blind palette check,2026-11-15
+CIEDE2000 colour difference,"Sharma, Wu, Dalal",https://doi.org/10.1002/col.20070,idea (paper),palette distance check,2026-11-15
