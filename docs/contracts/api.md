@@ -194,7 +194,8 @@ Name to coordinates through CDS Sesame. Cached for 1 day.
 Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need no server.
 
 - Ready spot: send `spot`, `x`, `y`. The server reads `web/data/catalog/<slug>.json` (no network).
-- Anywhere else (sky map, quick look): send `ra`, `dec` in degrees. The server asks SIMBAD TAP, Gaia TAP and JPL in parallel, 8 s each. Partial results are fine. Cached by position rounded to 1 arcsec.
+- Anywhere else (sky map, quick look): send `ra`, `dec` in degrees. The server asks SIMBAD TAP and Gaia TAP live, in parallel, 8 s each. Partial results are fine. Cached by position rounded to 1 arcsec, for 10 minutes (30 seconds when a source failed).
+- Live lookups are SIMBAD and Gaia only. JPL is `skipped` for a position without a time, since there is nothing to ask. A round answer outside ready spots makes no network call.
 - Radii (BP 8.16): SIMBAD objects within 9 arcsec, nearest Gaia source within 6 arcsec, solar-system objects within 2 px at any frame time.
 
 `mode=explore` response:

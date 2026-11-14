@@ -4,7 +4,8 @@
 // The server decides the mode (api.md section 2). A position inside a ready spot is answered in
 // full (explore) only when the caller asked for explore AND the signed unlock cookie covers that
 // spot. Everything else gets the locked shape, which has exactly the keys mode, locked, position.
-// Positions outside every ready spot are always explore, with live lookups skipped for now.
+// Positions outside every ready spot are always explore: SIMBAD and Gaia are asked live (liveCatalog.ts),
+// JPL is skipped because there is no observation time here.
 //
 // Files read (all server-only, never served): web/data/catalog/<slug>.json (pre-made catalog),
 // web/data/answers/<slug>.json (the reveal block only), web/public/fields/index.json and
@@ -16,13 +17,13 @@ import { z } from "zod";
 import { angularSeparationDeg } from "@/components/skymap/geometry";
 import { loadAnswerKey } from "@/lib/scoring";
 import { ApiFail } from "@/lib/server/http";
+import { GAIA_RADIUS_ARCSEC, type LiveDeps, lookupLive, SIMBAD_RADIUS_ARCSEC } from "@/lib/server/liveCatalog";
 import { isUnlocked } from "@/lib/server/unlock";
 import type { FieldWcs } from "@/lib/types";
 import { pixelToSky, skyToPixel } from "@/lib/wcs";
 
-/** Radii from BUILD_PROMPT 8.16 (api.md section 6). */
-export const SIMBAD_RADIUS_ARCSEC = 9;
-export const GAIA_RADIUS_ARCSEC = 6;
+/** The radii (BUILD_PROMPT 8.16) live in liveCatalog.ts. Re-exported for the callers that used them here. */
+export { GAIA_RADIUS_ARCSEC, SIMBAD_RADIUS_ARCSEC };
 export const SOLAR_RADIUS_PX = 2;
 /** A pixel may sit this far outside the picture (api.md section 3, MARK_MARGIN_PX). */
 const MARGIN_PX = 2;
@@ -295,6 +296,14 @@ function sourceStatus(block: { status?: string } | undefined, hits: number): Sou
 
 const SKIPPED = { simbad: "skipped", gaia: "skipped", jpl: "skipped" } as const;
 
+/** SIMBAD's coordinate search page for a position. */
+function simbadCoordLink(ra: number, dec: number) {
+  return {
+    label: "SIMBAD",
+    url: `https://simbad.cds.unistra.fr/simbad/sim-coo?Coord=${ra}%20${dec}&Radius=${SIMBAD_RADIUS_ARCSEC}&Radius.unit=arcsec`,
+  };
+}
+
 // ------------------------------------------------------------------ the answer
 
 function lockedBody(position: Record<string, number>) {
@@ -314,9 +323,7 @@ async function exploreReady(loc: Located, root?: string): Promise<Record<string,
       }
     : SKIPPED;
   const links = [
-    ...(simbad.length
-      ? [{ label: "SIMBAD", url: `https://simbad.cds.unistra.fr/simbad/sim-coo?Coord=${loc.ra}%20${loc.dec}&Radius=${SIMBAD_RADIUS_ARCSEC}&Radius.unit=arcsec` }]
-      : []),
+    ...(simbad.length ? [simbadCoordLink(loc.ra, loc.dec)] : []),
     IRSA_LINK,
   ];
   return {
@@ -336,26 +343,32 @@ async function exploreReady(loc: Located, root?: string): Promise<Record<string,
 
 /**
  * The response for one call (api.md sections 2 and 6). `root` is the app folder (tests pass a
- * temporary one); by default the process working directory.
+ * temporary one); by default the process working directory. `live` lets tests inject the fetch.
  */
-export async function answerInfo(request: Request, q: InfoQuery, root?: string): Promise<Record<string, unknown>> {
+export async function answerInfo(
+  request: Request,
+  q: InfoQuery,
+  root?: string,
+  live?: LiveDeps,
+): Promise<Record<string, unknown>> {
   const asked = q.mode === "explore";
   const loc = await locate(q, root);
 
   if (!loc) {
-    // Outside every ready spot: explore is always granted. Live SIMBAD, Gaia and JPL lookups
-    // are not built yet, so they answer "skipped" with empty lists.
+    // Outside every ready spot: explore is always granted, and only then is anything asked live.
+    // A round answer returns before any network call. JPL is skipped: this lookup has no time.
     const position = { ra: q.ra as number, dec: q.dec as number };
     if (!asked) return lockedBody(position);
+    const found = await lookupLive(position.ra, position.dec, live);
     return {
       mode: "explore",
       locked: false,
       position,
-      sources: SKIPPED,
-      simbad: [],
-      gaia: null,
+      sources: { simbad: found.simbad.status, gaia: found.gaia.status, jpl: "skipped" },
+      simbad: found.simbad.rows,
+      gaia: found.gaia.row,
       solar_system: [],
-      links: [IRSA_LINK],
+      links: [...(found.simbad.rows.length ? [simbadCoordLink(position.ra, position.dec)] : []), IRSA_LINK],
     };
   }
 

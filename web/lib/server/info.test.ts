@@ -116,14 +116,24 @@ describe("GET /api/info: explore on a ready spot with the cookie", () => {
 });
 
 describe("GET /api/info: outside every ready spot", () => {
-  it("explore is granted, live lookups are skipped, nothing is invented", async () => {
-    const { status, body } = await get("ra=100&dec=-60&mode=explore");
-    expect(status).toBe(200);
+  it("explore is granted; SIMBAD and Gaia are asked live with an injected fetch, JPL is skipped", async () => {
+    // CDS answers 404 (it was down), Gaia finds nothing: each source reports its own status.
+    const seen: string[] = [];
+    const fake = async (url: string) => {
+      seen.push(url);
+      return url.includes("simbad")
+        ? new Response("not found", { status: 404 })
+        : new Response(JSON.stringify({ metadata: [], data: [] }), { status: 200 });
+    };
+    const body = await answerInfo(new Request("http://localhost/api/info"), { ra: 100, dec: -60, mode: "explore" }, undefined, {
+      fetchImpl: fake,
+      now: () => 0,
+    });
     expect(body).toEqual({
       mode: "explore",
       locked: false,
       position: { ra: 100, dec: -60 },
-      sources: { simbad: "skipped", gaia: "skipped", jpl: "skipped" },
+      sources: { simbad: "error", gaia: "empty", jpl: "skipped" },
       simbad: [],
       gaia: null,
       solar_system: [],
@@ -131,6 +141,21 @@ describe("GET /api/info: outside every ready spot", () => {
         { label: "IRSA Spectrophotometry Tool", url: "https://irsa.ipac.caltech.edu/applications/spherex/tool-spectrophotometry" },
       ],
     });
+    expect(seen).toHaveLength(2);
+  });
+
+  it("mode=round outside every ready spot gives the locked shape and makes no network call", async () => {
+    let calls = 0;
+    const fake = async () => {
+      calls++;
+      throw new Error("no network allowed for a round answer");
+    };
+    const body = await answerInfo(new Request("http://localhost/api/info"), { ra: 102, dec: -61, mode: "round" }, undefined, {
+      fetchImpl: fake,
+    });
+    expect(body).toEqual({ mode: "round", locked: true, position: { ra: 102, dec: -61 } });
+    expect(Object.keys(body).sort()).toEqual(["locked", "mode", "position"]);
+    expect(calls).toBe(0);
   });
 });
 
