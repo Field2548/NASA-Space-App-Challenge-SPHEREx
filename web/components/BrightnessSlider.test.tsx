@@ -42,3 +42,32 @@ describe("BrightnessSlider", () => {
     expect(screen.getByText(/Fainter/)).toBeTruthy();
   });
 });
+
+describe("BrightnessSlider png8", () => {
+  it("clamps the black point to the stretch black and explains why", () => {
+    const onChange = vi.fn();
+    render(<BrightnessSlider value={-1.4} onChange={onChange} png8 minBlack={-1} />);
+    const input = screen.getByRole("slider") as HTMLInputElement;
+    expect(input.getAttribute("aria-valuetext")).toContain("1.0σ");
+    expect(Number(input.min)).toBeCloseTo(blackToSlider(-1), 9);
+    fireEvent.change(input, { target: { value: String(blackToSlider(30)) } });
+    expect(onChange.mock.calls[0][0]).toBeCloseTo(30, 6);
+    expect(screen.getByTestId("png8-note").textContent).toContain("cannot go fainter");
+    expect((screen.getByRole("button", { name: "Reset" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("float data ignores minBlack and shows no note", () => {
+    render(<BrightnessSlider value={-1.4} onChange={() => {}} minBlack={-1} />);
+    expect(screen.queryByTestId("png8-note")).toBeNull();
+    expect(Number((screen.getByRole("slider") as HTMLInputElement).min)).toBe(0);
+  });
+
+  it("uses the exact landmark texts", () => {
+    expect(LANDMARKS.map((m) => m.text)).toEqual([
+      "Eris: S/N ~2–4, needs Follow & stack",
+      "Makemake: S/N ~2–12",
+      "Hektor: S/N ~150",
+      "Eros: very bright",
+    ]);
+  });
+});

@@ -44,6 +44,8 @@ export interface FieldViewerProps {
   scale?: number;
   colors?: RGB[];
   inspectSlot?: ReactNode;
+  /** Keyboard crosshair at a native pixel; also feeds the readout when the pointer is away. */
+  cursor?: { x: number; y: number };
 }
 
 /** Largest integer scale that fits the box, at least 1. */
@@ -153,12 +155,15 @@ export default function FieldViewer(props: FieldViewerProps) {
   };
 
   let readout = "move the pointer over the image";
-  if (hover) {
-    const [x, y] = hover;
+  const cur = props.cursor && props.cursor.x >= 0 && props.cursor.x < W && props.cursor.y >= 0 && props.cursor.y < H ? props.cursor : null;
+  const probe = hover ?? (cur ? ([cur.x, cur.y] as [number, number]) : null);
+  if (probe) {
+    const [x, y] = probe;
     const [ra, dec] = pixelToSky(field.wcs, H, x, y);
     const v = frames[k]?.[y * W + x];
     const snr = v === undefined || !Number.isFinite(v) ? "no data" : v.toFixed(1);
-    readout = `x ${x}  y ${y}  RA ${formatRA(ra)}  Dec ${formatDec(dec)}  S/N ${snr}`;
+    const snrLabel = overlay === "colorByTime" ? `S/N (frame ${k + 1})` : "S/N";
+    readout = `x ${x}  y ${y}  RA ${formatRA(ra)}  Dec ${formatDec(dec)}  ${snrLabel} ${snr}`;
   }
 
   const frameNo = (i: number) => field.frames.findIndex((f) => f.i === i);
@@ -216,6 +221,12 @@ export default function FieldViewer(props: FieldViewerProps) {
                 </g>
               );
             })}
+            {cur && (
+              <g data-testid="kb-cursor" stroke="var(--text, #fff)" strokeWidth={1} fill="none">
+                <path d={`M${(cur.x + 0.5) * scale} 0V${H * scale}M0 ${(cur.y + 0.5) * scale}H${W * scale}`} opacity={0.6} />
+                <rect x={cur.x * scale} y={cur.y * scale} width={scale} height={scale} />
+              </g>
+            )}
           </svg>
         </div>
         {inspectSlot}

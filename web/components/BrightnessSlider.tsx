@@ -42,6 +42,8 @@ export interface BrightnessSliderProps {
   defaultValue?: number;
   png8?: boolean;
   id?: string;
+  /** Lowest black point in png8 mode: pass field.stretch.black_sigma. Ignored for float data. */
+  minBlack?: number;
 }
 
 export function formatBlack(black: number): string {
@@ -49,11 +51,22 @@ export function formatBlack(black: number): string {
   return `${black >= 0 ? "+" : "−"}${v.replace("-", "")}σ`;
 }
 
-export default function BrightnessSlider({ value, onChange, defaultValue = -1, png8 = false, id }: BrightnessSliderProps) {
+/**
+ * Black point actually used. In png8 mode the frames are quantised and clipped below
+ * field.stretch.black_sigma, so the black point cannot go fainter than that.
+ */
+export function effectiveBlack(value: number, png8: boolean, minBlack?: number): number {
+  return png8 && minBlack !== undefined ? Math.max(value, minBlack) : value;
+}
+
+export default function BrightnessSlider({ value: rawValue, onChange, defaultValue = -1, png8 = false, id, minBlack }: BrightnessSliderProps) {
   const autoId = useId();
   const inputId = id ?? `brightness-${autoId}`;
   const descId = `${inputId}-desc`;
+  const value = effectiveBlack(rawValue, png8, minBlack);
+  const resetTo = effectiveBlack(defaultValue, png8, minBlack);
   const p = blackToSlider(value);
+  const pMin = png8 && minBlack !== undefined ? blackToSlider(minBlack) : 0;
   return (
     <div className={styles.root}>
       <div className={styles.ends} aria-hidden="true">
@@ -68,13 +81,13 @@ export default function BrightnessSlider({ value, onChange, defaultValue = -1, p
         <input
           id={inputId}
           type="range"
-          min={0}
+          min={pMin}
           max={1}
           step="any"
           value={p}
           aria-valuetext={`black point ${formatBlack(value)}`}
           aria-describedby={descId}
-          onChange={(e) => onChange(sliderToBlack(Number(e.target.value)))}
+          onChange={(e) => onChange(effectiveBlack(sliderToBlack(Number(e.target.value)), png8, minBlack))}
           className={styles.input}
         />
         <ul className={styles.landmarks} aria-hidden="true">
@@ -100,10 +113,15 @@ export default function BrightnessSlider({ value, onChange, defaultValue = -1, p
           {png8 ? "levels " : "black "}
           {formatBlack(value)}
         </output>
-        <button type="button" onClick={() => onChange(defaultValue)} disabled={value === defaultValue}>
+        <button type="button" onClick={() => onChange(resetTo)} disabled={value === resetTo}>
           Reset
         </button>
       </div>
+      {png8 && (
+        <p className={styles.note} data-testid="png8-note">
+          Preview data cannot go fainter than {formatBlack(minBlack ?? value)}.
+        </p>
+      )}
     </div>
   );
 }

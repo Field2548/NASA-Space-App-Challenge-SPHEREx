@@ -109,3 +109,26 @@ describe("FieldViewer", () => {
     expect(screen.queryByText("preview quality")).toBeNull();
   });
 });
+
+describe("FieldViewer cursor and readout label", () => {
+  it("draws the keyboard crosshair and reads it out when the pointer is away", () => {
+    setup({ cursor: { x: 7, y: 3 } });
+    const g = screen.getByTestId("kb-cursor");
+    expect(g.querySelector("rect")?.getAttribute("x")).toBe("28");
+    expect(screen.getByTestId("hover-readout").textContent).toContain("S/N 6.0");
+  });
+
+  it("draws no crosshair without a cursor or outside the grid", () => {
+    setup();
+    expect(screen.queryByTestId("kb-cursor")).toBeNull();
+    cleanup();
+    setup({ cursor: { x: 99, y: 0 } });
+    expect(screen.queryByTestId("kb-cursor")).toBeNull();
+  });
+
+  it("labels the hover value as S/N (frame k) under Color by time", () => {
+    const { canvas } = setup({ overlay: "colorByTime" });
+    fireEvent.pointerMove(canvas, { clientX: 100 + 4 * 7 + 1, clientY: 50 + 4 * 3 + 1 });
+    expect(screen.getByTestId("hover-readout").textContent).toContain("S/N (frame 2) 6.0");
+  });
+});
