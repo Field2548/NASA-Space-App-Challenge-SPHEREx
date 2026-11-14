@@ -380,3 +380,75 @@ def test_fixture_is_unchanged_by_the_neutral_titles():
         assert json.load(f)["kind"] == "fixture"
     with open(os.path.join(ANSWERS, "fixture.json"), encoding="utf-8") as f:
         assert "reveal" not in json.load(f)
+
+
+# ------------------------------------------------------------------ bot candidate status
+def _bot_by_rank(slug):
+    _, _, ans = load(slug)
+    return ans, {c["rank"]: c for c in ans["bot"]["candidates"]}
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_bot_candidate_status_values(slug):
+    _, _, ans = load(slug)
+    for c in ans["bot"]["candidates"]:
+        assert c["status"] in ("known", "alias", "unconfirmed"), (slug, c["rank"])
+        named = c["status"] in ("known", "alias")
+        assert ("object_id" in c) == named, (slug, c["rank"])
+        assert ("near_object_frames" in c) == named, (slug, c["rank"])
+
+
+def test_bot_candidate_status_matches_the_measured_cases():
+    _, hek = _bot_by_rank("hektor")
+    assert hek[1]["status"] == "known" and hek[1]["object_id"] == "624"
+    assert hek[2]["status"] == "unconfirmed" and hek[3]["status"] == "unconfirmed"
+    _, eris = _bot_by_rank("eris")
+    assert eris[1]["status"] == "known" and eris[1]["object_id"] == "136199"
+    assert eris[2]["status"] == "alias" and eris[2]["near_object_frames"] == [5]
+    _, mm = _bot_by_rank("makemake")
+    assert mm[1]["status"] == "known"
+    ans, _ = _bot_by_rank("cygnus")
+    assert ans["bot"]["candidates"] and all(c["status"] == "unconfirmed"
+                                            for c in ans["bot"]["candidates"])
+
+
+@pytest.mark.parametrize("slug", ["hektor", "eris", "makemake"])
+def test_unconfirmed_candidates_match_no_catalogued_body(slug):
+    field, _, ans = load(slug)
+    with open(os.path.join(ROOT, "web", "data", "catalog", f"{slug}.json"), encoding="utf-8") as f:
+        catalog = json.load(f)
+    mjds = [fr["mjd"] for fr in field["frames"]]
+    close = []
+    for c in ans["bot"]["candidates"]:
+        if c["status"] != "unconfirmed" or not c["above_noise_bar"]:
+            continue
+        for body in catalog["asteroids"]:
+            for p in body["positions"]:
+                dt = mjds[p["frame"] - 1] - ans["t_ref_mjd"]
+                x = c["x"] + c["vx_px_per_day"] * dt
+                y = c["y"] + c["vy_px_per_day"] * dt
+                d = ((x - p["x"]) ** 2 + (y - p["y"]) ** 2) ** 0.5
+                if d <= 4:
+                    close.append((c["rank"], body["name"], p["frame"], round(d, 2)))
+    assert not close, close
+
+
+def test_candidate_status_on_made_up_numbers():
+    mjds = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    t_ref = 2.0
+    obj = {"id": "900", "positions": [
+        {"frame": i + 1, "x": 10 + 2 * m, "y": 20 - m, "in_grid": True}   # x = 10 + 2m, y = 20 - m
+        for i, m in enumerate(mjds)]}
+
+    def cand(x0, y0, vx, vy):
+        return {"x": x0, "y": y0, "vx_px_per_day": vx, "vy_px_per_day": vy}
+
+    st = ew.candidate_status
+    assert st(cand(14, 18, 2, -1), mjds, t_ref, [obj]) == {
+        "status": "known", "object_id": "900", "near_object_frames": [1, 2, 3, 4, 5]}
+    assert st(cand(24, 14, -3, 1), mjds, t_ref, [obj]) == {
+        "status": "alias", "object_id": "900", "near_object_frames": [5]}
+    assert st(cand(100, 100, 0, 0), mjds, t_ref, [obj]) == {"status": "unconfirmed"}
+    short = {"id": "901", "positions": [dict(p, in_grid=p["frame"] >= 4) for p in obj["positions"]]}
+    assert st(cand(14, 18, 2, -1), mjds, t_ref, [short]) == {
+        "status": "known", "object_id": "901", "near_object_frames": [4, 5]}

@@ -274,6 +274,33 @@ def read_candidates(folder, height):
     return out
 
 
+NEAR_OBJECT_PX = 3.0      # a candidate within this distance of the known object is "on" it
+
+
+def candidate_status(cand, mjds, t_ref, objects):
+    """Say what a bot candidate is, by comparing its straight path with the known object's
+    positions frame by frame (frames where the object is outside the picture do not count):
+      known        on the object in at least 3 frames (or in every frame, if fewer than 3 count)
+      alias        on the object in some frame but not enough: a wrong track that borrows
+                   the object's light in those frames
+      unconfirmed  never on a known object. Not a claim that it is real.
+    Returns the keys to add to the candidate."""
+    for obj in objects:
+        near = []
+        usable = [p for p in obj["positions"] if p["in_grid"]]
+        for p in usable:
+            dt = mjds[p["frame"] - 1] - t_ref
+            dx = cand["x"] + cand["vx_px_per_day"] * dt - p["x"]
+            dy = cand["y"] + cand["vy_px_per_day"] * dt - p["y"]
+            if (dx * dx + dy * dy) ** 0.5 <= NEAR_OBJECT_PX:
+                near.append(p["frame"])
+        if usable and len(near) >= min(3, len(usable)):
+            return {"status": "known", "object_id": obj["id"], "near_object_frames": near}
+        if near:
+            return {"status": "alias", "object_id": obj["id"], "near_object_frames": near}
+    return {"status": "unconfirmed"}
+
+
 def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=None,
                nothing_moves=False):
     """The server-only answer key (field-schema.md section 6).
@@ -282,7 +309,8 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     (max of the 3x3 pixels, as the repo's --track check does). change_snr is the same 3x3
     maximum in the frame minus the median of the other frames (motion_frames.residuals): stars
     cancel, so it tells whether the object itself is seen there. star is reserved for the
-    Tier 2 star targets and not used yet."""
+    Tier 2 star targets and not used yet. Each bot candidate gets a status (known, alias or
+    unconfirmed), see candidate_status."""
     if star is not None:
         raise NotImplementedError("star targets are not built yet")
     _repo_imports()
@@ -318,6 +346,8 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     cands = read_candidates(folder, height)
     if noise_bar is None:
         cands = []          # never report a bot candidate without its noise bar
+    for c in cands:
+        c.update(candidate_status(c, mjds, t_ref, objects))
     return {"slug": None, "nothing_moves": bool(nothing_moves), "noise_bar_sigma": noise_bar,
             "t_ref_mjd": round(t_ref, 6), "objects": objects,
             "bot": {"source": "shift_stack.py", "candidates": cands}}

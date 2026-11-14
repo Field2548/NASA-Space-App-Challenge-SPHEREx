@@ -72,6 +72,15 @@
      12.1,
      5.7,
      6.3
+    ],
+    "status": "known",
+    "object_id": "136472",
+    "near_object_frames": [
+     1,
+     2,
+     3,
+     4,
+     5
     ]
    },
    {
@@ -88,7 +97,8 @@
      1.9,
      0.2,
      4.4
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 3,
@@ -104,7 +114,8 @@
      2.2,
      0.0,
      6.0
-    ]
+    ],
+    "status": "unconfirmed"
    }
   ]
  },

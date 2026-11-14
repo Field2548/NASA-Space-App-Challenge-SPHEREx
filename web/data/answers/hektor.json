@@ -72,6 +72,15 @@
      50.7,
      22.4,
      4.4
+    ],
+    "status": "known",
+    "object_id": "624",
+    "near_object_frames": [
+     1,
+     2,
+     3,
+     4,
+     5
     ]
    },
    {
@@ -88,7 +97,8 @@
      3.7,
      0.0,
      3.6
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 3,
@@ -104,7 +114,8 @@
      1.2,
      5.2,
      2.9
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 4,
@@ -120,7 +131,8 @@
      5.3,
      4.1,
      0.5
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 5,
@@ -136,7 +148,8 @@
      1.8,
      3.2,
      2.2
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 6,
@@ -152,7 +165,8 @@
      3.6,
      2.1,
      1.7
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 7,
@@ -168,7 +182,8 @@
      2.4,
      0.6,
      3.1
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 8,
@@ -184,6 +199,11 @@
      1.4,
      2.7,
      3.9
+    ],
+    "status": "alias",
+    "object_id": "624",
+    "near_object_frames": [
+     1
     ]
    },
    {
@@ -200,7 +220,8 @@
      5.1,
      2.0,
      3.0
-    ]
+    ],
+    "status": "unconfirmed"
    },
    {
     "rank": 10,
@@ -216,7 +237,8 @@
      5.3,
      3.6,
      1.3
-    ]
+    ],
+    "status": "unconfirmed"
    }
   ]
  },
