@@ -64,6 +64,18 @@ def test_formula_matches_astropy_on_the_grid(slug):
     print(f"{slug}: max error {worst:.3e} px")
 
 
+@pytest.mark.parametrize("n", [59, 89, 119, 147])
+def test_grid_for_shape_is_centred_on_the_target(n):
+    wcs = ew.grid_for_shape(13.2004, 14.38, (n, n))
+    assert list(wcs.wcs.crpix) == [(n + 1) / 2, (n + 1) / 2]
+    assert list(wcs.wcs.crval) == [13.2004, 14.38]
+
+
+def test_grid_for_shape_refuses_an_even_size():
+    with pytest.raises(ValueError):
+        ew.grid_for_shape(13.2004, 14.38, (32, 32))
+
+
 def test_fixture_crval_is_the_centre_pixel():
     field = _field("fixture")
     x, y = sky_to_pixel(field["wcs"], field["size"], *field["wcs"]["crval"])
