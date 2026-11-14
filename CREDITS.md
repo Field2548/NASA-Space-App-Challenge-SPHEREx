@@ -53,6 +53,15 @@ We read these projects for ideas; all code here is our own.
 | lucide-react 1.73.0 | Lucide contributors | https://github.com/lucide-icons/lucide | ISC | icons | 2026-11-15 |
 | Orbitron | Matt McInerney | https://fonts.google.com/specimen/Orbitron | OFL-1.1 | headings and buttons | 2026-11-15 |
 
+## Papers and methods
+
+| Name | Author | Link | License | Used for | Checked |
+| --- | --- | --- | --- | --- | --- |
+| Heinze, Metchev & Trollo 2015 (AJ 150, 125), digital tracking | Heinze, Metchev & Trollo | https://arxiv.org/abs/1508.01599 | published paper or method, cited; no code or data copied | shift-and-stack search for faint movers (shift_stack.py) | 2026-11-14 |
+| Lupton et al. 2004, asinh stretch and colour-preserving RGB | Lupton et al. | https://arxiv.org/abs/astro-ph/0312483 | published paper or method, cited; no code or data copied | asinh stretch with the black point near the sky level (make_stretch in motion_frames.py); the repo also cites Lupton et al. 1999 for the softening, and has no link for that paper | 2026-11-14 |
+| Okabe & Ito colour-blind-safe palette | Okabe and Ito | https://jfly.uni-koeln.de/color/ | published paper or method, cited; no code or data copied | time colours for the onion skin (OKABE_ITO_TIME in motion_frames.py) | 2026-11-14 |
+| Whidden et al. 2019 (KBMOD) | Whidden et al. | https://arxiv.org/abs/1901.02492 | published paper or method, cited; no code or data copied | shift-and-stack idea for slow Kuiper Belt objects (shift_stack.py) | 2026-11-14 |
+
 ## Ideas from other teams
 
 | Name | Author | Link | License | Used for | Checked |

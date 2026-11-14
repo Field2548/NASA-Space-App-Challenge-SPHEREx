@@ -100,6 +100,11 @@ REQUIRED = [
     ("Vercel", r"^vercel", ("path", "vercel.json")),
     ("SPIFF templates", r"spiff", ("path", "web/public/ref/spherex_templates.json")),
     ("Mamajek dwarf colour / Teff table", r"mamajek", ("path", "web/public/ref/spt_teff.json")),
+    # Papers and methods named in build prompt section 13, required once the file using them exists.
+    ("Heinze et al. 2015 (digital tracking)", r"heinze", ("path", "shift_stack.py")),
+    ("Whidden et al. 2019 (KBMOD)", r"whidden", ("path", "shift_stack.py")),
+    ("Lupton et al. asinh stretch", r"lupton", ("path", "motion_frames.py")),
+    ("Okabe & Ito palette", r"okabe", ("path", "motion_frames.py")),
     ("Orbitron font", r"orbitron", ("grep", ["web/app"], r"Orbitron")),
     ("JetBrains Mono font", r"jetbrains mono", ("grep", ["web/app"], r"JetBrains_Mono")),
 ]
@@ -119,6 +124,7 @@ GROUPS = [
     ("data", "Data and services"),
     ("lib", "Software libraries"),
     ("font", "Fonts and icons"),
+    ("paper", "Papers and methods"),
     ("idea", "Ideas from other teams"),
 ]
 SERVICE_WORDS = re.compile(
@@ -206,6 +212,8 @@ def idea_key(project: str) -> str:
 
 def classify(row) -> str:
     key = row["_key"]
+    if row["license"].lower().startswith("published paper"):
+        return "paper"
     if any(idea_key(p[0]) in key for p in IDEAS):
         return "idea"
     if FONT_WORDS.search(row["name"]):

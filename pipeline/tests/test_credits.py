@@ -107,3 +107,13 @@ def test_output_is_deterministic_and_has_required_text(tmp_path):
     assert "GPL-3.0" in text and "LICENSE" in text
     run(dst)
     assert (dst / "CREDITS.md").read_text(encoding="utf-8") == text
+
+
+def test_missing_paper_row_fails_once_its_file_exists(tmp_path):
+    dst = make_copy(tmp_path)
+    assert run(dst, "--check").returncode == 0
+    shutil.copy(ROOT / "shift_stack.py", dst / "shift_stack.py")
+    edit_rows(dst, lambda rows: [x for x in rows if not x["name"].startswith("Heinze")])
+    r = run(dst, "--check")
+    assert r.returncode != 0
+    assert "Heinze" in r.stderr
