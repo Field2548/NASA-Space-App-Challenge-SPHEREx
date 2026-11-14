@@ -70,8 +70,18 @@ export type FieldForScoring = {
   slug: string;
   difficulty: string;
   pixel_arcsec: number;
+  /** [width, height] in pixels (field.json `size`). */
+  size: [number, number];
   frames: { i: number; mjd: number }[];
 };
+
+/**
+ * What "the same find" means in a spot, so a player cannot score one thing twice.
+ * `object:<id>` for a known object (however it was reached), `bot:<rank>` for a bot candidate
+ * that is not a known object, `nothing` for a correct "Nothing moved here".
+ * The route passes it to `record_find(p_find_key)` (supabase migration).
+ */
+export type FindKey = `object:${string}` | `bot:${number}` | "nothing";
 
 export type Scored = {
   verdict: Verdict;
@@ -80,7 +90,7 @@ export type Scored = {
   reveal?: { frame: number; x: number; y: number };
   noise_bar_sigma: number | null;
   /** Internal: which answer-key object or bot candidate matched. Not sent to the client. */
-  matched?: { object_id?: string; bot_rank?: number };
+  matched?: { find_key: FindKey; object_id?: string; bot_rank?: number };
 };
 
 export class ScoringError extends Error {
@@ -97,10 +107,18 @@ export class ScoringError extends Error {
 export const MATCH_RADIUS_PX = 2;
 /** A known object must be matched in at least this many different frames. */
 export const MIN_MATCHED_FRAMES = 2;
-/** Bot match: the fitted velocity must agree this closely (px per day)... */
-export const BOT_VELOCITY_TOL_PX_DAY = 2;
-/** ...and a track that moved less than this in total is a star, not a mover. */
+/**
+ * A bot candidate "is" a known object when its predicted path passes this close to the
+ * object's answer-key positions in at least MIN_MATCHED_FRAMES frames. 3 px, not 2: the bot's
+ * straight-line path for Hektor is up to 2.5 px from JPL's positions.
+ */
+export const BOT_KNOWN_RADIUS_PX = 3;
+/** A track that moved less than this in total is a star, not a mover. */
 export const STATIC_MOTION_PX = 1;
+/** Marks may sit at most this far outside the picture (a click on the edge pixel's border). */
+export const MARK_MARGIN_PX = 2;
+// No separate velocity tolerance for bot matches (removed in api.md 1.2): marks that are on the
+// bot's path in every marked frame, in at least 2 frames, already pin its velocity down.
 
 const BASE_POINTS: Record<string, number> = {
   easy: 100,
@@ -113,15 +131,23 @@ const BASE_POINTS: Record<string, number> = {
 };
 export const FIRST_FINDER_BONUS = 0.5;
 
-/** Points for a verdict. Only `known`, `bot_match` and `nothing_correct` score. */
+/** Verdicts that count as a correct submission for accuracy (and unlock the spot). */
+export const CORRECT_VERDICTS: readonly VerdictKind[] = ["known", "bot_match", "nothing_correct"];
+export const isCorrect = (kind: VerdictKind): boolean => CORRECT_VERDICTS.includes(kind);
+
+/**
+ * Points for a verdict. Only `known` and `nothing_correct` score. `bot_match` is correct but
+ * earns 0 (api.md 1.2: a bot candidate that is no known object is not a confirmed find).
+ * The first-finder bonus applies to `known` only.
+ */
 export function pointsFor(
   kind: VerdictKind,
   difficulty: string,
   firstFinder: boolean,
 ): number {
-  if (kind !== "known" && kind !== "bot_match" && kind !== "nothing_correct") return 0;
+  if (kind !== "known" && kind !== "nothing_correct") return 0;
   const base = BASE_POINTS[difficulty] ?? 0;
-  return firstFinder ? Math.round(base * (1 + FIRST_FINDER_BONUS)) : base;
+  return firstFinder && kind === "known" ? Math.round(base * (1 + FIRST_FINDER_BONUS)) : base;
 }
 
 /** The extra points a first finder gets on top of the base score. */
@@ -178,12 +204,23 @@ export function fitTrack(marks: Mark[], field: FieldForScoring): FittedTrack {
 function validateMarks(marks: Mark[], field: FieldForScoring): void {
   const known = new Set(field.frames.map((f) => f.i));
   const seen = new Set<number>();
+  const [w, h] = field.size;
   for (const m of marks) {
     if (!known.has(m.frame)) {
       throw new ScoringError("bad_request", `This spot has no frame ${m.frame}.`);
     }
     if (seen.has(m.frame)) {
       throw new ScoringError("bad_request", `Frame ${m.frame} is marked twice. Mark each frame once.`);
+    }
+    if (
+      !Number.isFinite(m.x) ||
+      !Number.isFinite(m.y) ||
+      m.x < -MARK_MARGIN_PX ||
+      m.y < -MARK_MARGIN_PX ||
+      m.x > w - 1 + MARK_MARGIN_PX ||
+      m.y > h - 1 + MARK_MARGIN_PX
+    ) {
+      throw new ScoringError("bad_request", `The mark in frame ${m.frame} is outside the picture.`);
     }
     seen.add(m.frame);
   }
@@ -194,7 +231,39 @@ function validateMarks(marks: Mark[], field: FieldForScoring): void {
 
 const fmt = (v: number) => v.toFixed(1);
 
-/** Score one submission against one answer key. Pure: no I/O, no database. */
+/** Where a bot candidate's straight-line path is at a given time (answer-key convention). */
+export function botPosition(key: AnswerKey, c: BotCandidate, mjd: number): { x: number; y: number } {
+  const dt = mjd - key.t_ref_mjd;
+  return { x: c.x + c.vx_px_per_day * dt, y: c.y + c.vy_px_per_day * dt };
+}
+
+/**
+ * The known object a bot candidate is, or null: its predicted path is within
+ * BOT_KNOWN_RADIUS_PX of the object's in-grid answer positions in at least 2 frames.
+ */
+export function botCandidateObject(
+  key: AnswerKey,
+  field: Pick<FieldForScoring, "frames">,
+  c: BotCandidate,
+): AnswerObject | null {
+  const mjd = new Map(field.frames.map((f) => [f.i, f.mjd]));
+  for (const obj of key.objects) {
+    let frames = 0;
+    for (const p of obj.positions) {
+      const t = mjd.get(p.frame);
+      if (!p.in_grid || t === undefined) continue;
+      const b = botPosition(key, c, t);
+      if (Math.hypot(b.x - p.x, b.y - p.y) <= BOT_KNOWN_RADIUS_PX) frames += 1;
+    }
+    if (frames >= MIN_MATCHED_FRAMES) return obj;
+  }
+  return null;
+}
+
+/**
+ * Score one submission against one answer key. Pure: no I/O, no database.
+ * Order (api.md section 3): known, then bot_match, then static, then candidate.
+ */
 export function scoreSubmission(
   key: AnswerKey,
   field: FieldForScoring,
@@ -219,14 +288,39 @@ export function scoreSubmission(
 
   if (sub.answer === "nothing") {
     return key.nothing_moves
-      ? make("nothing_correct", "Correct: nothing moved here. Every dot is a star that stays put.")
+      ? make("nothing_correct", "Correct: nothing moved here. Every dot is a star that stays put.", {
+          matched: { find_key: "nothing" },
+        })
       : make("nothing_wrong", "Something does move here. Look again.");
   }
 
   validateMarks(sub.marks, field);
   const track = fitTrack(sub.marks, field);
+  if (!Object.values(track).every(Number.isFinite)) {
+    throw new ScoringError("bad_request", "Those marks do not make a track. Mark the object again.");
+  }
+  const mjd = new Map(field.frames.map((f) => [f.i, f.mjd]));
 
-  // 1. A known object: within 2 px of its answer-key position in at least 2 frames.
+  const known = (obj: AnswerObject, hits: Mark[]): Scored => {
+    // Reveal at the earliest in-grid answer position among the hit frames (else the first in-grid one).
+    const inGrid = obj.positions.filter((q) => q.in_grid);
+    const hitFrames = new Set(hits.map((m) => m.frame));
+    const p =
+      inGrid.filter((q) => hitFrames.has(q.frame)).sort((a, b) => a.frame - b.frame)[0] ??
+      inGrid.sort((a, b) => a.frame - b.frame)[0];
+    return make(
+      "known",
+      `Confirmed: ${obj.name}, ${obj.kind.replace(/-/g, " ")}.`,
+      {
+        track,
+        ...(p ? { reveal: { frame: p.frame, x: p.x, y: p.y } } : {}),
+        matched: { find_key: `object:${obj.id}`, object_id: obj.id },
+      },
+      obj.name,
+    );
+  };
+
+  // 1a. A known object: within 2 px of its answer-key position in at least 2 frames.
   let best: { obj: AnswerObject; hits: Mark[] } | null = null;
   for (const obj of key.objects) {
     const pos = new Map(obj.positions.filter((p) => p.in_grid).map((p) => [p.frame, p]));
@@ -238,47 +332,44 @@ export function scoreSubmission(
       best = { obj, hits };
     }
   }
-  if (best) {
-    const first = best.hits.reduce((a, b) => (a.frame <= b.frame ? a : b));
-    const p = best.obj.positions.find((q) => q.frame === first.frame)!;
-    return make(
-      "known",
-      `Confirmed: ${best.obj.name}, ${best.obj.kind.replace(/-/g, " ")}.`,
-      { track, reveal: { frame: p.frame, x: p.x, y: p.y }, matched: { object_id: best.obj.id } },
-      best.obj.name,
-    );
+  if (best) return known(best.obj, best.hits);
+
+  // Bot candidates whose path the marks follow: within 2 px in every marked frame (at least 2
+  // frames, guaranteed by validateMarks). That fixes the velocity too, so there is no separate
+  // velocity check.
+  const onPath = key.bot.candidates.filter((c) =>
+    sub.marks.every((m) => {
+      const b = botPosition(key, c, mjd.get(m.frame) as number);
+      return Math.hypot(m.x - b.x, m.y - b.y) <= MATCH_RADIUS_PX;
+    }),
+  );
+
+  // 1b. A known object reached through the bot's path (Hektor's bot path is up to 2.5 px off JPL).
+  // Same object, same name, same points and same find key as a direct hit: never a second find.
+  for (const c of onPath) {
+    const obj = botCandidateObject(key, field, c);
+    if (obj) return known(obj, sub.marks);
   }
 
-  // 2. Did it move at all? Under 1 px in total over the marked frames = a star.
-  const mjd = new Map(field.frames.map((f) => [f.i, f.mjd]));
+  // 2. A bot candidate above the noise bar that is no known object: correct, but 0 points.
+  // Never claimed without the noise bar.
+  if (noise_bar_sigma !== null) {
+    for (const c of onPath) {
+      if (!c.above_noise_bar || !(c.stacked_snr > noise_bar_sigma)) continue;
+      return make(
+        "bot_match",
+        `Matches the bot: ${fmt(c.stacked_snr)}σ against a ${fmt(noise_bar_sigma)}σ noise bar. ` +
+          "Not a confirmed object, so no points.",
+        { track, matched: { find_key: `bot:${c.rank}`, bot_rank: c.rank } },
+      );
+    }
+  }
+
+  // 3. Did it move at all? Under 1 px in total over the marked frames = a star.
   const times = sub.marks.map((m) => mjd.get(m.frame) as number);
   const spanDays = Math.max(...times) - Math.min(...times);
   if (Math.hypot(track.vx, track.vy) * spanDays < STATIC_MOTION_PX) {
     return make("static", "That one didn't move; it's a star.", { track });
-  }
-
-  // 3. A bot candidate above the noise bar. Never claimed without the noise bar.
-  if (noise_bar_sigma !== null) {
-    for (const c of key.bot.candidates) {
-      if (!c.above_noise_bar || !(c.stacked_snr > noise_bar_sigma)) continue;
-      const onPath = sub.marks.every((m) => {
-        const dt = (mjd.get(m.frame) as number) - key.t_ref_mjd;
-        const px = c.x + c.vx_px_per_day * dt;
-        const py = c.y + c.vy_px_per_day * dt;
-        return Math.hypot(m.x - px, m.y - py) <= MATCH_RADIUS_PX;
-      });
-      const dv = Math.hypot(track.vx - c.vx_px_per_day, track.vy - c.vy_px_per_day);
-      // Marks that are each within 2 px of the bot's path can still differ in fitted speed
-      // by up to (2 * 2 px) / span when the frames are close in time, so allow for that.
-      const tol = Math.max(BOT_VELOCITY_TOL_PX_DAY, (2 * MATCH_RADIUS_PX) / spanDays);
-      if (onPath && dv <= tol) {
-        return make(
-          "bot_match",
-          `Matches the bot: ${fmt(c.stacked_snr)}σ against a ${fmt(noise_bar_sigma)}σ noise bar.`,
-          { track, matched: { bot_rank: c.rank } },
-        );
-      }
-    }
   }
 
   // 4. Moves, matches nothing we know.
@@ -322,16 +413,36 @@ export async function loadFieldForScoring(
   );
 }
 
-/** Check a submission for a ready spot. Throws ScoringError for an unknown spot or bad marks. */
+/** Slugs listed in public/fields/index.json. A missing or broken index is a server fault. */
+export async function readySlugs(root?: string): Promise<string[]> {
+  const file = path.join(webRoot(root), "public", "fields", "index.json");
+  const raw = await readJson<unknown>(file);
+  if (!Array.isArray(raw)) throw new Error(`Cannot read the spot list ${file}.`);
+  return raw.flatMap((s) => (s && typeof s.slug === "string" ? [s.slug as string] : []));
+}
+
+/**
+ * Check a submission for a ready spot. Throws ScoringError for an unknown spot or bad marks.
+ * A spot listed in index.json whose answer key or field.json cannot be read is a server fault
+ * (a plain Error, which the route answers as 500 `internal`), never `not_found`. A spot that is
+ * not listed (the test-only `fixture`) is scored when both files exist, else it is `not_found`.
+ */
 export async function checkSubmission(
   slug: string,
   sub: Submission,
   root?: string,
 ): Promise<Scored> {
-  const [key, field] = await Promise.all([
+  if (!SLUG.test(slug)) throw new ScoringError("not_found", `No spot called "${slug}".`);
+  const [listed, key, field] = await Promise.all([
+    readySlugs(root).then((s) => s.includes(slug)),
     loadAnswerKey(slug, root),
     loadFieldForScoring(slug, root),
   ]);
-  if (!key || !field) throw new ScoringError("not_found", `No spot called "${slug}".`);
+  if (!key || !field) {
+    if (listed || key || field) {
+      throw new Error(`Spot "${slug}" is missing its ${key ? "field.json" : "answer key"} on the server.`);
+    }
+    throw new ScoringError("not_found", `No spot called "${slug}".`);
+  }
   return scoreSubmission(key, field, sub);
 }

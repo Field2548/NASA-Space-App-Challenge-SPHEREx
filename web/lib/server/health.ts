@@ -1,6 +1,8 @@
 // Service health checks for GET /api/health and the /status page (owner: SERVER). Server only.
 // Contract: docs/contracts/api.md section 10. Every probe is cheap and read-only.
 
+import { unlockConfigured } from "@/lib/server/unlock";
+
 export type HealthStatus = "green" | "amber" | "red";
 
 export type ServiceHealth = {
@@ -16,7 +18,18 @@ export type HealthReport = {
   checked_at: string;
   overall: HealthStatus;
   services: ServiceHealth[];
+  /** Problems in our own setup (not an outside service). Present only when there is one. */
+  warnings?: string[];
 };
+
+export const UNLOCK_WARNING = "UNLOCK_SECRET is not set: finished spots will lock again.";
+
+/** Configuration problems for the status page. Not a service, so never in `services`. */
+export function configWarnings(env: Record<string, string | undefined>): string[] {
+  const w: string[] = [];
+  if (env.NODE_ENV === "production" && !unlockConfigured(env)) w.push(UNLOCK_WARNING);
+  return w;
+}
 
 type Fetch = typeof fetch;
 
@@ -48,7 +61,9 @@ const is2xx = (s: number) => s >= 200 && s < 300;
  *   CDS/P/SPHEREx/QR2/color (https://alasky.cds.unistra.fr/SPHEREx/color).
  * - simbad_tap, gaia_tap: the TAP `/availability` resource (VOSI).
  * - jpl_horizons: GET with MAKE_EPHEM=NO, which returns object info only (no ephemeris work).
- * - jpl_sbident: GET of a 0.1 degree field with a bright magnitude limit (tiny answer).
+ * - jpl_sbident: GET for a geocentric observer (xobs=0,0,0,0,0,0), a 0.01 degree field and
+ *   numbered comets only (sb-kind=c, sb-ns=n): HTTP 200 in about 0.7 s on 2026-11-15. The old
+ *   all-asteroid query of a 0.1 degree field took about 18 s, far over the 5 s probe timeout.
  */
 function probes(env: NodeJS.ProcessEnv): Probe[] {
   const list: Probe[] = [
@@ -105,7 +120,8 @@ function probes(env: NodeJS.ProcessEnv): Probe[] {
     {
       id: "jpl_sbident",
       name: "JPL asteroid identification",
-      url: "https://ssd-api.jpl.nasa.gov/sb_ident.api?mpc-code=500&obs-time=2026-01-01&fov-ra-center=10-00-00&fov-dec-center=%2B00-00-00&fov-ra-hwidth=0.1&fov-dec-hwidth=0.1&vmag-lim=12",
+      url:
+        "https://ssd-api.jpl.nasa.gov/sb_ident.api?xobs=0,0,0,0,0,0&obs-time=2026-01-01&fov-ra-center=10-00-00&fov-dec-center=%2B00-00-00&fov-ra-hwidth=0.01&fov-dec-hwidth=0.01&sb-kind=c&sb-ns=n",
       method: "GET",
       failMessage: "JPL asteroid identification is not answering right now. Ready spots still work; known-asteroid checks may fail.",
     },
@@ -205,7 +221,13 @@ export async function checkAll(
   const list = probes(env);
   const results = await Promise.all(list.map((p) => runProbe(p, fetchImpl, now, timeoutMs)));
   const services = list.some((p) => p.id === "supabase") ? results : [...results, { ...SUPABASE_OFF }];
-  return { checked_at: new Date(now()).toISOString(), overall: worst(services), services };
+  const warnings = configWarnings(env);
+  return {
+    checked_at: new Date(now()).toISOString(),
+    overall: worst(services),
+    services,
+    ...(warnings.length ? { warnings } : {}),
+  };
 }
 
 let cached: { at: number; report: HealthReport } | null = null;

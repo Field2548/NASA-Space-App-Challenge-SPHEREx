@@ -1,13 +1,16 @@
 // Scoring against the real answer keys DATA exported (web/data/answers) and the fixture.
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  botCandidateObject,
   checkSubmission,
   firstFinderBonus,
   fitTrack,
   loadAnswerKey,
   loadFieldForScoring,
+  MATCH_RADIUS_PX,
   pointsFor,
   scoreSubmission,
   ScoringError,
@@ -47,6 +50,13 @@ describe("pointsFor", () => {
     }
     expect(pointsFor("known", "no-such-difficulty", false)).toBe(0);
   });
+  it("gives a bot match 0 points (api.md 1.2), and the first-finder bonus only to known", () => {
+    expect(pointsFor("bot_match", "boss", false)).toBe(0);
+    expect(pointsFor("bot_match", "boss", true)).toBe(0);
+    expect(pointsFor("nothing_correct", "control", true)).toBe(250);
+    expect(firstFinderBonus("nothing_correct", "control")).toBe(0);
+    expect(firstFinderBonus("bot_match", "boss")).toBe(0);
+  });
 });
 
 describe("fitTrack", () => {
@@ -55,6 +65,7 @@ describe("fitTrack", () => {
       slug: "t",
       difficulty: "easy",
       pixel_arcsec: 6.15,
+      size: [32, 32],
       frames: [
         { i: 1, mjd: 100 },
         { i: 2, mjd: 100.5 },
@@ -144,19 +155,39 @@ describe("the fixture spot", () => {
 });
 
 describe("bot matches", () => {
-  it("matches a bot candidate only above the noise bar, and always quotes the bar", async () => {
+  const sub = { answer: "track" as const, marks: [{ frame: 1, x: 10.5, y: 16 }, { frame: 4, x: 16, y: 16.5 }] };
+
+  it("matches a bot candidate above the noise bar, quotes the bar, and pays 0 points", async () => {
     const { key, field } = await spot("fixture");
     const botOnly = { ...key, objects: [] };
-    const sub = { answer: "track" as const, marks: [{ frame: 1, x: 10.5, y: 16 }, { frame: 4, x: 16, y: 16.5 }] };
     const hit = scoreSubmission(botOnly, field, sub);
-    expect(hit.verdict.kind).toBe("bot_match");
-    expect(hit.verdict.message).toContain("38.0σ");
-    expect(hit.verdict.message).toContain("6.0σ noise bar");
+    expect(hit.verdict).toEqual({
+      kind: "bot_match",
+      points: 0,
+      message: "Matches the bot: 38.0σ against a 6.0σ noise bar. Not a confirmed object, so no points.",
+    });
     expect(hit.noise_bar_sigma).toBe(6);
-    // No noise bar on record: never claim a detection.
-    expect(scoreSubmission({ ...botOnly, noise_bar_sigma: null }, field, sub).verdict.kind).toBe("candidate");
-    // Candidate below the bar.
-    expect(scoreSubmission({ ...botOnly, noise_bar_sigma: 50 }, field, sub).verdict.kind).toBe("candidate");
+    expect(hit.matched).toEqual({ find_key: "bot:1", bot_rank: 1 });
+  });
+  it("never claims a bot match without a noise bar", async () => {
+    const { key, field } = await spot("fixture");
+    expect(scoreSubmission({ ...key, objects: [], noise_bar_sigma: null }, field, sub).verdict.kind).toBe("candidate");
+  });
+  it("needs above_noise_bar: a candidate flagged below the bar is not a match, whatever its S/N", async () => {
+    // Fails if the above_noise_bar check is deleted: stacked_snr 38 is far above the 6σ bar.
+    const { key, field } = await spot("fixture");
+    const flagged = { ...key, objects: [], bot: { candidates: key.bot.candidates.map((c) => ({ ...c, above_noise_bar: false })) } };
+    expect(flagged.bot.candidates[0].stacked_snr).toBeGreaterThan(flagged.noise_bar_sigma!);
+    expect(scoreSubmission(flagged, field, sub).verdict.kind).toBe("candidate");
+  });
+  it("needs stacked_snr above the noise bar, even when the candidate is flagged above it", async () => {
+    // Fails if the stacked_snr > noise_bar_sigma check is deleted: above_noise_bar stays true.
+    const { key, field } = await spot("fixture");
+    const r = scoreSubmission({ ...key, objects: [], noise_bar_sigma: 50 }, field, sub);
+    expect(key.bot.candidates[0].above_noise_bar).toBe(true);
+    expect(r.verdict.kind).toBe("candidate");
+    // Equal to the bar is not above it.
+    expect(scoreSubmission({ ...key, objects: [], noise_bar_sigma: 38 }, field, sub).verdict.kind).toBe("candidate");
   });
   it("rejects a track that crosses the bot's path in the wrong direction", async () => {
     const { key, field } = await spot("fixture");
@@ -165,6 +196,145 @@ describe("bot matches", () => {
       marks: [{ frame: 1, x: 16, y: 16 }, { frame: 4, x: 10, y: 16 }],
     });
     expect(r.verdict.kind).toBe("candidate");
+  });
+  it("needs the marks on the path in every marked frame, not just two", async () => {
+    const { key, field } = await spot("fixture");
+    const r = scoreSubmission({ ...key, objects: [] }, field, {
+      answer: "track",
+      marks: [{ frame: 1, x: 10, y: 16 }, { frame: 2, x: 12, y: 16 }, { frame: 4, x: 16, y: 25 }],
+    });
+    expect(r.verdict.kind).toBe("candidate");
+  });
+  it("checks bot_match before static: a slow bot candidate in two close frames is a bot match", async () => {
+    // A candidate moving 0.5 px/day: over frames 1 and 4 (9 hours) it moves 0.19 px, under the 1 px rule.
+    const { key, field } = await spot("fixture");
+    const slow = {
+      ...key,
+      objects: [],
+      bot: { candidates: [{ rank: 1, x: 20, y: 20, vx_px_per_day: 0.5, vy_px_per_day: 0, stacked_snr: 9, above_noise_bar: true }] },
+    };
+    const at = (frame: number) => {
+      const t = field.frames.find((f) => f.i === frame)!.mjd - key.t_ref_mjd;
+      return { frame, x: 20 + 0.5 * t, y: 20 };
+    };
+    const r = scoreSubmission(slow, field, { answer: "track", marks: [at(1), at(4)] });
+    expect(r.verdict.kind).toBe("bot_match");
+    // The same marks with no bot candidate are a star.
+    expect(scoreSubmission({ ...slow, bot: { candidates: [] } }, field, { answer: "track", marks: [at(1), at(4)] }).verdict.kind).toBe("static");
+  });
+  it("a bot candidate that is the known object gives `known` for that object, never bot_match", async () => {
+    const { key, field } = await spot("fixture");
+    // Marks on the bot's path but 2.5 px from the answer positions: not a direct hit.
+    const r = scoreSubmission(
+      { ...key, bot: { candidates: [{ ...key.bot.candidates[0], y: 18.5 }] } },
+      field,
+      { answer: "track", marks: [{ frame: 1, x: 10, y: 18.5 }, { frame: 4, x: 16, y: 18.5 }] },
+    );
+    expect(r.verdict.kind).toBe("known");
+    expect(r.verdict.object_name).toBe("Fixture mover");
+    expect(r.verdict.points).toBe(100);
+    expect(r.matched?.find_key).toBe("object:fixture-1");
+    expect(r.reveal).toEqual({ frame: 1, x: 10, y: 16 });
+  });
+});
+
+describe("bot candidates on the real spots", () => {
+  const have = (slug: string) => existsSync(path.join(root, "data", "answers", `${slug}.json`));
+  const onBotPath = (key: AnswerKey, field: FieldForScoring, rank: number, frames: number[]): Mark[] => {
+    const c = key.bot.candidates.find((b) => b.rank === rank)!;
+    return frames.map((i) => {
+      const t = field.frames.find((f) => f.i === i)!.mjd - key.t_ref_mjd;
+      return { frame: i, x: c.x + c.vx_px_per_day * t, y: c.y + c.vy_px_per_day * t };
+    });
+  };
+
+  it.runIf(have("hektor"))("hektor: marks on the bot's path are Hektor itself, so accurate marks cannot score it again", async () => {
+    const { key, field } = await spot("hektor");
+    const c = key.bot.candidates[0];
+    expect(botCandidateObject(key, field, c)?.id).toBe("624");
+    // Frames 2 and 5: the bot path is more than 2 px from JPL here, so this is not a direct hit.
+    const marks = onBotPath(key, field, 1, [2, 5]);
+    const jpl = key.objects[0].positions;
+    const off = marks.map((m) => {
+      const p = jpl.find((q) => q.frame === m.frame)!;
+      return Math.hypot(m.x - p.x, m.y - p.y);
+    });
+    expect(Math.max(...off)).toBeGreaterThan(MATCH_RADIUS_PX);
+    const viaBot = scoreSubmission(key, field, { answer: "track", marks });
+    const direct = scoreSubmission(key, field, { answer: "track", marks: marksOn(key, [2, 5]) });
+    expect(viaBot.verdict).toMatchObject({ kind: "known", object_name: "624 Hektor (A907 CF)", points: 250 });
+    expect(direct.verdict).toMatchObject({ kind: "known", object_name: "624 Hektor (A907 CF)", points: 250 });
+    expect(viaBot.matched?.find_key).toBe("object:624");
+    expect(direct.matched?.find_key).toBe(viaBot.matched?.find_key); // one find, so the database scores it once
+    expect(viaBot.reveal).toEqual(direct.reveal);
+  });
+  it.runIf(have("eris"))("eris: the bot's rank-2 candidate (6.24σ vs 5.9σ, no known object) is a bot match worth 0 points", async () => {
+    const { key, field } = await spot("eris");
+    const c = key.bot.candidates.find((b) => b.rank === 2)!;
+    expect(botCandidateObject(key, field, c)).toBeNull();
+    const r = scoreSubmission(key, field, { answer: "track", marks: onBotPath(key, field, 2, [1, 5]) });
+    expect(r.verdict).toEqual({
+      kind: "bot_match",
+      points: 0,
+      message: "Matches the bot: 6.2σ against a 5.9σ noise bar. Not a confirmed object, so no points.",
+    });
+    expect(r.matched?.find_key).toBe("bot:2");
+  });
+  it.runIf(have("eris"))("eris: the bot's rank-1 candidate is Eris, so it scores as Eris", async () => {
+    const { key, field } = await spot("eris");
+    expect(botCandidateObject(key, field, key.bot.candidates[0])?.id).toBe("136199");
+    const r = scoreSubmission(key, field, { answer: "track", marks: onBotPath(key, field, 1, [1, 5]) });
+    expect(r.verdict).toMatchObject({ kind: "known", points: 1000 });
+    expect(r.matched?.find_key).toBe("object:136199");
+  });
+  it.runIf(have("eris"))("eris without its answer objects: the slow rank-1 candidate in frames 1 and 2 is bot_match, not static", async () => {
+    const { key, field } = await spot("eris");
+    const r = scoreSubmission({ ...key, objects: [] }, field, { answer: "track", marks: onBotPath(key, field, 1, [1, 2]) });
+    expect(r.verdict.kind).toBe("bot_match");
+  });
+});
+
+describe("marks and spots the server refuses", () => {
+  it("refuses marks more than 2 px outside the picture, and huge numbers", async () => {
+    const { key, field } = await spot("fixture");
+    const at = (x: number, y: number) => ({ answer: "track" as const, marks: [{ frame: 1, x, y }, { frame: 4, x: 16, y: 16 }] });
+    expect(() => scoreSubmission(key, field, at(-2, 16))).not.toThrow();
+    expect(() => scoreSubmission(key, field, at(33, 33))).not.toThrow(); // W - 1 + 2
+    for (const [x, y] of [[-2.01, 16], [33.01, 16], [10, -3], [10, 40], [1e308, 0], [-1e308, 0], [Infinity, 0], [NaN, 0]]) {
+      expect(() => scoreSubmission(key, field, at(x, y))).toThrow(ScoringError);
+    }
+  });
+  it("gives finite track numbers for every accepted submission", async () => {
+    const { key, field } = await spot("fixture");
+    const r = scoreSubmission(key, field, { answer: "track", marks: [{ frame: 1, x: -2, y: 33 }, { frame: 4, x: 33, y: -2 }] });
+    expect(Object.values(r.track!).every(Number.isFinite)).toBe(true);
+  });
+  it("a listed spot whose files are missing is a server fault, not 'not found'", async () => {
+    const tmp = mkdtempSync(path.join(tmpdir(), "scoring-"));
+    try {
+      mkdirSync(path.join(tmp, "public", "fields"), { recursive: true });
+      writeFileSync(path.join(tmp, "public", "fields", "index.json"), JSON.stringify([{ slug: "ghost" }]));
+      const err = await checkSubmission("ghost", { answer: "nothing" }, tmp).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(err).not.toBeInstanceOf(ScoringError);
+      // Not listed and no files: an ordinary unknown spot.
+      await expect(checkSubmission("other", { answer: "nothing" }, tmp)).rejects.toMatchObject({ code: "not_found" });
+      // No spot list at all: a server fault.
+      rmSync(path.join(tmp, "public", "fields", "index.json"));
+      const noIndex = await checkSubmission("other", { answer: "nothing" }, tmp).catch((e: unknown) => e);
+      expect(noIndex).toBeInstanceOf(Error);
+      expect(noIndex).not.toBeInstanceOf(ScoringError);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+  it("gives each correct verdict a stable find key", async () => {
+    const fixture = await checkSubmission("fixture", { answer: "track", marks: [{ frame: 1, x: 10, y: 16 }, { frame: 4, x: 16, y: 16 }] }, root);
+    expect(fixture.matched).toEqual({ find_key: "object:fixture-1", object_id: "fixture-1" });
+    if (existsSync(path.join(root, "data", "answers", "cygnus.json"))) {
+      expect((await checkSubmission("cygnus", { answer: "nothing" }, root)).matched).toEqual({ find_key: "nothing" });
+    }
+    expect((await checkSubmission("fixture", { answer: "nothing" }, root)).matched).toBeUndefined();
   });
 });
 
@@ -197,17 +367,17 @@ describe("the real spots", () => {
     const r = await checkSubmission("eris", { answer: "track", marks: marksOn(key, [1, 2]) }, root);
     expect(r.verdict.kind).toBe("known");
   });
-  it.runIf(have("eros"))("eros: positions outside the picture are never matched", async () => {
+  it.runIf(have("eros"))("eros: positions outside the picture are refused, never matched", async () => {
     const { key } = await spot("eros");
     const out = key.objects[0].positions.filter((p) => !p.in_grid);
-    if (out.length >= 2) {
-      const r = await checkSubmission(
+    expect(out.length).toBeGreaterThanOrEqual(2);
+    await expect(
+      checkSubmission(
         "eros",
         { answer: "track", marks: out.slice(0, 2).map((p) => ({ frame: p.frame, x: p.x, y: p.y })) },
         root,
-      );
-      expect(r.verdict.kind).not.toBe("known");
-    }
+      ),
+    ).rejects.toMatchObject({ code: "bad_request" });
   });
   it.runIf(have("cygnus"))("cygnus: 'nothing moved' is correct, random clicks are not a find", async () => {
     const ok = await checkSubmission("cygnus", { answer: "nothing" }, root);

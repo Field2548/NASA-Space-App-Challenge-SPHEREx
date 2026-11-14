@@ -1,6 +1,7 @@
 // Shared helpers for route handlers (owner: SERVER). Server only.
 // Error shape and codes: docs/contracts/api.md section 1.
 
+import { unstable_rethrow } from "next/navigation";
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 import { ScoringError } from "@/lib/scoring";
@@ -65,10 +66,16 @@ export function parse<T>(schema: ZodType<T>, data: unknown): T {
   });
 }
 
-/** Read a JSON body. Refuses bodies over 64 kB and anything that is not JSON. */
+export const MAX_BODY_BYTES = 64_000;
+
+/** Read a JSON body. Refuses bodies over 64 kB (by Content-Length first, then by bytes) and anything that is not JSON. */
 export async function readJsonBody(request: Request): Promise<unknown> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null && !(Number(declared) <= MAX_BODY_BYTES)) {
+    throw new ApiFail("bad_request", "That request is too large.");
+  }
   const text = await request.text();
-  if (text.length > 64_000) throw new ApiFail("bad_request", "That request is too large.");
+  if (Buffer.byteLength(text, "utf8") > MAX_BODY_BYTES) throw new ApiFail("bad_request", "That request is too large.");
   try {
     return JSON.parse(text);
   } catch {
@@ -87,11 +94,19 @@ export function clientIp(request: Request): string {
   return (fwd ? fwd.split(",")[0] : request.headers.get("x-real-ip") ?? "local").trim();
 }
 
+/** Next.js's own control-flow error while prerendering (cacheComponents): it must reach Next. */
+function isPrerenderBailout(e: unknown): boolean {
+  return typeof e === "object" && e !== null && (e as { digest?: unknown }).digest === "NEXT_PRERENDER_INTERRUPTED";
+}
+
 /** Run a handler and turn every failure into the contract's error JSON. */
 export async function handle(fn: () => Promise<Response>): Promise<Response> {
   try {
     return await fn();
   } catch (e) {
+    // Framework errors (prerender bail-out, notFound, redirect, dynamic-usage) pass through.
+    unstable_rethrow(e);
+    if (isPrerenderBailout(e)) throw e;
     if (e instanceof ApiFail) return errorResponse(e.code, e.message, e.details, e.headers);
     if (e instanceof ScoringError) return errorResponse(e.code, e.message);
     console.error("[api] unexpected error", e);

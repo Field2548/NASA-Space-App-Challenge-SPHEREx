@@ -2,7 +2,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/health/route";
-import { checkAll, getHealth, resetHealthCache } from "@/lib/server/health";
+import { checkAll, getHealth, resetHealthCache, UNLOCK_WARNING } from "@/lib/server/health";
 import { resetRateLimit } from "@/lib/server/rateLimit";
 
 const IDS = ["irsa_sia", "irsa_s3", "cds_sesame", "cds_hips", "simbad_tap", "gaia_tap", "jpl_horizons", "jpl_sbident", "supabase"];
@@ -105,6 +105,31 @@ describe("checkAll", () => {
     const f = fakeFetch((u) => (u.includes("ssd-api") ? ok(500) : ok()));
     const r = await checkAll(asFetch(f), Date.now, 5000, NONE);
     expect(r.overall).toBe("red");
+  });
+});
+
+describe("configuration warnings", () => {
+  const f = () => asFetch(fakeFetch(() => ok()));
+  it("warns in production when no secret signs the unlock cookie, without adding a service", async () => {
+    const r = await checkAll(f(), Date.now, 5000, { ...SB, NODE_ENV: "production" } as unknown as NodeJS.ProcessEnv);
+    expect(r.warnings).toEqual(["UNLOCK_SECRET is not set: finished spots will lock again."]);
+    expect(r.warnings).toEqual([UNLOCK_WARNING]);
+    expect(r.services.map((s) => s.id)).toEqual(IDS);
+    expect(r.overall).toBe("green");
+  });
+  it("no warning in production with UNLOCK_SECRET (or a derived key), and none outside production", async () => {
+    for (const extra of [{ UNLOCK_SECRET: "u" }, { CRON_SECRET: "c" }, { SUPABASE_SERVICE_ROLE_KEY: "k" }]) {
+      const r = await checkAll(f(), Date.now, 5000, { ...SB, NODE_ENV: "production", ...extra } as unknown as NodeJS.ProcessEnv);
+      expect(r.warnings).toBeUndefined();
+    }
+    expect((await checkAll(f(), Date.now, 5000, { ...SB, NODE_ENV: "development" } as unknown as NodeJS.ProcessEnv)).warnings).toBeUndefined();
+  });
+  it("probes JPL SB Identification with a geocentric observer, not mpc-code=500", async () => {
+    const calls = fakeFetch(() => ok());
+    await checkAll(asFetch(calls), Date.now, 5000, SB);
+    const url = calls.mock.calls.map((c) => String(c[0])).find((u) => u.includes("sb_ident"))!;
+    expect(url).toContain("xobs=0,0,0,0,0,0");
+    expect(url).not.toContain("mpc-code");
   });
 });
 
