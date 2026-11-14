@@ -198,6 +198,23 @@ describe("PlayScreen round mode", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Test spot");
   });
 
+  it("keeps the title hidden after a wrong verdict that leaves the spot locked", async () => {
+    const wrong: CheckResponse = {
+      ...known,
+      verdict: { kind: "candidate", points: 0, message: "Not a known object." },
+      unlocked: false,
+      reveal: undefined,
+    };
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(wrong), { status: 200 })) as unknown as typeof fetch });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(neutralTitle(makeField()));
+    expect(document.body.textContent).not.toContain("Test spot");
+  });
+
   it("the tutorial shows the title from the start", async () => {
     await loadGame({ showTitle: true });
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Test spot");

@@ -115,7 +115,7 @@ function VerdictView({ res }: { res: CheckResponse }) {
       <p className={styles.kind}>{KIND_TITLE[v.kind] ?? v.kind.toUpperCase()}</p>
       <p>{v.message}</p>
       <p>
-        <strong>+{v.points}</strong> points{res.already_found ? " (already found)" : ""}
+        <strong>+{v.points}</strong> points{res.practice ? " (practice: this spot was already open)" : res.already_found ? " (already found)" : ""}
         {res.first_finder ? ", first finder" : ""}
       </p>
       {track && (

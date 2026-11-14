@@ -229,7 +229,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   };
 
   const onResult = (res: CheckResponse) => {
-    setVerdictIn(true);
+    // A wrong answer leaves the spot locked (api.md 3), so the name stays hidden for a retry.
+    if (res.unlocked) setVerdictIn(true);
     emit("submitted", marks);
     if (res.reveal) {
       setInspected([Math.round(res.reveal.x), Math.round(res.reveal.y)]);
