@@ -39,6 +39,7 @@ def test_committed_fixture_matches_the_script():
     assert np.nanmax(np.abs(src - frames)) <= field["data"]["scale"] / 2 + 1e-9
     assert np.isnan(frames[:, 31, 31]).all()          # the no-data pixel
     assert len(field["thumbs"]) == len(field["frames"]) == 4
+    assert all(isinstance(v, float) for v in field["wcs"]["crpix"])
     for t in field["thumbs"]:
         assert os.path.exists(os.path.join(SPOT, t))
 

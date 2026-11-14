@@ -105,7 +105,7 @@ def test_png_fallback_equals_fits_within_one_level(slug):
         redrawn = (ew.stretch_gray(png_frames[k], white) * 255).astype(int)
         assert np.abs(redrawn - levels_png).max() <= 1
     # ... and the S/N numbers are approximate: "preview quality". These are the measured
-    # limits (worst case is the crowded Cygnus field), not a wish.
+    # limits (worst case is Makemake), not a wish.
     seen = np.isfinite(fits_frames) & np.isfinite(png_frames)
     sky = seen & (fits_frames > -0.9) & (fits_frames < 3)
     stars = seen & (fits_frames >= 5) & (fits_frames < 50)
@@ -216,3 +216,28 @@ def test_exposures_rebuild_the_frames(slug):
         assert both.sum() > 0.8 * np.isfinite(frames[fr["i"] - 1]).sum()
         err = np.abs(rebuilt - frames[fr["i"] - 1])[both]
         assert np.median(err) < 0.1 and np.percentile(err, 99) < 2.0     # in noise sigmas
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_utc_strings_match_frames_csv(slug):
+    with open(os.path.join(FIELDS, slug, "field.json"), encoding="utf-8") as f:
+        field = json.load(f)
+    rows = ew.read_frames_csv(os.path.join(ROOT, SPOT[slug]["folder"]))
+    assert [fr["utc"] for fr in field["frames"]] == [r["utc"] for r in rows]
+
+
+def test_mjd_to_utc_truncates_to_the_second():
+    # 0.752824 d = 65043.9936 s = 18 h 4 min 3.9936 s, so truncation gives :03, not :04
+    assert ew.mjd_to_utc(60865.752824) == "2025-07-09T18:04:03"
+
+
+def test_star_targets_are_refused():
+    with pytest.raises(NotImplementedError):
+        ew.answer_key("x", None, [1.0], star="Barnard")
+
+
+def test_public_guard_refuses_answers_under_public(tmp_path):
+    with pytest.raises(ValueError):
+        ew.export_field(str(tmp_path / "x"), "x", "t", "easy",
+                        str(tmp_path / "web" / "public" / "fields"),
+                        answers_dir=str(tmp_path / "web" / "public" / "answers"))

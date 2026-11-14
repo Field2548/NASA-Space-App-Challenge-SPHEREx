@@ -18,9 +18,10 @@ BLACK_SIGMA, SOFT_SIGMA = -1.0, 2.0   # the shared stretch of motion_frames.make
 
 
 def mjd_to_utc(mjd):
-    """MJD (UTC) -> '2025-07-09T18:04:04'. MJD 0 is 1858-11-17T00:00."""
+    """MJD (UTC) -> '2025-07-09T18:04:04', truncated to the second, like frames.csv.
+    MJD 0 is 1858-11-17T00:00."""
     t = datetime(1858, 11, 17, tzinfo=timezone.utc) + timedelta(days=float(mjd))
-    return (t + timedelta(microseconds=500000)).strftime("%Y-%m-%dT%H:%M:%S")
+    return t.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def write_u16(frames, path):
@@ -79,7 +80,7 @@ def make_thumbs(frames, out_dir, size=48, white=None):
 def simple_wcs(ra, dec, half):
     """The field.json 'wcs' block for a centred grid of 2*half+1 pixels (grid_wcs layout)."""
     step = round(PIXEL_ARCSEC / 3600, 7)
-    return {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec], "crpix": [half + 1, half + 1],
+    return {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec], "crpix": [float(half + 1), float(half + 1)],
             "cdelt": [-step, step], "rows": "top-down"}
 
 
@@ -236,8 +237,9 @@ def _solve_stretch(levels):
     noise sigma 1 by construction (frames are in noise units), so the 25th percentile of the
     sky sits 0.6745 below its median in S/N. Find the asinh(a) that makes it so. Only the lower
     half of the distribution is used because stars fill the upper half in crowded fields.
-    Measured against FITS on the five ready spots: sky values within 0.09 sigma (median),
-    sources within about 20%; the worst case is the crowded Cygnus field."""
+    Measured against FITS on the five ready spots, the recovered values are always a little low:
+    the white point by 9 to 28 percent and source S/N by 6 to 19 percent, worst on Makemake.
+    The sky is within 0.09 sigma."""
     sky = levels[:, ~_uncovered(levels)]
     lo, hi = ((np.percentile(sky, q) + 0.5) / 255 for q in (25, 50))
 
@@ -279,6 +281,8 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     motion_frames.track_positions. frames (top-down) adds the measured S/N at each position
     (max of the 3x3 pixels, as the repo's --track check does). star is reserved for the
     Tier 2 star targets and not used yet."""
+    if star is not None:
+        raise NotImplementedError("star targets are not built yet")
     _repo_imports()
     height, width = wcs.array_shape if wcs.array_shape else frames.shape[1:]
     mjds = np.asarray(mjds, dtype=float)
@@ -447,10 +451,12 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     (default web/data/answers next to it, never under public/). bands: a data/bands_<slug>
     folder; when it holds cube.fits the spectrum tiles are written (section 8).
     Returns field.json as a dict."""
+    if star is not None:
+        raise NotImplementedError("star targets are not built yet")
     out_dir = os.path.abspath(out_dir)
     answers_dir = answers_dir or os.path.join(os.path.dirname(os.path.dirname(out_dir)),
                                               "data", "answers")
-    if os.sep + "public" in os.path.abspath(answers_dir):
+    if "public" in os.path.abspath(answers_dir).split(os.sep):
         raise ValueError("answer keys must not be written under public/")
     spot = os.path.join(out_dir, slug)
     os.makedirs(spot, exist_ok=True)
@@ -539,6 +545,8 @@ def parse_args():
 
 def main():
     a = parse_args()
+    if a.star:
+        raise SystemExit("--star is reserved for star targets, which are not built yet")
     if a.all:
         jobs = [dict(s, folder=os.path.join(ROOT, s["folder"])) for s in SPOTS]
     elif a.folder and a.slug and a.title and a.difficulty:
