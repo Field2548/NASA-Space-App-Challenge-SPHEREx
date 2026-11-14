@@ -21,7 +21,7 @@
 // asteroids" draws nothing yet, so it shows only when the caller passes `tools` with "overlays"
 // (the tutorial's overlay step), never with the /play default.
 //
-// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools? }
+// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools?; initialView?; onViewChange? }
 
 import Link from "next/link";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -40,6 +40,7 @@ import { Scoreboard } from "./Scoreboard";
 import SubmitBar from "./SubmitBar";
 import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
 import VisionPicker from "./VisionPicker";
+import { type ViewState } from "./viewState";
 import WavelengthSwitch, { useWavelengthFrames, type WavelengthSelection } from "./WavelengthSwitch";
 
 type Loaded = { spot: string; field: Field; frames: Float32Array[] } | { spot: string; error: string };
@@ -100,6 +101,10 @@ export interface PlayScreenProps {
   objectName?: string;
   /** Parts shown; the viewer, Play and Next frame are always there. Default: ALL_TOOLS. */
   tools?: ReadonlySet<PlayTool>;
+  /** Initial vision, onion range and spacing (from the URL on /play). */
+  initialView?: ViewState;
+  /** Called when vision, onion range or spacing change (/play writes them back to the URL). */
+  onViewChange?(v: ViewState): void;
 }
 
 /** Heading that does not give the answer away: the field's sky position. */
@@ -195,11 +200,11 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange }: GameProps) {
   const tools = toolsProp ?? ALL_TOOLS;
   const showOverlays = toolsProp?.has("overlays") ?? false;
   const [W, H] = field.size;
-  const [vision, setVision] = useState<Vision>("normal");
+  const [vision, setVision] = useState<Vision>(initialView?.vision ?? "normal");
   const [wavelength, setWavelength] = useState<WavelengthSelection>("all");
   // The exposures (up to ~1 MB) are fetched only once a band other than "all" is picked.
   const wlField = useMemo<Field>(
@@ -236,8 +241,17 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
   const statusId = useId();
   const [loopMode, setLoopMode] = useState<BlinkMode>("loop");
-  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion([0, ONION_MAX - 1], frames.length));
-  const [realSpacing, setRealSpacing] = useState(false);
+  const defaultOnion = useMemo(() => clampOnion([0, ONION_MAX - 1], frames.length), [frames.length]);
+  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length));
+  const [realSpacing, setRealSpacing] = useState(initialView?.realSpacing ?? false);
+  const viewCb = useRef(onViewChange);
+  useEffect(() => {
+    viewCb.current = onViewChange;
+  });
+  useEffect(() => {
+    const isDefault = onionRange[0] === defaultOnion[0] && onionRange[1] === defaultOnion[1];
+    viewCb.current?.({ frames: isDefault ? null : onionRange, realSpacing, vision });
+  }, [onionRange, defaultOnion, realSpacing, vision]);
   const [verdictIn, setVerdictIn] = useState(false);
   const blink = useBlink(frames.length, { mode: loopMode });
   const { pause } = blink;

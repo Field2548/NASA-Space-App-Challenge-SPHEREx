@@ -123,6 +123,32 @@ describe("PlayScreen", () => {
     expect(screen.getByTestId("mode-status").textContent).toMatch(/INSPECT/);
   });
 
+  it("starts from initialView and reports view changes", async () => {
+    stubFetch(true);
+    const seen: unknown[] = [];
+    render(
+      <PlayScreen
+        spot="fixture"
+        initialView={{ frames: [0, 1], realSpacing: true, vision: "mono" }}
+        onViewChange={(v) => seen.push(v)}
+      />,
+    );
+    await screen.findByTestId("field-canvas");
+    expect(seen.at(-1)).toEqual({ frames: [0, 1], realSpacing: true, vision: "mono" });
+    const pick = screen.getByLabelText("Colour vision") as HTMLSelectElement;
+    expect(pick.value).toBe("mono");
+    fireEvent.change(pick, { target: { value: "deutan" } });
+    expect(seen.at(-1)).toEqual({ frames: [0, 1], realSpacing: true, vision: "deutan" });
+  });
+
+  it("reports the default onion range as null", async () => {
+    stubFetch(true);
+    const seen: unknown[] = [];
+    render(<PlayScreen spot="fixture" onViewChange={(v) => seen.push(v)} />);
+    await screen.findByTestId("field-canvas");
+    expect(seen.at(-1)).toEqual({ frames: null, realSpacing: false, vision: "normal" });
+  });
+
   it("has exactly one h1 in every state", async () => {
     const { unmount } = render(<PlayScreen />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);

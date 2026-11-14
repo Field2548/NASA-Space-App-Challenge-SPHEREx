@@ -17,8 +17,6 @@ for (const route of routes) {
     page.on("console", (m) => {
       if (m.type() !== "error") return;
       const url = m.location().url;
-      // /status probes /api/check on purpose; until SERVER's routes merge that probe is a 404.
-      if (url.endsWith("/api/check")) return;
       // /map: SkyMap probes the CDS SPHEREx HiPS mirrors, which answer 404 for now (SERVER, issue
       // #12); the browser logs each failed probe. The page shows its offline spot list instead.
       if (route === "/map" && hostOf(url).endsWith("cds.unistra.fr")) return;

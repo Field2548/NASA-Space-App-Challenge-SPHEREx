@@ -3,6 +3,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SiteFooter from "./SiteFooter";
 
+const nav = vi.hoisted(() => ({ path: "/play" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.path }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>
@@ -14,6 +16,7 @@ vi.mock("next/link", () => ({
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  nav.path = "/play";
 });
 
 describe("SiteFooter", () => {
@@ -26,5 +29,13 @@ describe("SiteFooter", () => {
     expect(status.getAttribute("href")).toBe("/status");
     expect(credits.nextElementSibling).toBe(status);
     expect(fetch).toHaveBeenCalledWith("/api/health", expect.anything());
+  });
+
+  it("renders nothing on /embed", () => {
+    nav.path = "/embed";
+    vi.stubGlobal("fetch", vi.fn());
+    const { container } = render(<SiteFooter />);
+    expect(container.innerHTML).toBe("");
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
