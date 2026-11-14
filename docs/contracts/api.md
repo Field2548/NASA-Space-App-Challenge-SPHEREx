@@ -1,6 +1,6 @@
 # Contract: API routes (owner: SERVER)
 
-Version 1, published 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1.1, 2026-11-15 Bangkok (1.1: server-enforced spoiler lock with a signed cookie, after GAME review of PR #6). Change only through a `contract` issue (coordination 3.5).
 Source for behaviour: `docs/BUILD_PROMPT.md` (BP) sections 8.10 to 8.12, 8.14, 8.16, 8.19, 9, 10.
 Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts/field-schema.md` (DATA):
 `x`, `y` are 0-based, top-down, pixel centres at integers; frame numbers start at 1.
@@ -29,7 +29,7 @@ Routes owned by DATA (`/api/quicklook/*`, `/api/overlay`) are listed in section 
 
 - **Login.** Supabase Auth runs in the browser. A logged-in call sends `Authorization: Bearer <supabase access token>`. No header = guest. Guests can call every route; routes that write to the database answer as noted per route.
 - **No database is a normal state** (issue #3 item 1 default). Each route below says what it does without one. Nothing crashes.
-- **Rate limit:** light, per IP, in memory. About 30 calls per minute for `/api/check`, 60 for the read routes.
+- **Rate limit:** light, per IP, in memory. About 30 calls per minute for `/api/check`, 60 for the read routes. On Vercel each serverless instance counts on its own, so this is best effort only: it slows a runaway loop, it is not a security control.
 - **Points and verdicts are computed only on the server.** The client never sends points and never reads an answer key. Nothing under `web/data/` is ever served.
 
 ## 2. The spoiler rule: `mode=round|explore`
@@ -39,11 +39,18 @@ Used by `/api/info` (and DATA's `/api/overlay`).
 | `mode` | When the client sends it | What the server returns |
 | --- | --- | --- |
 | `round` | a tutorial level, or play before Submit | **no names, types, spectral types, distances, parallaxes, redshifts, JPL results or links.** Those keys are absent from the JSON, not `null`. |
-| `explore` | after Submit on that spot, in free explore, on the sky map, in quick look | everything |
+| `explore` | after Submit on that spot, in free explore, on the sky map, in quick look | everything, if the server grants it (see below) |
 
 - A missing or unknown `mode` is treated as `round` (the safe side).
-- The client switches a spot from `round` to `explore` only after `/api/check` answered with `"unlocked": true`.
-- The lock is tested: a `mode=round` response for Eros must not contain the strings `Eros`, `433`, `au`, `otype`, `plx`.
+- **The server decides, not the client** (BP section 3: "The server enforces this"). Asking for `mode=explore` is only a request:
+  - For a **ready spot** (a call with `spot=`, or `ra`/`dec` inside a ready spot's picture), the server answers as `explore` only if this player has submitted on that spot. Otherwise it answers exactly as `round`, with `"mode": "round", "locked": true`. Always read `locked` from the response; never assume.
+  - For a position **outside every ready spot** (sky map, quick look), `explore` is always granted.
+- **How the server knows you submitted:** every `/api/check` and `/api/complete` answer sets a cookie `unlock` (`HttpOnly`, `SameSite=Lax`, `Secure` on https, `Path=/api`, 30 days). It holds the list of unlocked spot slugs, signed with HMAC-SHA256 by a server secret, so it cannot be forged or edited. A logged-in player with a saved visit to the spot is also unlocked, on any device. Works for guests and with no database.
+  - Client: call the API with `credentials: "same-origin"` (the `fetch` default). Nothing else to do; the cookie is not readable from JavaScript.
+  - Secret: `UNLOCK_SECRET`; if unset, a key derived from `CRON_SECRET` or `SUPABASE_SERVICE_ROLE_KEY`; if none is set (local development), a random key per server process, so a restart locks spots again until the next submit.
+  - `/embed` inside another site's page does not receive the cookie (`SameSite=Lax`), so embedded views stay locked.
+- The client switches a spot's UI from locked to unlocked after `/api/check` answered with `"unlocked": true`.
+- The lock is tested on the JSON, not on loose substrings: a locked response has exactly the keys `mode`, `locked`, `position`, and its text contains neither `Eros` nor `433`.
 
 ## 3. `POST /api/check`
 
@@ -100,6 +107,10 @@ Response `200`:
 | `nothing_correct` | answered "nothing" and the key has `nothing_moves: true` | absent | yes |
 | `nothing_wrong` | answered "nothing" but something moves here | absent (no spoiler) | 0 |
 
+The checks run in the order of the table, and the first that fits wins. So a slow known object (Eris moves about 1.7 px between frames) marked in two close frames is `known`, not `static`: `known` is tested before the 1 px motion rule.
+
+For `bot_match`, the bot's position in a marked frame is `x + vx * (mjd_frame - t_ref_mjd)` from the answer key. When the marked frames are close in time, the velocity tolerance widens to `4 px / time span`, because two marks that are each within 2 px of the path cannot pin the speed down better than that.
+
 Other keys:
 
 | Key | Meaning |
@@ -109,7 +120,7 @@ Other keys:
 | `first_finder` | `true` if no other player found this object before. Always `false` for guests and with no database. |
 | `already_found` | this player already has this object in this spot; no points the second time |
 | `persisted` | `true` if a row was written to `finds`. `false` for guests and with no database: the client then keeps the result in localStorage. |
-| `unlocked` | `true` after any submission: the spot's spoiler lock is off for this player (section 2) |
+| `unlocked` | `true` after any submission: the spot's spoiler lock is off for this player. The same response sets the signed `unlock` cookie (section 2). |
 | `reveal` | where to open Inspect as the reward (answer-key position of the found object). Present only for `known`. |
 | `track` | the server's fit: `x0, y0` at the first marked frame's time, `vx, vy` in px/day, `rms` in px. Absent for `answer: "nothing"`. |
 | `noise_bar_sigma` | the spot's noise bar, or `null` when no bot search was run. Never show a bot match without it. |
@@ -252,5 +263,6 @@ authHeader(): Promise<Record<string, string>>    // { Authorization: "Bearer ...
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser and server | login, reads |
 | `SUPABASE_SERVICE_ROLE_KEY` | server only, never `NEXT_PUBLIC_` | writing `finds`, `visits` |
 | `CRON_SECRET` | server only | `/api/keepalive` |
+| `UNLOCK_SECRET` | server only, optional | signing the `unlock` cookie (section 2) |
 
-All four missing = guest mode: `/api/check` scores from the answer key, the scoreboard shows the snapshot, the density layers are empty.
+All of them missing = guest mode: `/api/check` scores from the answer key, the scoreboard shows the snapshot, the density layers are empty.
