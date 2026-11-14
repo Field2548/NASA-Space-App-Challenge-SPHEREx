@@ -6,7 +6,8 @@ for (const route of routes) {
   test(`route ${route} renders with no console errors`, async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (m) => {
-      if (m.type() === "error") errors.push(m.text());
+      // /status probes /api/check on purpose; until SERVER's routes merge that probe is a 404.
+      if (m.type() === "error" && !m.location().url.endsWith("/api/check")) errors.push(m.text());
     });
     const res = await page.goto(route);
     expect(res?.status()).toBe(200);
