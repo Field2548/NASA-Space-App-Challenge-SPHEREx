@@ -18,9 +18,10 @@ BLACK_SIGMA, SOFT_SIGMA = -1.0, 2.0   # the shared stretch of motion_frames.make
 
 
 def mjd_to_utc(mjd):
-    """MJD (UTC) -> '2025-07-09T18:04:04'. MJD 0 is 1858-11-17T00:00."""
+    """MJD (UTC) -> '2025-07-09T18:04:04', truncated to the second, like frames.csv.
+    MJD 0 is 1858-11-17T00:00."""
     t = datetime(1858, 11, 17, tzinfo=timezone.utc) + timedelta(days=float(mjd))
-    return (t + timedelta(microseconds=500000)).strftime("%Y-%m-%dT%H:%M:%S")
+    return t.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def write_u16(frames, path):
@@ -79,7 +80,7 @@ def make_thumbs(frames, out_dir, size=48, white=None):
 def simple_wcs(ra, dec, half):
     """The field.json 'wcs' block for a centred grid of 2*half+1 pixels (grid_wcs layout)."""
     step = round(PIXEL_ARCSEC / 3600, 7)
-    return {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec], "crpix": [half + 1, half + 1],
+    return {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec], "crpix": [float(half + 1), float(half + 1)],
             "cdelt": [-step, step], "rows": "top-down"}
 
 
@@ -236,8 +237,9 @@ def _solve_stretch(levels):
     noise sigma 1 by construction (frames are in noise units), so the 25th percentile of the
     sky sits 0.6745 below its median in S/N. Find the asinh(a) that makes it so. Only the lower
     half of the distribution is used because stars fill the upper half in crowded fields.
-    Measured against FITS on the five ready spots: sky values within 0.09 sigma (median),
-    sources within about 20%; the worst case is the crowded Cygnus field."""
+    Measured against FITS on the five ready spots, the recovered values are always a little low:
+    the white point by 9 to 28 percent and source S/N by 6 to 19 percent, worst on Makemake.
+    The sky is within 0.09 sigma."""
     sky = levels[:, ~_uncovered(levels)]
     lo, hi = ((np.percentile(sky, q) + 0.5) / 255 for q in (25, 50))
 
@@ -272,13 +274,45 @@ def read_candidates(folder, height):
     return out
 
 
+NEAR_OBJECT_PX = 3.0      # a candidate within this distance of the known object is "on" it
+
+
+def candidate_status(cand, mjds, t_ref, objects):
+    """Say what a bot candidate is, by comparing its straight path with the known object's
+    positions frame by frame (frames where the object is outside the picture do not count):
+      known        on the object in at least 3 frames (or in every frame, if fewer than 3 count)
+      alias        on the object in some frame but not enough: a wrong track that borrows
+                   the object's light in those frames
+      unconfirmed  never on a known object. Not a claim that it is real.
+    Returns the keys to add to the candidate."""
+    for obj in objects:
+        near = []
+        usable = [p for p in obj["positions"] if p["in_grid"]]
+        for p in usable:
+            dt = mjds[p["frame"] - 1] - t_ref
+            dx = cand["x"] + cand["vx_px_per_day"] * dt - p["x"]
+            dy = cand["y"] + cand["vy_px_per_day"] * dt - p["y"]
+            if (dx * dx + dy * dy) ** 0.5 <= NEAR_OBJECT_PX:
+                near.append(p["frame"])
+        if usable and len(near) >= min(3, len(usable)):
+            return {"status": "known", "object_id": obj["id"], "near_object_frames": near}
+        if near:
+            return {"status": "alias", "object_id": obj["id"], "near_object_frames": near}
+    return {"status": "unconfirmed"}
+
+
 def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=None,
                nothing_moves=False):
     """The server-only answer key (field-schema.md section 6).
     track: a JPL Horizons small-body id; its position in every frame comes from
     motion_frames.track_positions. frames (top-down) adds the measured S/N at each position
-    (max of the 3x3 pixels, as the repo's --track check does). star is reserved for the
-    Tier 2 star targets and not used yet."""
+    (max of the 3x3 pixels, as the repo's --track check does). change_snr is the same 3x3
+    maximum in the frame minus the median of the other frames (motion_frames.residuals): stars
+    cancel, so it tells whether the object itself is seen there. star is reserved for the
+    Tier 2 star targets and not used yet. Each bot candidate gets a status (known, alias or
+    unconfirmed), see candidate_status."""
+    if star is not None:
+        raise NotImplementedError("star targets are not built yet")
     _repo_imports()
     height, width = wcs.array_shape if wcs.array_shape else frames.shape[1:]
     mjds = np.asarray(mjds, dtype=float)
@@ -289,6 +323,10 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
         fx, fy, name = track_positions(track, list(mjds), wcs)
         x, y = to_top_down(fx, fy, height)
         days = mjds - t_ref
+        resid = None
+        if frames is not None:
+            from motion_frames import residuals
+            resid = np.array(residuals(list(frames)))     # each frame minus the others' median
         positions = []
         for k in range(len(mjds)):
             inside = bool(-0.5 <= x[k] <= width - 0.5 and -0.5 <= y[k] <= height - 0.5)
@@ -298,6 +336,8 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
                 ix, iy = int(round(x[k])), int(round(y[k]))
                 box = frames[k, max(iy - 1, 0):iy + 2, max(ix - 1, 0):ix + 2]
                 p["snr"] = round(float(np.nanmax(box)), 1) if np.isfinite(box).any() else None
+                rbox = resid[k, max(iy - 1, 0):iy + 2, max(ix - 1, 0):ix + 2]
+                p["change_snr"] = round(float(np.nanmax(rbox)), 1) if np.isfinite(rbox).any() else None
             positions.append(p)
         objects.append({"id": str(track), "name": name, "kind": "asteroid", "source": "JPL Horizons",
                         "positions": positions,
@@ -306,6 +346,8 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     cands = read_candidates(folder, height)
     if noise_bar is None:
         cands = []          # never report a bot candidate without its noise bar
+    for c in cands:
+        c.update(candidate_status(c, mjds, t_ref, objects))
     return {"slug": None, "nothing_moves": bool(nothing_moves), "noise_bar_sigma": noise_bar,
             "t_ref_mjd": round(t_ref, 6), "objects": objects,
             "bot": {"source": "shift_stack.py", "candidates": cands}}
@@ -359,10 +401,25 @@ def quantize_plane(plane, noise):
     return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), scale, offset, bool(clipped)
 
 
-def export_exposures(folder, sky, out_dir):
+def grid_for_shape(ra, dec, shape):
+    """The north-up grid (spectral_bands.grid_wcs) that has exactly this (height, width).
+    grid_wcs takes a field of view and returns 2 * half + 1 pixels, so pass the field of view
+    that makes half = (height - 1) / 2. Only odd, square grids exist in this project."""
+    _repo_imports()
+    from astropy.coordinates import SkyCoord
+    from spectral_bands import grid_wcs
+    h, w = shape
+    wcs, got = grid_wcs(SkyCoord(ra, dec, unit="deg"), (h - 1) * PIXEL_ARCSEC / 3600)
+    if tuple(got) != (h, w):
+        raise ValueError(f"no centred grid of {w}x{h} pixels; pass wcs")
+    return wcs
+
+
+def export_exposures(folder, sky, out_dir, wcs=None):
     """Every single exposure behind the frames, on the frames' grid (field-schema.md section 7).
     folder: a motion_* folder with frames.csv and its downloaded cutouts in images/.
-    sky: the FITS-order sky grid (fits_sky_grid). Writes out_dir/exposures.u16 and
+    sky: the FITS-order sky grid (fits_sky_grid). wcs: the frames' own WCS (pass it; it is
+    rebuilt from the grid size when omitted). Writes out_dir/exposures.u16 and
     exposures.json; returns the JSON as a dict.
     Reuses clean_band (zodi and background removed, MJy/sr) and resample unchanged, and keeps
     the same planes build_frame keeps (more than 20% of the spot covered)."""
@@ -372,11 +429,10 @@ def export_exposures(folder, sky, out_dir):
     from astropy.time import Time
     from motion_frames import noise_of
     from spectral_bands import clean_band, resample, unique_images
-    from astropy.coordinates import SkyCoord
-    from spectral_bands import grid_wcs
     h, w = sky.shape
     ra, dec = folder_center(folder)
-    wcs, _ = grid_wcs(SkyCoord(ra, dec, unit="deg"), round(h * PIXEL_ARCSEC / 3600, 1))
+    if wcs is None:
+        wcs = grid_for_shape(ra, dec, (h, w))
     urls = {}
     cache = os.path.join(folder, "sia_results.ecsv")
     if os.path.exists(cache):
@@ -441,14 +497,31 @@ def rebuild_frame(planes, noises):
     return frame / noise_of(frame)
 
 
+def public_title(ra, dec):
+    """A title that does not give the answer away: the constellation of the spot centre."""
+    from astropy.coordinates import SkyCoord, get_constellation
+    return f"Field in {get_constellation(SkyCoord(ra, dec, unit='deg'))}"
+
+
+def public_difficulty(difficulty):
+    """The control spot must not be recognisable: it is listed (and scored) as medium."""
+    return "medium" if difficulty == "control" else difficulty
+
+
 def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None, kind="asteroid",
-                 fov=0.2, noise_bar=None, nothing_moves=False, answers_dir=None):
+                 fov=0.2, noise_bar=None, nothing_moves=False, answers_dir=None, bands=None):
     """Export one spot. out_dir is web/public/fields; the answer key goes to answers_dir
-    (default web/data/answers next to it, never under public/). Returns field.json as a dict."""
+    (default web/data/answers next to it, never under public/). bands: a data/bands_<slug>
+    folder; when it holds cube.fits the spectrum tiles are written (section 8).
+    The public files get a neutral title, kind 'spot' and a non-revealing difficulty; the real
+    ones go into the answer key's 'reveal' block (issue #10).
+    Returns field.json as a dict."""
+    if star is not None:
+        raise NotImplementedError("star targets are not built yet")
     out_dir = os.path.abspath(out_dir)
     answers_dir = answers_dir or os.path.join(os.path.dirname(os.path.dirname(out_dir)),
                                               "data", "answers")
-    if os.sep + "public" in os.path.abspath(answers_dir):
+    if "public" in os.path.abspath(answers_dir).split(os.sep):
         raise ValueError("answer keys must not be written under public/")
     spot = os.path.join(out_dir, slug)
     os.makedirs(spot, exist_ok=True)
@@ -467,7 +540,8 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     if len(meta) != n:
         raise ValueError(f"{folder}: frames.csv has {len(meta)} rows but there are {n} frames")
     field = {
-        "slug": slug, "title": title, "kind": kind, "difficulty": difficulty,
+        "slug": slug, "title": public_title(ra, dec), "kind": "spot",
+        "difficulty": public_difficulty(difficulty),
         "ra": ra, "dec": dec, "fov_deg": fov, "pixel_arcsec": PIXEL_ARCSEC, "size": [w, h],
         "wcs": {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec],
                 "crpix": [float(v) for v in wcs.wcs.crpix],
@@ -486,19 +560,28 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     images = os.path.join(folder, "images")
     if precision == "float" and all(os.path.exists(os.path.join(images, name))
                                     for m in meta for name in m["files"]):
-        export_exposures(folder, fits_sky_grid(wcs, (h, w)), spot)
+        export_exposures(folder, fits_sky_grid(wcs, (h, w)), spot, wcs=wcs)
         field["has"]["exposures"] = True
     else:                                    # no cutouts: drop stale files, hide the feature
         for name in ("exposures.u16", "exposures.json"):
             if os.path.exists(os.path.join(spot, name)):
                 os.remove(os.path.join(spot, name))
+    if bands and os.path.exists(os.path.join(bands, "cube.fits")):
+        from spectrum_tiles import check_cube_grid, export_spectrum_tiles
+        check_cube_grid(bands, [w, h], field["wcs"]["crval"], field["wcs"]["crpix"])
+        export_spectrum_tiles(bands, spot)
+        field["has"]["spectrum"] = True
+    elif os.path.isdir(os.path.join(spot, "spectrum")):      # no cube: drop stale tiles
+        import shutil
+        shutil.rmtree(os.path.join(spot, "spectrum"))
     write_json(os.path.join(spot, "field.json"), field)
-    update_index(out_dir, {"slug": slug, "title": title, "ra": ra, "dec": dec, "fov_deg": fov,
-                           "difficulty": difficulty, "kind": kind,
+    update_index(out_dir, {"slug": slug, "title": field["title"], "ra": ra, "dec": dec, "fov_deg": fov,
+                           "difficulty": field["difficulty"], "kind": field["kind"],
                            "thumbnail": f"{slug}/thumbs/1.webp"})
     key = answer_key(folder, wcs, mjds, track=track, star=star, frames=frames,
                      noise_bar=noise_bar, nothing_moves=nothing_moves)
     key["slug"] = slug
+    key["reveal"] = {"title": title, "kind": kind, "difficulty": difficulty}
     for obj in key["objects"]:
         obj["kind"] = kind if kind in ("asteroid", "dwarf-planet") else obj["kind"]
     write_json(os.path.join(answers_dir, f"{slug}.json"), key)
@@ -521,26 +604,32 @@ def parse_args():
     p.add_argument("--star", help="reserved for star targets")
     p.add_argument("--noise-bar", type=float, help="the bot search's noise bar (sigma)")
     p.add_argument("--nothing-moves", action="store_true", help="control spot")
+    p.add_argument("--bands", help="a data/bands_* folder (cube.fits) for the spectrum tiles; "
+                                   "--all uses data/bands_<slug> when it exists")
     p.add_argument("--out", default=os.path.join(ROOT, "web", "public", "fields"))
     return p.parse_args()
 
 
 def main():
     a = parse_args()
+    if a.star:
+        raise SystemExit("--star is reserved for star targets, which are not built yet")
     if a.all:
         jobs = [dict(s, folder=os.path.join(ROOT, s["folder"])) for s in SPOTS]
     elif a.folder and a.slug and a.title and a.difficulty:
         jobs = [{"slug": a.slug, "folder": a.folder, "title": a.title, "kind": a.kind,
                  "difficulty": a.difficulty, "fov": a.fov, "track": a.track,
-                 "noise_bar": a.noise_bar, "nothing_moves": a.nothing_moves}]
+                 "noise_bar": a.noise_bar, "nothing_moves": a.nothing_moves, "bands": a.bands}]
     else:
         raise SystemExit("give FOLDER --slug --title --difficulty, or --all")
     for j in jobs:
-        f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out,
+        bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all else None)
+        f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out, bands=bands,
                          track=j.get("track"), kind=j["kind"], fov=j["fov"],
                          noise_bar=j.get("noise_bar"), nothing_moves=j.get("nothing_moves", False))
         print(f"{j['slug']}: {len(f['frames'])} frames {f['size'][0]}x{f['size'][1]}, "
-              f"{f['data']['precision']}, scale {f['data']['scale']}, white {f['stretch']['white']}")
+              f"{f['data']['precision']}, scale {f['data']['scale']}, white {f['stretch']['white']}"
+              + (", spectrum" if f["has"]["spectrum"] else ""))
     if a.all:
         # real spots have landed: the index lists them in game order, without the fixture
         with open(os.path.join(a.out, "index.json"), encoding="utf-8") as f:

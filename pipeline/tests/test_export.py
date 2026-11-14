@@ -105,7 +105,7 @@ def test_png_fallback_equals_fits_within_one_level(slug):
         redrawn = (ew.stretch_gray(png_frames[k], white) * 255).astype(int)
         assert np.abs(redrawn - levels_png).max() <= 1
     # ... and the S/N numbers are approximate: "preview quality". These are the measured
-    # limits (worst case is the crowded Cygnus field), not a wish.
+    # limits (worst case is Makemake), not a wish.
     seen = np.isfinite(fits_frames) & np.isfinite(png_frames)
     sky = seen & (fits_frames > -0.9) & (fits_frames < 3)
     stars = seen & (fits_frames >= 5) & (fits_frames < 50)
@@ -135,6 +135,26 @@ def test_eros_is_bright_at_its_track_while_in_the_picture():
     for p in pos[:3]:
         x, y = int(round(p["x"])), int(round(p["y"]))
         assert np.nanmax(frames[p["frame"] - 1, y - 1:y + 2, x - 1:x + 2]) > 100   # rows top-down
+
+
+@pytest.mark.parametrize("slug", [s for s in SLUGS if SPOT[s]["track"]])
+def test_positions_carry_snr_and_change_snr(slug):
+    _, _, ans = load(slug)
+    for p in ans["objects"][0]["positions"]:
+        if p["in_grid"]:
+            assert "snr" in p and "change_snr" in p
+            for key in ("snr", "change_snr"):
+                assert p[key] is None or np.isfinite(p[key])
+        else:
+            assert "snr" not in p and "change_snr" not in p
+
+
+def test_eros_change_snr_is_bright_while_in_the_picture():
+    """Eros is fast: its residual (frame minus the others' median) stays bright in frames 1-3."""
+    _, _, ans = load("eros")
+    pos = ans["objects"][0]["positions"]
+    for p in pos[:3]:
+        assert p["in_grid"] and p["change_snr"] > 100
 
 
 def test_eris_bot_candidate_matches_jpl():
@@ -216,3 +236,219 @@ def test_exposures_rebuild_the_frames(slug):
         assert both.sum() > 0.8 * np.isfinite(frames[fr["i"] - 1]).sum()
         err = np.abs(rebuilt - frames[fr["i"] - 1])[both]
         assert np.median(err) < 0.1 and np.percentile(err, 99) < 2.0     # in noise sigmas
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_utc_strings_match_frames_csv(slug):
+    with open(os.path.join(FIELDS, slug, "field.json"), encoding="utf-8") as f:
+        field = json.load(f)
+    rows = ew.read_frames_csv(os.path.join(ROOT, SPOT[slug]["folder"]))
+    assert [fr["utc"] for fr in field["frames"]] == [r["utc"] for r in rows]
+
+
+def test_mjd_to_utc_truncates_to_the_second():
+    # 0.752824 d = 65043.9936 s = 18 h 4 min 3.9936 s, so truncation gives :03, not :04
+    assert ew.mjd_to_utc(60865.752824) == "2025-07-09T18:04:03"
+
+
+def test_star_targets_are_refused():
+    with pytest.raises(NotImplementedError):
+        ew.answer_key("x", None, [1.0], star="Barnard")
+
+
+def test_public_guard_refuses_answers_under_public(tmp_path):
+    with pytest.raises(ValueError):
+        ew.export_field(str(tmp_path / "x"), "x", "t", "easy",
+                        str(tmp_path / "web" / "public" / "fields"),
+                        answers_dir=str(tmp_path / "web" / "public" / "answers"))
+
+
+# ------------------------------------------------------------------ sample (no FITS needed)
+SAMPLE_PATH = os.path.join(HERE, "ref", "fits_sample.json")
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_committed_frames_match_fits_sample(slug):
+    """Like test_export_equals_fits_within_half_a_step, but reads only the committed sample
+    (ref/fits_sample.json, made by make_fits_sample.py from frames.fits). Never opens frames.fits."""
+    with open(SAMPLE_PATH, encoding="utf-8") as f:
+        sample = json.load(f)[slug]
+    field, frames, _ = load(slug)
+    assert list(frames.shape) == sample["shape"]
+    flat = frames.reshape(-1)
+    idx = np.array(sample["index"])
+    got = flat[idx]
+    want = np.array([np.nan if v is None else v for v in sample["value"]], dtype=float)
+    assert np.array_equal(np.isnan(want), np.isnan(got))
+    ok = ~np.isnan(want)
+    assert np.all(np.abs(got[ok] - want[ok]) <= field["data"]["scale"] / 2 + 1e-6)
+
+
+# ------------------------------------------------------------------ metadata and leaks
+@pytest.mark.parametrize("slug", SLUGS)
+def test_frame_metadata_matches_frames_csv(slug):
+    field, _, _ = load(slug)
+    rows = ew.read_frames_csv(os.path.join(ROOT, SPOT[slug]["folder"]))
+    assert len(rows) == len(field["frames"])
+    for k, row in enumerate(rows):
+        fr = field["frames"][k]
+        assert fr["n_bands"] == row["n_bands"]
+        assert fr["detectors"] == row["detectors"]
+        assert abs(fr["hours_since_prev"] - row["hours_since_prev"]) <= 0.011
+
+
+ANSWER_KEYS = {"positions", "candidates", "objects", "bot", "noise_bar_sigma", "nothing_moves",
+               "t_ref_mjd", "above_noise_bar", "stacked_snr", "reveal"}
+
+
+def _all_keys(obj):
+    """Every dictionary key anywhere in a parsed JSON value."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield k
+            yield from _all_keys(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _all_keys(v)
+
+
+def test_no_answer_data_in_any_public_file():
+    public = os.path.join(ROOT, "web", "public")
+    for root, _, files in os.walk(public):
+        for name in files:
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(root, name)
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            leaked = sorted(set(_all_keys(data)) & ANSWER_KEYS)
+            assert not leaked, f"{os.path.relpath(path, ROOT)} has answer key(s): {leaked}"
+
+
+# ------------------------------------------------------------------ neutral public files (issue #10)
+GIVEAWAYS = ["Eros", "Hektor", "Makemake", "Eris", "control", "624", "136472", "136199",
+             "asteroid", "dwarf"]
+# "433" is also a substring of Eris's dec (-0.4338), so for it only the title, kind and
+# difficulty values are checked (not the raw text).
+
+
+def _read_text(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def test_public_files_do_not_name_the_answer():
+    for slug in SLUGS:
+        text = _read_text(os.path.join(FIELDS, slug, "field.json"))
+        for word in GIVEAWAYS:
+            assert word not in text, f"{slug}/field.json contains {word!r}"
+        field = json.loads(text)
+        for value in (field["title"], field["kind"], field["difficulty"]):
+            assert "433" not in value, f"{slug}/field.json contains '433' in {value!r}"
+    text = _read_text(os.path.join(FIELDS, "index.json"))
+    for word in GIVEAWAYS:
+        assert word not in text, f"index.json contains {word!r}"
+    for entry in json.loads(text):
+        for value in (entry["title"], entry["kind"], entry["difficulty"]):
+            assert "433" not in value, f"index.json contains '433' in {value!r}"
+
+
+def test_public_title_kind_difficulty():
+    with open(os.path.join(FIELDS, "index.json"), encoding="utf-8") as f:
+        index = {e["slug"]: e for e in json.load(f)}
+    for slug in SLUGS:
+        with open(os.path.join(FIELDS, slug, "field.json"), encoding="utf-8") as f:
+            field = json.load(f)
+        assert field["title"].startswith("Field in ")
+        assert field["kind"] == "spot"
+        assert field["difficulty"] in ("easy", "medium", "hard", "boss")
+        entry = index[slug]
+        assert (entry["title"], entry["kind"], entry["difficulty"]) == \
+            (field["title"], field["kind"], field["difficulty"])
+
+
+def test_reveal_block():
+    for slug in SLUGS:
+        with open(os.path.join(ANSWERS, f"{slug}.json"), encoding="utf-8") as f:
+            ans = json.load(f)
+        assert ans["reveal"] == {"title": SPOT[slug]["title"], "kind": SPOT[slug]["kind"],
+                                 "difficulty": SPOT[slug]["difficulty"]}
+
+
+def test_fixture_is_unchanged_by_the_neutral_titles():
+    with open(os.path.join(FIELDS, "fixture", "field.json"), encoding="utf-8") as f:
+        assert json.load(f)["kind"] == "fixture"
+    with open(os.path.join(ANSWERS, "fixture.json"), encoding="utf-8") as f:
+        assert "reveal" not in json.load(f)
+
+
+# ------------------------------------------------------------------ bot candidate status
+def _bot_by_rank(slug):
+    _, _, ans = load(slug)
+    return ans, {c["rank"]: c for c in ans["bot"]["candidates"]}
+
+
+@pytest.mark.parametrize("slug", SLUGS)
+def test_bot_candidate_status_values(slug):
+    _, _, ans = load(slug)
+    for c in ans["bot"]["candidates"]:
+        assert c["status"] in ("known", "alias", "unconfirmed"), (slug, c["rank"])
+        named = c["status"] in ("known", "alias")
+        assert ("object_id" in c) == named, (slug, c["rank"])
+        assert ("near_object_frames" in c) == named, (slug, c["rank"])
+
+
+def test_bot_candidate_status_matches_the_measured_cases():
+    _, hek = _bot_by_rank("hektor")
+    assert hek[1]["status"] == "known" and hek[1]["object_id"] == "624"
+    assert hek[2]["status"] == "unconfirmed" and hek[3]["status"] == "unconfirmed"
+    _, eris = _bot_by_rank("eris")
+    assert eris[1]["status"] == "known" and eris[1]["object_id"] == "136199"
+    assert eris[2]["status"] == "alias" and eris[2]["near_object_frames"] == [5]
+    _, mm = _bot_by_rank("makemake")
+    assert mm[1]["status"] == "known"
+    ans, _ = _bot_by_rank("cygnus")
+    assert ans["bot"]["candidates"] and all(c["status"] == "unconfirmed"
+                                            for c in ans["bot"]["candidates"])
+
+
+@pytest.mark.parametrize("slug", ["hektor", "eris", "makemake"])
+def test_unconfirmed_candidates_match_no_catalogued_body(slug):
+    field, _, ans = load(slug)
+    with open(os.path.join(ROOT, "web", "data", "catalog", f"{slug}.json"), encoding="utf-8") as f:
+        catalog = json.load(f)
+    mjds = [fr["mjd"] for fr in field["frames"]]
+    close = []
+    for c in ans["bot"]["candidates"]:
+        if c["status"] != "unconfirmed" or not c["above_noise_bar"]:
+            continue
+        for body in catalog["asteroids"]:
+            for p in body["positions"]:
+                dt = mjds[p["frame"] - 1] - ans["t_ref_mjd"]
+                x = c["x"] + c["vx_px_per_day"] * dt
+                y = c["y"] + c["vy_px_per_day"] * dt
+                d = ((x - p["x"]) ** 2 + (y - p["y"]) ** 2) ** 0.5
+                if d <= 4:
+                    close.append((c["rank"], body["name"], p["frame"], round(d, 2)))
+    assert not close, close
+
+
+def test_candidate_status_on_made_up_numbers():
+    mjds = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    t_ref = 2.0
+    obj = {"id": "900", "positions": [
+        {"frame": i + 1, "x": 10 + 2 * m, "y": 20 - m, "in_grid": True}   # x = 10 + 2m, y = 20 - m
+        for i, m in enumerate(mjds)]}
+
+    def cand(x0, y0, vx, vy):
+        return {"x": x0, "y": y0, "vx_px_per_day": vx, "vy_px_per_day": vy}
+
+    st = ew.candidate_status
+    assert st(cand(14, 18, 2, -1), mjds, t_ref, [obj]) == {
+        "status": "known", "object_id": "900", "near_object_frames": [1, 2, 3, 4, 5]}
+    assert st(cand(24, 14, -3, 1), mjds, t_ref, [obj]) == {
+        "status": "alias", "object_id": "900", "near_object_frames": [5]}
+    assert st(cand(100, 100, 0, 0), mjds, t_ref, [obj]) == {"status": "unconfirmed"}
+    short = {"id": "901", "positions": [dict(p, in_grid=p["frame"] >= 4) for p in obj["positions"]]}
+    assert st(cand(14, 18, 2, -1), mjds, t_ref, [short]) == {
+        "status": "known", "object_id": "901", "near_object_frames": [4, 5]}
