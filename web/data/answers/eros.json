@@ -54,5 +54,10 @@
  "bot": {
   "source": "shift_stack.py",
   "candidates": []
+ },
+ "reveal": {
+  "title": "(433) Eros",
+  "kind": "asteroid",
+  "difficulty": "easy"
  }
 }

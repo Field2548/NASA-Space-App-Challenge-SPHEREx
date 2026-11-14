@@ -219,5 +219,10 @@
     ]
    }
   ]
+ },
+ "reveal": {
+  "title": "(624) Hektor",
+  "kind": "asteroid",
+  "difficulty": "medium"
  }
 }

@@ -323,3 +323,60 @@ def test_no_answer_data_in_any_public_file():
                 data = json.load(f)
             leaked = sorted(set(_all_keys(data)) & ANSWER_KEYS)
             assert not leaked, f"{os.path.relpath(path, ROOT)} has answer key(s): {leaked}"
+
+
+# ------------------------------------------------------------------ neutral public files (issue #10)
+GIVEAWAYS = ["Eros", "Hektor", "Makemake", "Eris", "control", "624", "136472", "136199",
+             "asteroid", "dwarf"]
+# "433" is also a substring of Eris's dec (-0.4338), so for it only the title, kind and
+# difficulty values are checked (not the raw text).
+
+
+def _read_text(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def test_public_files_do_not_name_the_answer():
+    for slug in SLUGS:
+        text = _read_text(os.path.join(FIELDS, slug, "field.json"))
+        for word in GIVEAWAYS:
+            assert word not in text, f"{slug}/field.json contains {word!r}"
+        field = json.loads(text)
+        for value in (field["title"], field["kind"], field["difficulty"]):
+            assert "433" not in value, f"{slug}/field.json contains '433' in {value!r}"
+    text = _read_text(os.path.join(FIELDS, "index.json"))
+    for word in GIVEAWAYS:
+        assert word not in text, f"index.json contains {word!r}"
+    for entry in json.loads(text):
+        for value in (entry["title"], entry["kind"], entry["difficulty"]):
+            assert "433" not in value, f"index.json contains '433' in {value!r}"
+
+
+def test_public_title_kind_difficulty():
+    with open(os.path.join(FIELDS, "index.json"), encoding="utf-8") as f:
+        index = {e["slug"]: e for e in json.load(f)}
+    for slug in SLUGS:
+        with open(os.path.join(FIELDS, slug, "field.json"), encoding="utf-8") as f:
+            field = json.load(f)
+        assert field["title"].startswith("Field in ")
+        assert field["kind"] == "spot"
+        assert field["difficulty"] in ("easy", "medium", "hard", "boss")
+        entry = index[slug]
+        assert (entry["title"], entry["kind"], entry["difficulty"]) == \
+            (field["title"], field["kind"], field["difficulty"])
+
+
+def test_reveal_block():
+    for slug in SLUGS:
+        with open(os.path.join(ANSWERS, f"{slug}.json"), encoding="utf-8") as f:
+            ans = json.load(f)
+        assert ans["reveal"] == {"title": SPOT[slug]["title"], "kind": SPOT[slug]["kind"],
+                                 "difficulty": SPOT[slug]["difficulty"]}
+
+
+def test_fixture_is_unchanged_by_the_neutral_titles():
+    with open(os.path.join(FIELDS, "fixture", "field.json"), encoding="utf-8") as f:
+        assert json.load(f)["kind"] == "fixture"
+    with open(os.path.join(ANSWERS, "fixture.json"), encoding="utf-8") as f:
+        assert "reveal" not in json.load(f)

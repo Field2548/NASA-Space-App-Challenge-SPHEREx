@@ -1,6 +1,6 @@
 # Contract: field schema (owner: DATA)
 
-Version 1, published 2026-11-15 04:10 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1, published 2026-11-15 04:10 Bangkok. Change only through a `contract` issue (coordination 3.5). Version 1.1 (2026-11-15): neutral public title, kind and difficulty; `reveal` in the answer key (issue #10); `change_snr` in answer-key positions.
 Every file below is written by `pipeline/export_web.py` (real spots) or `pipeline/make_fixture.py` (the `fixture` spot).
 
 ```
@@ -34,7 +34,7 @@ Schema from BUILD_PROMPT 6.2, verbatim, plus the marked additions.
 
 ```json
 {
-  "slug": "eros", "title": "(433) Eros", "kind": "asteroid", "difficulty": "easy",
+  "slug": "eros", "title": "Field in Pisces", "kind": "spot", "difficulty": "easy",
   "ra": 13.2004, "dec": 14.38, "fov_deg": 0.2, "pixel_arcsec": 6.15, "size": [119, 119],
   "wcs": { "ctype": ["RA---TAN", "DEC--TAN"], "crval": [13.2004, 14.38], "crpix": [60, 60],
            "cdelt": [-0.0017083, 0.0017083], "rows": "top-down" },
@@ -51,8 +51,9 @@ Schema from BUILD_PROMPT 6.2, verbatim, plus the marked additions.
 
 | Key | Meaning |
 | --- | --- |
-| `kind` | `asteroid`, `dwarf-planet`, `control`, `star`, `fixture` |
-| `difficulty` | `easy`, `medium`, `hard`, `boss`, `control` |
+| `title` | neutral on purpose: `Field in <constellation of the spot centre>`. The object's name is in the answer key only (`reveal`, section 6) |
+| `kind` | `spot` for every ready spot (`fixture` for the test spot). The real kind is in the answer key only |
+| `difficulty` | `easy`, `medium`, `hard`, `boss`. The control spot is listed as `medium` so it cannot be recognised; its real difficulty is in the answer key only |
 | `frames[].i` | frame number, **from 1**, in time order. Plane `i - 1` of `frames.u16`. |
 | `frames[].mjd` | mean time of the frame (MJD, UTC). `utc` is the same time as ISO text. |
 | `frames[].hours_since_prev` | 0 for the first frame |
@@ -84,8 +85,8 @@ const frame = (k: number) => Float32Array.from(u.subarray(k * W * H, (k + 1) * W
 ## 5. `index.json`
 
 ```json
-[ { "slug": "eros", "title": "(433) Eros", "ra": 13.2004, "dec": 14.38, "fov_deg": 0.2,
-    "difficulty": "easy", "kind": "asteroid", "thumbnail": "eros/thumbs/1.webp" } ]
+[ { "slug": "eros", "title": "Field in Pisces", "ra": 13.2004, "dec": 14.38, "fov_deg": 0.2,
+    "difficulty": "easy", "kind": "spot", "thumbnail": "eros/thumbs/1.webp" } ]
 ```
 
 `thumbnail` is relative to `web/public/fields/`. The `fixture` spot is listed only until real spots land; after that its folder stays (tests use it) but it leaves the index.
@@ -100,6 +101,7 @@ Never import this from client code and never copy it under `public/`.
   "nothing_moves": false,
   "noise_bar_sigma": null,
   "t_ref_mjd": 60866.1,
+  "reveal": { "title": "(433) Eros", "kind": "asteroid", "difficulty": "easy" },
   "objects": [
     { "id": "433", "name": "433 Eros (A898 PA)", "kind": "asteroid", "source": "JPL Horizons",
       "positions": [ { "frame": 1, "x": 51.2, "y": 63.9, "in_grid": true, "snr": 721.2, "change_snr": 763.6 } ],
@@ -116,6 +118,7 @@ Never import this from client code and never copy it under `public/`.
 | `noise_bar_sigma` | the field's noise bar for the bot search (stacked S/N). `null` if no bot search was run. Never report a bot match without it. |
 | `objects[].positions` | one entry per frame, in the top-down grid (section 1). `in_grid` is false when the object is outside the picture in that frame (Eros leaves after frame 3; `x, y` are then outside `0..W-1`). Optional `snr`: measured S/N there (max of the 3 x 3 pixels), absent when out of the grid, `null` when there is no data. Optional `change_snr`: the same 3 x 3 maximum taken in the frame minus the median of the other frames (`motion_frames.residuals`), so stars cancel. Use `change_snr`, not `snr`, to say whether the object itself is seen in a frame: `snr` also counts a background star that happens to lie under the path. |
 | `objects[].v*_px_per_day` | straight-line fit to the positions of all frames, top-down (positive `vy` = moving down = south). A summary only: score against `positions`, because fast objects do not move in a straight line. |
+| `reveal` | the real title, kind and difficulty of the spot (for the control spot: `control`). Public files never carry these (issue #10). The server sends them only after a correct answer |
 | `bot.candidates` | from `candidates.csv`, already converted: `y = H - 1 - y_csv`, `vy = -vy_csv`. `x, y` is the position at `t_ref_mjd` (the mean of the frame times); position in frame `i` is `x + vx * (mjd_i - t_ref_mjd)`, same for y. |
 
 `objects` is `[]` and `bot.candidates` is `[]` when there are none.

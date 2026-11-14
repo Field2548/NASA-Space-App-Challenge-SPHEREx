@@ -1,8 +1,8 @@
 {
  "slug": "cygnus",
- "title": "Cygnus control field",
- "kind": "control",
- "difficulty": "control",
+ "title": "Field in Cygnus",
+ "kind": "spot",
+ "difficulty": "medium",
  "ra": 304.6935,
  "dec": 42.4437,
  "fov_deg": 0.2,

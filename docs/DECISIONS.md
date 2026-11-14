@@ -36,3 +36,10 @@ This file is kept in step with section 14 of `docs/BUILD_PROMPT.md`.
 | Other teams' work: **ideas only, credited by name** | Keeps the code original for judging, and the Space Apps terms require citing every resource. |
 | **PR #1 M101 frames not used in the game** | They are single exposures at different wavelengths, so stars change brightness between frames and create false "changes." M101 is a galaxy, so nothing in it moves. |
 
+## Decided during the build
+
+| Decision | Why |
+| --- | --- |
+| Public spot files carry a neutral title (`Field in Pisces`), kind `spot`, and the control spot is listed as `medium` | The build prompt locks names and types until the player submits, but its example `field.json` showed them. Real names moved to the server-only answer key (issue #10). |
+| Spot slugs (`eros`, `hektor`, `makemake`, `eris`) stay as they are | They appear in URLs and file paths and do give the object away to someone who reads them. Renaming them would have touched every agent's code on the last night; accepted as a known leak (issue #10, option B not taken). |
+| Sky position and frame times stay public | The viewer and the sky map need them. A determined player can ask JPL what was there; the lock is against reading the answer off the screen. |

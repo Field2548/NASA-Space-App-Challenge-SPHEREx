@@ -168,5 +168,10 @@
     ]
    }
   ]
+ },
+ "reveal": {
+  "title": "Cygnus control field",
+  "kind": "control",
+  "difficulty": "control"
  }
 }
