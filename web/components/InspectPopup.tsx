@@ -208,8 +208,10 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
         top: pos.top,
         zIndex: 50,
         width: "min(380px, calc(100vw - 32px))",
-        maxHeight: "calc(100vh - 24px)",
-        overflowY: "auto",
+        maxHeight: "min(80vh, 640px)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
         background: "var(--bg-1)",
         color: "var(--text)",
         border: "1px solid var(--line)",
@@ -221,6 +223,7 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
       <div
         tabIndex={0}
         aria-describedby={hintId}
+        title="drag or arrow keys"
         onPointerDown={onTitleDown}
         onPointerMove={onTitleMove}
         onPointerUp={onTitleUp}
@@ -235,18 +238,28 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
           borderBottom: "1px solid var(--line)",
           cursor: "grab",
           touchAction: "none",
-          position: "sticky",
-          top: 0,
+          flexShrink: 0,
           background: "var(--bg-1)",
         }}
       >
-        <h2 id={titleId} style={{ ...headingStyle, margin: 0, color: "var(--text)" }}>
+        <h2
+          id={titleId}
+          style={{
+            ...headingStyle,
+            margin: 0,
+            color: "var(--text)",
+            minWidth: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {title}
         </h2>
-        <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-          <span id={hintId} style={{ ...dimStyle, fontSize: 11 }}>
-            drag or arrow keys
-          </span>
+        <span id={hintId} className="sr-only">
+          drag or arrow keys
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
           <button
             type="button"
             onClick={onClose}
@@ -268,6 +281,7 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
         </span>
       </div>
 
+      <div tabIndex={0} aria-label="Inspect sections" style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
       <Section id={sid("a")} title="A. Where">
         <ul style={listStyle}>
           <li>
@@ -383,6 +397,7 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
           <p style={{ margin: 0, ...dimStyle }}>No links for this spot.</p>
         )}
       </Section>
+      </div>
     </div>
   );
 }

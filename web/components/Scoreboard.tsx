@@ -117,7 +117,7 @@ export function Scoreboard({ slug = null, refreshKey = 0, defaultCollapsed = fal
       </button>
 
       {expanded && (
-        <div id={panelId} className="panel" data-part="SCOREBOARD" style={{ flex: 1, minWidth: 0 }}>
+        <div id={panelId} className="panel" style={{ flex: 1, minWidth: 0 }}>
           <div role="group" aria-label="Scope" style={{ display: "flex", gap: "var(--space-1)" }}>
             <button
               type="button"
