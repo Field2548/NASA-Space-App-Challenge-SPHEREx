@@ -40,6 +40,7 @@ import {
   type AladinStatic,
 } from "./skymap/aladin";
 import { difficultyStyle, flyFovForSpot, heatColor, heatGradientCss } from "./skymap/geometry";
+import { startHipsPrefetch, type HipsPrefetch } from "./skymap/hipsPrefetch";
 import { difficultyColor, reticleCanvas, SpotGlyph } from "./skymap/markers";
 import { loadSpotsOnce } from "./skymap/spots";
 
@@ -129,6 +130,7 @@ export function SkyMap({
   const playRef = useRef<HTMLButtonElement>(null);
   const aladinRef = useRef<AladinInstance | null>(null);
   const libRef = useRef<AladinStatic | null>(null);
+  const prefetchRef = useRef<HipsPrefetch | null>(null);
   const objectClickRef = useRef(false);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -187,6 +189,8 @@ export function SkyMap({
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       aladinRef.current = null;
+      prefetchRef.current?.stop();
+      prefetchRef.current = null;
       // Aladin cannot be destroyed; free its WebGL contexts so the hidden map stops drawing.
       releaseAladin(el);
       setFailReason(why);
@@ -314,11 +318,17 @@ export function SkyMap({
             }
           }, 400);
         };
+        // Zoom prefetch: fetch the tiles of the next zoom in (or a fly-to) before Aladin asks for them.
+        const prefetch = startHipsPrefetch(a, el);
         a.on("zoomChanged", (f: number) => {
           if (!cancelled && Number.isFinite(f)) setFov(f);
           viewSoon();
+          prefetch.viewChanged();
         });
-        a.on("positionChanged", viewSoon);
+        a.on("positionChanged", () => {
+          viewSoon();
+          prefetch.viewChanged();
+        });
         // Double click zooms in one step, like a street map (Aladin's own double click only recentres
         // on the point, so together they zoom into it). A single click never zooms.
         dblZoom = () => {
@@ -332,6 +342,7 @@ export function SkyMap({
         };
         el.addEventListener("dblclick", dblZoom);
 
+        prefetchRef.current = prefetch;
         aladinRef.current = a;
         libRef.current = lib;
         setMapState("ready");
@@ -350,6 +361,8 @@ export function SkyMap({
       clickTimer.current = null;
       if (dblZoom) el.removeEventListener("dblclick", dblZoom);
       aladinRef.current = null;
+      prefetchRef.current?.stop();
+      prefetchRef.current = null;
       releaseAladin(el);
     };
   }, [attempt]);
@@ -413,6 +426,7 @@ export function SkyMap({
   const flyTo = useCallback((ra: number, dec: number, fovDeg: number) => {
     const a = aladinRef.current;
     if (!a) return;
+    prefetchRef.current?.flyTo(ra, dec, fovDeg);
     try {
       if (prefersReducedMotion()) {
         a.gotoRaDec(ra, dec);
@@ -848,7 +862,10 @@ export function SkyMap({
           <button
             type="button"
             aria-label="Zoom in"
-            onClick={() => aladinRef.current?.increaseZoom()}
+            onClick={() => {
+              prefetchRef.current?.zoomingIn();
+              aladinRef.current?.increaseZoom();
+            }}
             style={{ padding: 6, lineHeight: 0 }}
           >
             <Plus size={16} aria-hidden="true" />
