@@ -4,6 +4,9 @@ import type { Vision } from "./types";
 
 export const GUEST_KEY = "onionsky:v1";
 
+/** Version of the saved tutorial progress. Bump it when the tutorial levels change so old progress is ignored once. */
+export const TUTORIAL_VERSION = 2;
+
 export interface GuestFind {
   spot: string;
   kind: string; // verdict kind
@@ -12,14 +15,14 @@ export interface GuestFind {
 }
 
 export interface GuestData {
-  tutorial: { level: number; step: number; done: number[] };
+  tutorial: { v: number; level: number; step: number; done: number[] };
   settings: { vision: Vision; reducedMotion?: boolean; music?: boolean; musicVolume?: number; uiSounds?: boolean };
   finds: GuestFind[];
   name?: string;
 }
 
 export const defaultGuest = (): GuestData => ({
-  tutorial: { level: 1, step: 0, done: [] },
+  tutorial: { v: TUTORIAL_VERSION, level: 0, step: 0, done: [] },
   settings: { vision: "normal" },
   finds: [],
 });
@@ -38,7 +41,8 @@ function sane(raw: unknown): GuestData {
   const d = defaultGuest();
   if (!raw || typeof raw !== "object") return d;
   const r = raw as Partial<GuestData>;
-  if (r.tutorial && typeof r.tutorial === "object") {
+  // Progress saved by an older tutorial (no or lower version) is dropped; everything else is kept.
+  if (r.tutorial && typeof r.tutorial === "object" && (r.tutorial as { v?: unknown }).v === TUTORIAL_VERSION) {
     const t = r.tutorial;
     if (Number.isFinite(t.level)) d.tutorial.level = t.level;
     if (Number.isFinite(t.step)) d.tutorial.step = t.step;
@@ -89,7 +93,7 @@ export function saveGuest(patch: GuestPatch): GuestData {
   const cur = loadGuest();
   const next: GuestData = {
     ...cur,
-    tutorial: { ...cur.tutorial, ...patch.tutorial },
+    tutorial: { ...cur.tutorial, ...patch.tutorial, v: TUTORIAL_VERSION },
     settings: { ...cur.settings, ...patch.settings },
     finds: patch.finds ?? cur.finds,
     name: patch.name ?? cur.name,

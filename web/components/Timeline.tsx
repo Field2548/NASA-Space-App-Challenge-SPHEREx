@@ -200,7 +200,7 @@ function RangeLane({ name, hint, range, n, left, total, minSpan, maxSpan, tone, 
         <span className={styles.laneName}>{name}</span>
         <span className={styles.laneValue}>{spanText(range)}</span>
       </div>
-      <div className={styles.laneRow} data-sync="" data-tone={tone} role="group" aria-label={`${name} ${spanText(range)}`} title={hint}>
+      <div className={styles.laneRow} data-sync="" data-tone={tone} data-tutorial-target={`${tone}-range`} role="group" aria-label={`${name} ${spanText(range)}`} title={hint}>
         <div className={styles.lane} style={{ width: total }}>
           <div className={styles.rail} />
           <div className={styles.span} style={{ left: left[a], width: left[b] + CLIP_W - left[a] }} />
@@ -342,7 +342,7 @@ export default function Timeline(props: TimelineProps) {
   return (
     <section className={styles.root} aria-label="Timeline">
       <div className={styles.bar}>
-        <div className={styles.transport} role="group" aria-label="Frame controls">
+        <div className={styles.transport} role="group" aria-label="Frame controls" data-tutorial-target="frame-controls">
           <button type="button" className={styles.step} aria-label="Previous frame" title="Previous frame (←)" onClick={() => step(-1)} disabled={!canStep}>
             ◀
           </button>
@@ -374,7 +374,7 @@ export default function Timeline(props: TimelineProps) {
         </div>
         <div className={styles.options}>
           {onFrameCountChange && n >= 1 && frameMax > 2 && (
-            <div className={`${styles.field}`} role="group" aria-label="Frames shown" title="How many of this spot's frames to use, spread evenly across the time span. Marks on hidden frames are kept.">
+            <div className={styles.field} role="group" aria-label="Frames shown" data-tutorial-target="frames-count" title="How many of this spot's frames to use, spread evenly across the time span. Marks on hidden frames are kept.">
               <span className={styles.fieldName}>Frames</span>
               <div className={styles.stepper}>
                 <button type="button" aria-label="Show fewer frames" onClick={() => onFrameCountChange(Math.max(2, n - 1))} disabled={n <= 2}>
@@ -419,7 +419,7 @@ export default function Timeline(props: TimelineProps) {
             </div>
           )}
           {onFpsChange && (
-            <div className={styles.field} role="group" aria-label="Blink speed" title="How fast the blink steps through the frames (3 a second at most).">
+            <div className={styles.field} role="group" aria-label="Blink speed" data-tutorial-target="blink-speed" title="How fast the blink steps through the frames (3 a second at most).">
               <span className={styles.fieldName}>Speed</span>
               <div className={styles.segments}>
                 {BLINK_SPEEDS.map((f) => (

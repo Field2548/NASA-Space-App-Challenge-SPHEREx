@@ -223,24 +223,24 @@ describe("POST /api/check", () => {
     expect(b.practice).toBe(true);
     expect(a.verdict.points + b.verdict.points).toBe(250);
   });
-  it.runIf(have("eris"))("eris: the bot's rank-2 candidate is a bot match with 0 points, and it unlocks", async () => {
-    const key = (await loadAnswerKey("eris"))!;
-    const field = (await loadFieldForScoring("eris"))!;
+  it.runIf(have("hektor"))("hektor: the bot's rank-2 candidate is a bot match with 0 points, and it unlocks", async () => {
+    const key = (await loadAnswerKey("hektor"))!;
+    const field = (await loadFieldForScoring("hektor"))!;
     const c = key.bot.candidates.find((x) => x.rank === 2)!;
     const marks = [1, 5].map((i) => {
       const t = field.frames.find((f) => f.i === i)!.mjd - key.t_ref_mjd;
       return { frame: i, x: c.x + c.vx_px_per_day * t, y: c.y + c.vy_px_per_day * t };
     });
-    const res = await check(post({ spot: "eris", answer: "track", marks }));
+    const res = await check(post({ spot: "hektor", answer: "track", marks }));
     const json = await res.json();
     expect(json.verdict).toEqual({
       kind: "bot_match",
       points: 0,
-      message: "Matches the bot: 6.2σ against a 5.9σ noise bar. Not a confirmed object, so no points.",
+      message: "Matches the bot: 6.8σ against a 6.4σ noise bar. Not a confirmed object, so no points.",
     });
     expect(json.unlocked).toBe(true);
-    expect(json.noise_bar_sigma).toBe(5.9);
-    expect(decodeUnlocked(cookieValue(res))).toEqual(["eris"]);
+    expect(json.noise_bar_sigma).toBe(6.4);
+    expect(decodeUnlocked(cookieValue(res))).toEqual(["hektor"]);
   });
   it("refuses huge, out-of-picture and oversized input with 400", async () => {
     const huge = await check(post({ spot: "fixture", answer: "track", marks: [{ frame: 1, x: 1e308, y: 0 }, { frame: 4, x: -1e308, y: 0 }] }));
