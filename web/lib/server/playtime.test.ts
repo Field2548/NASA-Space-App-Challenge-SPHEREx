@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type Reply = { data: unknown; error: { code?: string; message: string } | null };
 const state = vi.hoisted(() => ({
   configured: true,
-  user: { id: "u1" } as { id: string } | null,
+  auth: { data: { user: { id: "u1" } }, error: null } as { data: { user: { id: string } | null }; error: { status?: number; message: string } | null },
+  authThrows: null as Error | null,
+  authHangs: false,
   calls: [] as { name: string; args: Record<string, unknown> }[],
   reply: { data: 60, error: null } as Reply,
   serviceUsed: 0,
@@ -18,6 +20,14 @@ vi.mock("@/lib/server/db", async (original) => ({
     state.clientRequests.push(req?.headers.get("authorization") ?? null);
     return state.configured
       ? {
+          auth: {
+            getUser: async (token: string) => {
+              state.clientRequests.push(`getUser:${token}`);
+              if (state.authHangs) return new Promise(() => {});
+              if (state.authThrows) throw state.authThrows;
+              return state.auth;
+            },
+          },
           rpc: (name: string, args: Record<string, unknown>) => {
             state.calls.push({ name, args });
             return { abortSignal: async (): Promise<Reply> => state.reply };
@@ -29,7 +39,6 @@ vi.mock("@/lib/server/db", async (original) => ({
     state.serviceUsed += 1;
     return null;
   },
-  userFromRequest: async () => state.user,
 }));
 
 import { POST } from "@/app/api/playtime/route";
@@ -45,7 +54,9 @@ const post = (body: unknown, headers: Record<string, string> = { authorization: 
 beforeEach(() => {
   resetRateLimit();
   state.configured = true;
-  state.user = { id: "u1" };
+  state.auth = { data: { user: { id: "u1" } }, error: null };
+  state.authThrows = null;
+  state.authHangs = false;
   state.calls = [];
   state.reply = { data: 60, error: null };
   state.serviceUsed = 0;
@@ -60,7 +71,7 @@ describe("POST /api/playtime", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await res.json()).toEqual({ credited: 60 });
     expect(state.calls).toEqual([{ name: "add_play_time", args: { p_seconds: 60 } }]);
-    expect(state.clientRequests).toEqual(["Bearer tok"]);
+    expect(state.clientRequests).toEqual(["Bearer tok", "getUser:tok"]);
     expect(state.serviceUsed).toBe(0);
   });
 
@@ -78,11 +89,60 @@ describe("POST /api/playtime", () => {
     expect(state.calls).toHaveLength(0);
   });
 
-  it("refuses a token the database does not accept with 401", async () => {
-    state.user = null;
+  it.each([
+    [401, "bad_jwt"],
+    [403, "user_not_found"],
+    [400, "bad request"],
+  ])("refuses a token the auth server calls invalid (status %i) with 401", async (status, message) => {
+    state.auth = { data: { user: null }, error: { status, message } };
     const res = await POST(post({ seconds: 60 }));
     expect(res.status).toBe(401);
+    expect((await res.json()).error.code).toBe("unauthorized");
     expect(state.calls).toHaveLength(0);
+  });
+
+  it("refuses a token with no user and no error with 401", async () => {
+    state.auth = { data: { user: null }, error: null };
+    expect((await POST(post({ seconds: 60 }))).status).toBe(401);
+    expect(state.calls).toHaveLength(0);
+  });
+
+  it.each([
+    [500, "auth server error"],
+    [502, "bad gateway"],
+    [503, "unavailable"],
+    [429, "rate limited"],
+    [408, "timeout"],
+    [undefined, "fetch failed"],
+  ])("answers 503 db_unavailable, not 401, when the auth server errors (status %s)", async (status, message) => {
+    state.auth = { data: { user: null }, error: { status, message } };
+    const res = await POST(post({ seconds: 60 }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("db_unavailable");
+    expect(state.calls).toHaveLength(0);
+  });
+
+  it("answers 503 db_unavailable when the auth call throws", async () => {
+    state.authThrows = new Error("network down");
+    const res = await POST(post({ seconds: 60 }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("db_unavailable");
+    expect(state.calls).toHaveLength(0);
+  });
+
+  it("answers 503 db_unavailable when the auth server times out", async () => {
+    vi.useFakeTimers();
+    try {
+      state.authHangs = true;
+      const pending = POST(post({ seconds: 60 }));
+      await vi.advanceTimersByTimeAsync(5001);
+      const res = await pending;
+      expect(res.status).toBe(503);
+      expect((await res.json()).error.code).toBe("db_unavailable");
+      expect(state.calls).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("503 db_unavailable with no database, and when the function is missing or fails", async () => {
@@ -119,8 +179,8 @@ describe("POST /api/playtime", () => {
     expect((await POST(post({ seconds: 120 }))).status).toBe(200);
   });
 
-  it("rate limits at 10 a minute", async () => {
-    for (let i = 0; i < 10; i++) expect((await POST(post({ seconds: 5 }))).status).toBe(200);
+  it("rate limits at 60 a minute", async () => {
+    for (let i = 0; i < 60; i++) expect((await POST(post({ seconds: 5 }))).status).toBe(200);
     const res = await POST(post({ seconds: 5 }));
     expect(res.status).toBe(429);
     expect((await res.json()).error.code).toBe("rate_limited");

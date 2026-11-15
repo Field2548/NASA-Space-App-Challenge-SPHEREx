@@ -17,6 +17,7 @@ export default function PlayTimeTracker() {
     let cached: Record<string, string> = {};
     let interval: ReturnType<typeof setInterval> | null = null;
     let listening = false;
+    let lastToken = "";
 
     const timer = new PlayTimer({
       now: () => Date.now(),
@@ -67,7 +68,13 @@ export default function PlayTimeTracker() {
       const headers = await authHeader();
       if (disposed) return;
       cached = headers;
-      const loggedIn = Boolean(headers.Authorization);
+      const token = headers.Authorization ?? "";
+      const loggedIn = Boolean(token);
+      // A new token or a new login lifts a 401 halt; the same token does not.
+      if (token !== lastToken) {
+        lastToken = token;
+        timer.resume();
+      }
       timer.setLoggedIn(loggedIn);
       timer.setVisible(document.visibilityState === "visible");
       if (loggedIn && !timer.stopped) startTimers();

@@ -113,6 +113,44 @@ describe("PlayTimeTracker", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("lifts the 401 halt when the token changes, but not when the same token is announced again", async () => {
+    auth.header = { Authorization: "Bearer old" };
+    fetchMock.mockImplementation(async () => new Response("{}", { status: 401 }));
+    render(<PlayTimeTracker />);
+    await settle();
+    await play(70);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+    // The same token again (for example SIGNED_IN on a tab focus): still halted.
+    auth.listeners.forEach((cb) => cb());
+    await settle();
+    expect(vi.getTimerCount()).toBe(0);
+    await play(70);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A refreshed token: counting and reporting resume.
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ credited: 60 }), { status: 200 }));
+    auth.header = { Authorization: "Bearer new" };
+    auth.listeners.forEach((cb) => cb());
+    await settle();
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    await play(70);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((fetchMock.mock.calls[1][1] as RequestInit).headers).toMatchObject({ Authorization: "Bearer new" });
+  });
+
+  it("keeps counting after a 503 and does not retry that report", async () => {
+    auth.header = { Authorization: "Bearer tok" };
+    fetchMock.mockImplementationOnce(async () => new Response("{}", { status: 503 }));
+    render(<PlayTimeTracker />);
+    await settle();
+    await play(70);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    await play(70);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body)).seconds).toBeLessThanOrEqual(65);
+  });
+
   it("starts counting when the player logs in during the page view, and stops on logout", async () => {
     render(<PlayTimeTracker />);
     await settle();

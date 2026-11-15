@@ -2,8 +2,9 @@
 // Time counts only while (a) the player is logged in, (b) the tab is visible and (c) there was user
 // input (pointer, key, wheel, touch) in the last 120 s. Every 60 s of counted time the whole seconds
 // are reported (at most 120 per report); the rest is reported when the tab is hidden or closed.
-// A failed report is dropped, never retried, and after a 401 or 503 nothing more is sent for the
-// page view. The server (add_play_time) still caps what it credits by the real time elapsed.
+// A failed report (any status but 401, a network error included) is dropped, never retried, and
+// counting goes on. After a 401 (token rejected) nothing more is counted or sent until resume() is
+// called, which the tracker does when the login changes to a new token or a new login. The server (add_play_time) still caps what it credits by the real time elapsed.
 
 export const INPUT_WINDOW_MS = 120_000;
 export const REPORT_AFTER_MS = 60_000;
@@ -22,6 +23,7 @@ export class PlayTimer {
   private loggedIn = false;
   private visible = true;
   private halted = false;
+  private generation = 0;
   private lastInput = Number.NEGATIVE_INFINITY;
   private mark: number;
   private pendingMs = 0;
@@ -31,9 +33,19 @@ export class PlayTimer {
     this.mark = deps.now();
   }
 
-  /** True after a 401 or 503: nothing is counted or sent any more. */
+  /** True after a 401 until resume(): nothing is counted or sent. */
   get stopped(): boolean {
     return this.halted;
+  }
+
+  /**
+   * The login changed to a new token or a new login: lift a 401 halt. A 401 still on its way for a
+   * report sent with the old token is ignored.
+   */
+  resume(): void {
+    this.advance(this.deps.now()); // the halted stretch is not counted
+    this.generation += 1;
+    this.halted = false;
   }
 
   /** Milliseconds counted and not yet reported. */
@@ -98,9 +110,10 @@ export class PlayTimer {
     } catch {
       return;
     }
+    const generation = this.generation;
     sent.then(
       (status) => {
-        if (status === 401 || status === 503) {
+        if (status === 401 && generation === this.generation) {
           this.halted = true;
           this.pendingMs = 0;
         }

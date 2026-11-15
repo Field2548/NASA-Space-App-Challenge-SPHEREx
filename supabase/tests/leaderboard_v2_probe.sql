@@ -468,6 +468,37 @@ begin
   raise notice 'ok: add_play_time (first ping 90, 10 s gap gives 10, long gap capped at 90, clamps, day cap 86400, guests, own row only)';
 end $$;
 
+-- The first ping of a UTC day measures from the latest ping on the previous days (fake the earlier
+-- row), and counts as 90 only when there is no earlier ping within two days.
+do $$
+declare
+  f constant uuid := '0000000f-0000-4000-8000-00000000000f';
+  d constant date := (now() at time zone 'UTC')::date;
+  got int;
+begin
+  insert into public.play_time (user_id, day, seconds, last_ping) values (f, d - 1, 100, now() - interval '3 seconds');
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', f::text, true);
+  got := public.add_play_time(60);
+  if got <> 3 then raise exception 'FAIL: first ping of the day, 3 s after a ping on the previous day, credited %, wanted 3', got; end if;
+  reset role;
+  if (select last_ping from public.play_time where user_id = f and day = d) < now() then
+    raise exception 'FAIL: last_ping is earlier than the transaction start';
+  end if;
+
+  -- A ping older than two days is not an earlier ping for this purpose: 90.
+  delete from public.play_time where user_id = f;
+  insert into public.play_time (user_id, day, seconds, last_ping) values (f, d - 5, 100, now() - interval '3 seconds');
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', f::text, true);
+  got := public.add_play_time(60);
+  if got <> 60 then raise exception 'FAIL: first ping with only an old row credited %, wanted 60', got; end if;
+  reset role;
+
+  delete from public.play_time where user_id = f;
+  raise notice 'ok: add_play_time first ping of a day uses the real gap to the previous day''s last ping';
+end $$;
+
 -- probe_a: 600 + 300 + 50 + 70 + 1000 = 2020 s in all, and 950 s in the last 7 UTC days
 -- (today, 3 and 6 days ago; the 7-day-old and 10-day-old rows are outside).
 select pg_temp.expect('player_stats play time for probe_a (all time, last 7 days)',

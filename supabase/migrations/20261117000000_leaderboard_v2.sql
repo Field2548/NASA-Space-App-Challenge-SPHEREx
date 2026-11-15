@@ -78,10 +78,12 @@ alter table public.play_time enable row level security;
 revoke all on public.play_time from anon, authenticated;
 
 -- The caller reports p_seconds of play. The credit is the smallest of: p_seconds (never below 0),
--- 90, the seconds since this player's last report today (taken as 90 when there is none today), and
--- what is left of the day (86400). So a forged client can add at most the real time that has passed,
+-- 90, the seconds since this player's last report (the first report of a UTC day measures from the
+-- player's last report on the previous two days, and counts as 90 only when there is no earlier
+-- report at all), and what is left of the day (86400). So a forged client can add at most the real time that has passed,
 -- and a day never exceeds 24 hours. Returns the seconds credited (0 for a guest). The row is locked
--- while it is updated, so two parallel calls cannot both claim the same gap.
+-- while it is updated, so two parallel calls cannot both claim the same gap. The gap is measured with
+-- clock_timestamp() taken after the lock is acquired, and last_ping never moves backwards.
 create or replace function public.add_play_time(p_seconds int)
 returns int
 language plpgsql
@@ -94,6 +96,8 @@ declare
   v_day date := (pg_catalog.now() at time zone 'UTC')::date;
   v_have int;
   v_last timestamptz;
+  v_now timestamptz;
+  v_prev timestamptz;
   v_gap int;
   v_credit int;
 begin
@@ -109,14 +113,24 @@ begin
   where t.user_id = v_uid and t.day = v_day
   for update;
 
+  -- Taken after the row lock, so a call that waited for the lock measures from its own real time.
+  v_now := pg_catalog.clock_timestamp();
+
+  -- No ping yet today: measure from the latest ping on the previous two days, if there is one.
+  if v_last is null then
+    select pg_catalog.max(t.last_ping) into v_prev
+    from public.play_time t
+    where t.user_id = v_uid and t.day >= v_day - 2 and t.day < v_day;
+  end if;
+
   v_gap := case
-    when v_last is null then 90
-    else greatest(0, pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now() - v_last))::int)
+    when coalesce(v_last, v_prev) is null then 90
+    else greatest(0, pg_catalog.floor(pg_catalog.date_part('epoch', v_now - coalesce(v_last, v_prev)))::int)
   end;
   v_credit := least(greatest(coalesce(p_seconds, 0), 0), 90, v_gap, 86400 - v_have);
 
   update public.play_time t
-  set seconds = t.seconds + v_credit, last_ping = pg_catalog.now()
+  set seconds = t.seconds + v_credit, last_ping = greatest(coalesce(v_last, v_now), v_now)
   where t.user_id = v_uid and t.day = v_day;
 
   return v_credit;

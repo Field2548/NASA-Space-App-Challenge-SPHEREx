@@ -141,26 +141,59 @@ describe("PlayTimer", () => {
     expect(timer2.pending).toBe(80_000);
   });
 
-  it("stops counting and sending after a 401, and after a 503", async () => {
-    for (const code of [401, 503]) {
-      sent = [];
-      status = code;
-      const timer = make();
-      timer.setLoggedIn(true);
-      timer.input();
-      run(timer, 70, true);
-      expect(sent).toHaveLength(1);
-      await flushPromises();
-      expect(timer.stopped).toBe(true);
-      run(timer, 300, true);
-      timer.setVisible(false);
-      timer.finish();
-      expect(sent).toHaveLength(1);
-    }
+  it("stops counting and sending after a 401 with no change of login", async () => {
+    status = 401;
+    const timer = make();
+    timer.setLoggedIn(true);
+    timer.input();
+    run(timer, 70, true);
+    expect(sent).toHaveLength(1);
+    await flushPromises();
+    expect(timer.stopped).toBe(true);
+    run(timer, 300, true);
+    timer.setVisible(false);
+    timer.finish();
+    expect(sent).toHaveLength(1);
   });
 
-  it("drops a failed report without retrying, and keeps going after a 500, a 429 or a network error", async () => {
-    for (const code of [500, 429, 0]) {
+  it("counts and reports again after resume() (a new token or a new login) lifts a 401 halt", async () => {
+    status = 401;
+    const timer = make();
+    timer.setLoggedIn(true);
+    timer.input();
+    run(timer, 70, true);
+    await flushPromises();
+    expect(timer.stopped).toBe(true);
+    run(timer, 300, true); // halted time is not counted
+    expect(timer.pending).toBe(0);
+    status = 200;
+    timer.resume();
+    expect(timer.stopped).toBe(false);
+    timer.input();
+    run(timer, 70, true);
+    await flushPromises();
+    expect(sent).toHaveLength(2);
+    expect(sent[1].seconds).toBeGreaterThanOrEqual(60);
+    expect(timer.stopped).toBe(false);
+  });
+
+  it("ignores a 401 that answers a report sent before resume()", async () => {
+    let release: (s: number) => void = () => {};
+    const timer = new PlayTimer({
+      now: () => t,
+      send: () => new Promise<number>((r) => (release = r)),
+    });
+    timer.setLoggedIn(true);
+    timer.input();
+    run(timer, 70, true); // report in flight with the old token
+    timer.resume(); // the token changed meanwhile
+    release(401);
+    await flushPromises();
+    expect(timer.stopped).toBe(false);
+  });
+
+  it("drops a failed report without retrying, and keeps going after a 500, a 503, a 429 or a network error", async () => {
+    for (const code of [500, 503, 429, 0]) {
       sent = [];
       status = code;
       const timer = make();

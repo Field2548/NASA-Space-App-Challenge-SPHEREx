@@ -7,7 +7,8 @@
 // auth.uid() inside the function is the caller and nobody else's row can be touched.
 
 import { z } from "zod";
-import { anonClient, bearerToken, userFromRequest } from "@/lib/server/db";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { anonClient, bearerToken } from "@/lib/server/db";
 import { ApiFail, parse } from "@/lib/server/http";
 
 /** Most seconds one report may claim (the database credits at most 90 of them anyway). */
@@ -17,16 +18,46 @@ const UNAVAILABLE = "Play time cannot be saved right now.";
 
 export const PlayTimeBody = z.object({ seconds: z.number().int().min(1).max(MAX_REPORT_SECONDS) });
 
-/** Validate the body, check the caller, call add_play_time. Throws ApiFail (400, 401, 503). */
+/**
+ * Is this token good? True when the auth server knows the user, false when it says the token is
+ * invalid, expired or missing (a 4xx other than 408 and 429). Anything else (the auth server
+ * erroring, timing out or throwing, a 5xx, 408, 429, no status at all) is not an answer about the
+ * token and throws 503 db_unavailable, so a blip never looks like a logout.
+ */
+async function tokenIsValid(sb: SupabaseClient, token: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("auth timeout")), TIMEOUT_MS);
+    });
+    const { data, error } = await Promise.race([sb.auth.getUser(token), timeout]);
+    if (error) {
+      const status = typeof error.status === "number" ? error.status : 0;
+      if (status >= 400 && status < 500 && status !== 408 && status !== 429) return false;
+      console.error("[playtime] auth server failed:", error.message);
+      throw new ApiFail("db_unavailable", UNAVAILABLE);
+    }
+    return Boolean(data.user);
+  } catch (e) {
+    if (e instanceof ApiFail) throw e;
+    console.error("[playtime] auth check failed:", e instanceof Error ? e.message : e);
+    throw new ApiFail("db_unavailable", UNAVAILABLE);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Validate the body, check the caller, call add_play_time. Throws ApiFail (400, 401, 503; 401 only when the auth server says the token is invalid). */
 export async function creditPlayTime(request: Request, rawBody: unknown): Promise<{ credited: number }> {
   // A guest has no play time to save; this needs neither a body nor a database.
-  if (!bearerToken(request)) throw new ApiFail("unauthorized", "Log in to save play time.");
+  const token = bearerToken(request);
+  if (!token) throw new ApiFail("unauthorized", "Log in to save play time.");
   const { seconds } = parse(PlayTimeBody, rawBody);
 
   const sb = anonClient(request);
   if (!sb) throw new ApiFail("db_unavailable", UNAVAILABLE);
-  // A token the database does not accept (expired, forged) is a guest as well.
-  if (!(await userFromRequest(request))) throw new ApiFail("unauthorized", "Log in to save play time.");
+  // A token the auth server rejects (expired, forged) is a guest as well; an auth server that fails is a 503.
+  if (!(await tokenIsValid(sb, token))) throw new ApiFail("unauthorized", "Log in to save play time.");
 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);

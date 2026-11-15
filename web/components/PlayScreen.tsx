@@ -3,7 +3,7 @@
 // scoreboard panel, bottom timeline. Loads a spot from field.json + frames.u16; a missing or
 // broken spot shows an ASCII empty state. Players never see placeholders: parts not built yet
 // (coordinate box, show-work) render nothing until a real component exists. The right panel holds
-// SERVER's Scoreboard (refreshKey bumps on every verdict). Log in is the layout's top-right AccountControl.
+// SERVER's Scoreboard (refreshKey bumps on every verdict). Log in is the layout's top-right AccountControl (absolute: it scrolls away with the page).
 //
 // Keyboard marking: focus the viewer, arrows move a crosshair (Shift = 10 px), Enter marks
 // (or inspects in Inspect mode). Tutorial hooks: data-tutorial-target on the parts a coach mark
