@@ -20,7 +20,7 @@ const Query = z.object({
   dec: z.preprocess(blank, z.coerce.number().finite().gte(-90).lte(90).optional()),
   // A missing (or empty) mode means round. Any value other than round or explore is a 400 bad_request.
   mode: z.preprocess(blank, z.enum(["round", "explore"]).optional()),
-  // `patch=1`: asked from a picked patch (/play?patch=), where the mode locks as before (no name before a correct answer).
+  // `patch=1`: asked from a picked patch (/play?patch=). Accepted; Inspect is open there too.
   patch: z.preprocess(blank, z.enum(["1"]).optional()),
 });
 
