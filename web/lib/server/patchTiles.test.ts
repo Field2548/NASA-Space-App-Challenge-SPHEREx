@@ -13,6 +13,7 @@ const store = (over: Partial<PatchStore> = {}): PatchStore => ({
   saveSolve: async () => true,
   saveReport: async () => true,
   near: async () => [],
+  reportsFor: async () => [],
   tileDensity: async () => [],
   tilePatches: async () => [],
   ...over,
