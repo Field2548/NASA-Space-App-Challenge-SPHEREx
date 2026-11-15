@@ -10,6 +10,7 @@ import { GET as listRequests, POST as postRequest } from "@/app/api/request-spot
 import { loadAnswerKey } from "@/lib/scoring";
 import { BOT_NAME, botScore, botScoreForSpot, mergeBot } from "@/lib/server/bot";
 import { resetRateLimit } from "@/lib/server/rateLimit";
+import { encodeUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
 
 const KEYS = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -56,9 +57,21 @@ describe("GET /api/leaderboard without a database", () => {
   it("defaults to scope=all and builds a per-spot bot row", async () => {
     const all = await (await leaderboard(get("/api/leaderboard"))).json();
     expect(all.scope).toBe("all");
-    const eris = await (await leaderboard(get("/api/leaderboard?scope=spot&slug=eris"))).json();
+    const cookie = `${UNLOCK_COOKIE}=${encodeUnlocked(["eris"])}`;
+    const eris = await (await leaderboard(get("/api/leaderboard?scope=spot&slug=eris", { cookie }))).json();
     expect(eris).toMatchObject({ scope: "spot", slug: "eris", source: "snapshot" });
     expect(eris.rows[0]).toMatchObject({ is_bot: true, score: 1000 });
+  });
+  it("hides the per-spot bot row until the caller has solved that spot", async () => {
+    // The bot's score on a spot says whether something moves there (0 on the control field).
+    const other = `${UNLOCK_COOKIE}=${encodeUnlocked(["hektor"])}`;
+    for (const slug of ["eris", "cygnus", "hektor"]) {
+      const headers: Record<string, string> = slug === "hektor" ? {} : { cookie: other };
+      const res = await leaderboard(get(`/api/leaderboard?scope=spot&slug=${slug}`, headers));
+      const body = await res.json();
+      expect(body.rows.some((r: { is_bot: boolean }) => r.is_bot)).toBe(false);
+      expect(res.headers.get("cache-control")).toMatch(/private|no-store/);
+    }
   });
   it("the committed snapshot agrees with botScore", async () => {
     const file = JSON.parse(readFileSync("public/leaderboard-snapshot.json", "utf8"));

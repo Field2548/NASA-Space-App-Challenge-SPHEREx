@@ -11,6 +11,7 @@ import { readySlugs } from "@/lib/scoring";
 import { botScore, mergeBot, type BoardMe, type BoardRow } from "@/lib/server/bot";
 import { ApiFail, handle, parse, queryObject } from "@/lib/server/http";
 import { rateLimit } from "@/lib/server/rateLimit";
+import { isUnlocked } from "@/lib/server/unlock";
 
 const Query = z
   .object({
@@ -54,7 +55,7 @@ async function fromDb(request: NextRequest, slug: string | null): Promise<{ rows
   }
 }
 
-async function snapshot(scope: "spot" | "all", slug: string | null): Promise<Board> {
+async function snapshot(scope: "spot" | "all", slug: string | null, showBot: boolean): Promise<Board> {
   if (scope === "all") {
     try {
       const raw = await readFile(path.join(process.cwd(), "public", "leaderboard-snapshot.json"), "utf8");
@@ -64,7 +65,7 @@ async function snapshot(scope: "spot" | "all", slug: string | null): Promise<Boa
       // fall through: build the same thing from the answer keys
     }
   }
-  const bot = await botScore(slug ? [slug] : undefined);
+  const bot = showBot ? await botScore(slug ? [slug] : undefined) : null;
   return {
     scope,
     slug,
@@ -73,6 +74,9 @@ async function snapshot(scope: "spot" | "all", slug: string | null): Promise<Boa
     rows: mergeBot([], bot).rows,
   };
 }
+
+// The body can depend on the caller's unlock cookie (and on who is logged in), so no cache may keep it.
+const PRIVATE = { headers: { "Cache-Control": "private, no-store" } };
 
 export async function GET(request: NextRequest): Promise<Response> {
   return handle(async () => {
@@ -84,8 +88,12 @@ export async function GET(request: NextRequest): Promise<Response> {
       throw new ApiFail("not_found", `No spot called "${slug}".`);
     }
 
+    // The bot's score on one spot tells whether something moves there (0 on the control field), so a
+    // per-spot board shows the bot only to a caller whose signed unlock cookie covers that spot.
+    const showBot = slug === null || slug === "fixture" || isUnlocked(request, slug);
+
     const db = await fromDb(request, slug);
-    if (!db) return NextResponse.json(await snapshot(q.scope, slug));
+    if (!db) return NextResponse.json(await snapshot(q.scope, slug, showBot), PRIVATE);
 
     const all = db.rows
       .map((r) => ({
@@ -98,7 +106,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       .sort((a, b) => a.rank - b.rank);
     const mine = all.find((r) => r.is_me);
     const humans = all.filter((r) => r.rank <= MAX_ROWS).slice(0, MAX_ROWS);
-    const bot = await botScore(slug ? [slug] : undefined);
+    const bot = showBot ? await botScore(slug ? [slug] : undefined) : null;
     const merged = mergeBot(
       humans,
       bot,
@@ -112,6 +120,6 @@ export async function GET(request: NextRequest): Promise<Response> {
       rows: merged.rows,
       ...(merged.me ? { me: merged.me } : {}),
     };
-    return NextResponse.json(body);
+    return NextResponse.json(body, PRIVATE);
   });
 }
