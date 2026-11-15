@@ -282,6 +282,8 @@ as $$ select 1; $$;
 --               first finder, not counted.
 --   p_ra, p_dec, p_hpx12: the SPOT CENTRE for a ready spot, the marked position for quick look.
 -- A quick-look row (p_spot = 'quicklook') scores nothing, is never a first finder and is not counted.
+-- A repeat by the same user of a 'candidate' or 'static' verdict on a spot is not counted. A user
+-- who already has 50 rows on a spot gets no new row (already_found = true, 0 points, not counted).
 create function public.record_find(
   p_user uuid, p_spot text, p_ra double precision, p_dec double precision, p_hpx12 bigint,
   p_x real, p_y real, p_vx real, p_vy real,
@@ -302,6 +304,7 @@ declare
   v_already boolean := false;
   v_counted boolean;
   v_points int := 0;
+  v_rows int;
 begin
   -- One submission at a time per find in a spot (first finder and already-found are decided here).
   perform pg_advisory_xact_lock(hashtextextended(p_spot || '/' || v_key, 0));
@@ -315,6 +318,26 @@ begin
         and f.verdict in ('known', 'bot_match', 'nothing_correct')
         and coalesce(f.find_key, f.verdict) = v_key
     ) into v_already;
+  end if;
+
+  -- A repeat of a candidate or static verdict on the same spot is not a new find: it is not
+  -- counted (so repeats cannot inflate the Finds layer or the accuracy figure). Points are 0 anyway.
+  if p_verdict in ('candidate', 'static') and p_user is not null and not v_quick then
+    select exists (
+      select 1 from public.finds f
+      where f.user_id = p_user and f.spot_slug = p_spot and f.counted and f.verdict = p_verdict
+    ) into v_already;
+  end if;
+
+  -- At most 50 rows per user per spot: past that nothing is inserted (the answer is reported as
+  -- already found, with 0 points), so one player cannot grow the table without limit.
+  -- A first correct answer is always saved and paid, however many wrong ones came before.
+  if p_user is not null then
+    select count(*) into v_rows from public.finds f where f.user_id = p_user and f.spot_slug = p_spot;
+    if v_rows >= 50 and not (v_correct and not v_quick and not v_practice and not v_already) then
+      return query select false, true, 0, false;
+      return;
+    end if;
   end if;
 
   v_counted := not v_quick and not v_practice and not v_already;
@@ -349,6 +372,51 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------- request queue
+
+-- Called by /api/request-spot with the service role. A request within 0.05 degrees of one that is
+-- queued, processing or done returns that row with duplicate = true (nothing is inserted). With 200
+-- rows already queued it refuses with the exception 'queue_full'. Otherwise it inserts.
+-- The distance test is a box: |dec difference| and |RA difference| * cos(dec) both at most 0.05.
+create function public.request_spot(
+  p_user uuid, p_ra double precision, p_dec double precision, p_fov real
+)
+returns table (id bigint, status text, duplicate boolean)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id bigint;
+  v_status text;
+begin
+  -- Serialise requests, so two callers cannot both pass the full-queue check.
+  perform pg_advisory_xact_lock(hashtextextended('request_spot', 0));
+
+  select q.id, q.status into v_id, v_status
+  from public.spot_requests q
+  where q.status in ('queued', 'processing', 'done')
+    and pg_catalog.abs(q.dec - p_dec) <= 0.05
+    and least(pg_catalog.abs(q.ra - p_ra), 360 - pg_catalog.abs(q.ra - p_ra))
+        * pg_catalog.cos(pg_catalog.radians(p_dec)) <= 0.05
+  order by q.id
+  limit 1;
+  if found then
+    return query select v_id, v_status, true;
+    return;
+  end if;
+
+  if (select pg_catalog.count(*) from public.spot_requests q where q.status = 'queued') >= 200 then
+    raise exception 'queue_full';
+  end if;
+
+  insert into public.spot_requests as q (user_id, ra, dec, fov)
+  values (p_user, p_ra, p_dec, p_fov)
+  returning q.id, q.status into v_id, v_status;
+  return query select v_id, v_status, false;
+end;
+$$;
+
 -- ---------------------------------------------------------------- who may call what
 
 revoke execute on function
@@ -360,7 +428,8 @@ revoke execute on function
   public.density(text, int, boolean),
   public.spot_request_queue(int),
   public.ping(),
-  public.record_find(uuid, text, double precision, double precision, bigint, real, real, real, real, text, text, text, int, int, boolean)
+  public.record_find(uuid, text, double precision, double precision, bigint, real, real, real, real, text, text, text, int, int, boolean),
+  public.request_spot(uuid, double precision, double precision, real)
 from public, anon, authenticated;
 
 -- display_name_valid is pure and is evaluated by the profiles check constraint.
@@ -376,4 +445,8 @@ to anon, authenticated, service_role;
 
 grant execute on function
   public.record_find(uuid, text, double precision, double precision, bigint, real, real, real, real, text, text, text, int, int, boolean)
+to service_role;
+
+grant execute on function
+  public.request_spot(uuid, double precision, double precision, real)
 to service_role;

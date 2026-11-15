@@ -109,6 +109,21 @@ export interface InfoExplore {
   links?: { label: string; url: string }[];
 }
 
+/**
+ * The address back, normalised, only when it parses and its protocol is `https:`; otherwise null.
+ * Links in the popup come from API data (SIMBAD names, catalog files), so a `javascript:` or
+ * `data:` address must never reach an `href`.
+ */
+export function safeHttpsUrl(u: unknown): string | null {
+  if (typeof u !== "string") return null;
+  try {
+    const url = new URL(u);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 const KM_PER_AU = 149597870.7;
 const LIGHT_MIN_PER_AU = 8.3167;
 

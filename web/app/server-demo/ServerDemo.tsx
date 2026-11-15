@@ -26,6 +26,9 @@ function pixelCentre(box: HTMLDivElement, x: number, y: number) {
 export function ServerDemo() {
   const [field, setField] = useState<Field | null>(null);
   const [frames, setFrames] = useState<Frame[] | undefined>(undefined);
+  const [marksText, setMarksText] = useState(
+    '{"spot":"eros","answer":"track","marks":[{"frame":1,"x":0,"y":0},{"frame":2,"x":0,"y":0}]}',
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [explore, setExplore] = useState(false);
@@ -73,14 +76,8 @@ export function ServerDemo() {
       const res = await fetch("/api/check", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          spot: "eros",
-          answer: "track",
-          marks: [
-            { frame: 1, x: 84, y: 79 },
-            { frame: 3, x: 40, y: 43 },
-          ],
-        }),
+        // No answer is kept in this public page: the tester types the marks.
+        body: marksText,
       });
       const text = await res.text();
       let shown = text;
@@ -110,13 +107,23 @@ export function ServerDemo() {
               <input type="checkbox" checked={explore} onChange={(e) => setExplore(e.target.checked)} />
               explore mode
             </label>
-            <button type="button" disabled={!field} onClick={() => openAtPixel(84, 79)}>
-              Inspect Eros frame-1 position
+            <button type="button" disabled={!field} onClick={() => openAtPixel(59, 59)}>
+              Inspect the centre pixel
             </button>
             <button type="button" onClick={submitCorrect}>
-              Submit correct Eros answer
+              Send this body to /api/check
             </button>
           </div>
+          <label style={{ display: "grid", gap: "var(--space-1)" }}>
+            Request body (type your own marks)
+            <textarea
+              rows={3}
+              cols={60}
+              value={marksText}
+              onChange={(e) => setMarksText(e.target.value)}
+              spellCheck={false}
+            />
+          </label>
 
           {loadError ? (
             <p role="alert" style={{ margin: 0, color: "var(--magenta)" }}>

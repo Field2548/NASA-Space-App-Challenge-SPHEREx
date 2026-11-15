@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Orbitron } from "next/font/google";
+import type { CSSProperties } from "react";
+import SiteFooter from "@/components/SiteFooter";
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
 import "./globals.css";
 
@@ -22,7 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${orbitron.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body style={{ "--site-footer-h": "32px" } as CSSProperties}>
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }

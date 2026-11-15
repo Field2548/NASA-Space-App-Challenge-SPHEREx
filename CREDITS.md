@@ -45,10 +45,16 @@ We read these projects for ideas; all code here is our own.
 | --- | --- | --- | --- | --- | --- |
 | @hscmap/healpix | Koike Michitaro | https://github.com/michitaro/healpix | MIT | HEALPix NESTED cell maths for the density layers (web/lib/healpix.ts; planned, phase 2) | 2026-11-15 |
 | @supabase/supabase-js | Supabase Inc. | https://github.com/supabase/supabase-js | MIT | database and auth client in web/lib/supabase.ts (planned, phase 3) | 2026-11-15 |
+| @testing-library/dom 10.4.2 | Kent C. Dodds | https://github.com/testing-library/dom-testing-library | MIT | component tests | 2026-11-15 |
+| @testing-library/react 16.3.3 | Kent C. Dodds | https://github.com/testing-library/react-testing-library | MIT | component tests | 2026-11-15 |
+| @testing-library/user-event 14.6.10 | Giorgio Polvara | https://github.com/testing-library/user-event | MIT | component tests | 2026-11-15 |
+| @vitest/coverage-v8 5.1.0 | Vitest team | https://github.com/vitest-dev/vitest | MIT | test coverage | 2026-11-15 |
 | Aladin Lite v3 | Thomas Boch and Matthieu Baumann, CDS, Strasbourg Observatory | https://github.com/cds-astro/aladin-lite | GPL-3 (licence field of the pinned npm package aladin-lite@3.8.2, checked with npm view; the 3.9 beta says LGPL-3.0-or-later, but we pin 3.8.2) | sky map viewer (web/components/SkyMap.tsx; planned, phase 2) | 2026-11-15 |
 | Astropy | The Astropy Collaboration | https://www.astropy.org/ | BSD-3-Clause | FITS reading, sky coordinates and WCS in the export pipeline | 2026-11-15 |
 | astroquery | The Astroquery developers | https://astroquery.readthedocs.io/ | BSD-3-Clause | queries to JPL Horizons and IRSA from Python | 2026-11-15 |
+| CIEDE2000 colour difference | Sharma, Wu, Dalal | https://doi.org/10.1002/col.20070 | idea (paper) | palette distance check | 2026-11-15 |
 | jsdom 31.0.1 | jsdom contributors | https://github.com/jsdom/jsdom | MIT | test DOM | 2026-11-15 |
+| Machado et al. 2009 colour-vision simulation | Machado, Oliveira, Fernandes | https://doi.org/10.1109/TVCG.2009.113 | idea (paper) | colour-blind palette check | 2026-11-15 |
 | Matplotlib | Matplotlib Development Team | https://matplotlib.org/ | Matplotlib License (PSF-based) | summary figures in the repo's processing scripts (not shipped on the site) | 2026-11-15 |
 | Next.js 16.4.6 | Vercel | https://github.com/vercel/next.js | MIT | web framework | 2026-11-15 |
 | NumPy | NumPy Developers | https://numpy.org/ | BSD-3-Clause | array maths in the export pipeline (pipeline/) | 2026-11-15 |

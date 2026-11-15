@@ -6,7 +6,7 @@ import { POST as complete } from "@/app/api/complete/route";
 import { POST as check } from "@/app/api/check/route";
 import { cellCenter, hpxNest } from "@/lib/healpix";
 import { loadFieldForScoring, scoreSubmission, type AnswerKey, type FieldForScoring } from "@/lib/scoring";
-import { resetRateLimit } from "@/lib/server/rateLimit";
+import { hit, resetRateLimit } from "@/lib/server/rateLimit";
 import { buildFindRow, hasVisit, saveFind } from "@/lib/server/persist";
 
 const EROS_MARKS = [
@@ -233,6 +233,18 @@ describe("POST /api/complete", () => {
     const res = await complete(post("http://localhost/api/complete", { replay: [{ spot: "fixture", answer: "nothing" }] }));
     expect(res.status).toBe(401);
     expect((await res.json()).error.code).toBe("unauthorized");
+  });
+});
+
+describe("rate limit cost (hit)", () => {
+  it("a call with cost uses that many units of the window", () => {
+    expect(hit("cost-a", 30, 60_000, 0, 20)).toBe(0);
+    expect(hit("cost-a", 30, 60_000, 0, 10)).toBe(0);
+    expect(hit("cost-a", 30, 60_000, 0)).toBe(60);
+  });
+
+  it("a single call costing more than the whole limit is refused at once", () => {
+    expect(hit("cost-b", 30, 60_000, 0, 31)).toBe(60);
   });
 });
 

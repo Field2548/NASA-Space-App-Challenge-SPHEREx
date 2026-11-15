@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeFrames, loadField, loadFrames } from "./fields";
+import { clearFieldCache, decodeFrames, loadField, loadFieldIndex, loadFrames, loadThumbs, prefetchField } from "./fields";
 import type { Field } from "./types";
 
 const meta = (n: number, w: number, h: number) =>
@@ -58,5 +58,86 @@ describe("loaders", () => {
   it("surfaces HTTP errors", async () => {
     const fake = (async () => new Response("no", { status: 404 })) as unknown as typeof fetch;
     await expect(loadField("missing", fake)).rejects.toThrow(/404/);
+  });
+});
+
+describe("loadFieldIndex", () => {
+  it("fetches index.json", async () => {
+    const urls: string[] = [];
+    const fake = (async (u: string) => {
+      urls.push(u);
+      return new Response("[]");
+    }) as unknown as typeof fetch;
+    expect(await loadFieldIndex(fake)).toEqual([]);
+    expect(urls).toEqual(["/fields/index.json"]);
+  });
+});
+
+describe("loadThumbs", () => {
+  it("fetches each thumb relative to the spot folder and decodes via the injected maker", async () => {
+    const urls: string[] = [];
+    const fake = (async (u: string) => {
+      urls.push(u);
+      return new Response(new Uint8Array([1, 2]));
+    }) as unknown as typeof fetch;
+    const field = { slug: "t", thumbs: ["thumbs/1.webp", "thumbs/2.webp"] } as unknown as Field;
+    const maker = async (b: Blob) => ({ size: b.size }) as unknown as ImageBitmap;
+    const out = await loadThumbs(field, fake, "/fields", maker);
+    expect(urls).toEqual(["/fields/t/thumbs/1.webp", "/fields/t/thumbs/2.webp"]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("rejects on HTTP error", async () => {
+    const fake = (async () => new Response("no", { status: 500 })) as unknown as typeof fetch;
+    const field = { slug: "t", thumbs: ["thumbs/1.webp"] } as unknown as Field;
+    await expect(loadThumbs(field, fake, "/fields", async () => ({}) as ImageBitmap)).rejects.toThrow(/500/);
+  });
+});
+
+describe("prefetchField", () => {
+  const run = (slug: string, fake: typeof fetch) =>
+    new Promise<void>((resolve) => {
+      prefetchField(slug, {
+        fetcher: fake,
+        idle: (fn) => fn(),
+        makeBitmap: async () => ({}) as ImageBitmap,
+        onDone: resolve,
+      });
+    });
+
+  it("fills the cache so loaders do not refetch", async () => {
+    clearFieldCache();
+    const urls: string[] = [];
+    const f = { ...meta(1, 1, 1), slug: "p", thumbs: ["thumbs/1.webp"] };
+    const fake = (async (u: string) => {
+      urls.push(u);
+      if (u.endsWith("field.json")) return new Response(JSON.stringify(f));
+      if (u.endsWith(".webp")) return new Response(new Uint8Array([1]));
+      return new Response(u16le([1000]));
+    }) as unknown as typeof fetch;
+    await run("p", fake);
+    expect(urls).toHaveLength(3);
+    const never = (async () => {
+      throw new Error("should not fetch");
+    }) as unknown as typeof fetch;
+    const field = await loadField("p", never);
+    expect((await loadFrames(field, never))[0][0]).toBeCloseTo(0, 5);
+    expect(await loadThumbs(field, never)).toHaveLength(1);
+    clearFieldCache();
+  });
+
+  it("never throws on failure and caches nothing", async () => {
+    clearFieldCache();
+    const fake = (async () => new Response("no", { status: 404 })) as unknown as typeof fetch;
+    await run("bad", fake);
+    const retry = (async () => new Response(JSON.stringify(meta(1, 1, 1)))) as unknown as typeof fetch;
+    expect((await loadField("bad", retry)).slug).toBe("t");
+    expect(() =>
+      prefetchField("x", {
+        idle: () => {
+          throw new Error("boom");
+        },
+      }),
+    ).not.toThrow();
   });
 });

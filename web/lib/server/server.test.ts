@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as check } from "@/app/api/check/route";
 import { PRACTICE_SUFFIX, responseBody } from "@/lib/server/checkResponse";
 import { loadAnswerKey, loadFieldForScoring, scoreSubmission, type AnswerKey, type FieldForScoring, type Scored } from "@/lib/scoring";
-import { ApiFail, handle } from "@/lib/server/http";
-import { hit, resetRateLimit } from "@/lib/server/rateLimit";
+import { ApiFail, clientIp, handle } from "@/lib/server/http";
+import { hit, MAX_KEYS, resetRateLimit } from "@/lib/server/rateLimit";
 import { decodeUnlocked, encodeUnlocked, isUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
 
 const have = (slug: string) => existsSync(path.join(process.cwd(), "data", "answers", `${slug}.json`));
@@ -84,6 +84,41 @@ describe("rate limit", () => {
     expect(hit("k", 3, 60_000, 31_000)).toBe(30);
     expect(hit("other", 3, 60_000, 31_000)).toBe(0);
     expect(hit("k", 3, 60_000, 61_001)).toBe(0);
+  });
+});
+
+describe("clientIp", () => {
+  const ip = (headers: Record<string, string>) => clientIp(new Request("http://localhost/x", { headers }));
+  it("prefers x-vercel-forwarded-for (first entry), whatever else is sent", () => {
+    expect(ip({ "x-vercel-forwarded-for": "198.51.100.1, 10.0.0.1", "x-real-ip": "192.0.2.5", "x-forwarded-for": "1.1.1.1, 2.2.2.2" })).toBe("198.51.100.1");
+  });
+  it("then x-real-ip", () => {
+    expect(ip({ "x-real-ip": "192.0.2.5", "x-forwarded-for": "1.1.1.1, 2.2.2.2" })).toBe("192.0.2.5");
+  });
+  it("then the LAST x-forwarded-for entry, the one added by the nearest proxy (a client-written first entry is ignored)", () => {
+    expect(ip({ "x-forwarded-for": "6.6.6.6, 203.0.113.7" })).toBe("203.0.113.7");
+    expect(ip({ "x-forwarded-for": "203.0.113.8" })).toBe("203.0.113.8");
+  });
+  it("else local", () => {
+    expect(ip({})).toBe("local");
+    expect(ip({ "x-forwarded-for": "" })).toBe("local");
+  });
+});
+
+describe("rate limit eviction", () => {
+  it("a full map drops the ~10% that end soonest and keeps everyone else's counts", () => {
+    resetRateLimit();
+    // Key i starts its window at time i, so key 0 ends first and the last key ends last.
+    for (let i = 0; i < MAX_KEYS; i++) expect(hit(`e${i}`, 1, 1_000_000, i)).toBe(0);
+    // One more address arrives while the map is full and nothing has expired.
+    expect(hit("newcomer", 1, 1_000_000, MAX_KEYS)).toBe(0);
+    // The newest keys kept their count: their second hit is over the limit of 1.
+    expect(hit(`e${MAX_KEYS - 1}`, 1, 1_000_000, MAX_KEYS + 1)).toBeGreaterThan(0);
+    expect(hit(`e${Math.ceil(MAX_KEYS * 0.1) + 5}`, 1, 1_000_000, MAX_KEYS + 1)).toBeGreaterThan(0);
+    expect(hit("newcomer", 1, 1_000_000, MAX_KEYS + 1)).toBeGreaterThan(0);
+    // The earliest-ending keys were evicted: they start again from zero.
+    expect(hit("e0", 1, 1_000_000, MAX_KEYS + 1)).toBe(0);
+    expect(hit(`e${Math.ceil(MAX_KEYS * 0.1) - 1}`, 1, 1_000_000, MAX_KEYS + 1)).toBe(0);
   });
 });
 
