@@ -1,6 +1,6 @@
 # Contract: API routes (owner: SERVER)
 
-Version 1.3, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1.4, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
 Source for behaviour: `docs/BUILD_PROMPT.md` (BP) sections 8.10 to 8.12, 8.14, 8.16, 8.19, 9, 10.
 Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts/field-schema.md` (DATA):
 `x`, `y` are 0-based, top-down, pixel centres at integers; frame numbers start at 1.
@@ -258,7 +258,8 @@ Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need 
 
 - Top 50 rows. `accuracy` is 0 to 1, or `null` with no counted submissions. `me` is absent for guests.
 - Accuracy counts only `counted` rows: a repeat of a find the player already has, a practice answer, and quick-look marks do not move it. Every wrong answer counts.
-- The bot row is scored from the bot's candidates that match known objects, and is always labelled as a bot. Display names `bot` and `Shift-and-stack bot` (any case) are reserved; the database refuses them.
+- The bot row is scored from the bot's candidates that match known objects, and is always labelled as a bot.
+- **1.4 (spoiler fix):** with `scope=spot`, the bot row is present only when the caller's signed unlock cookie covers that spot (section 2); otherwise `rows` holds the humans only. Reason: the bot's score on one spot says whether something moves there (0 on the control field). `scope=all` always has it. Every response is `Cache-Control: private, no-store`. Display names `bot` and `Shift-and-stack bot` (any case) are reserved; the database refuses them.
 - The route calls the `leaderboard` RPC **with the caller's token** (anon key client plus the caller's `Authorization` header), never with the service role: the function uses `auth.uid()` for `is_me` and `me`.
 - `source` is `db`, or `snapshot` when Supabase is missing or down: the route then serves `web/public/leaderboard-snapshot.json` (same shape) with status 200.
 

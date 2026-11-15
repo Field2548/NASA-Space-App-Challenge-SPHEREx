@@ -113,9 +113,15 @@ export type BoardMe = { rank: number; name: string; score: number; accuracy: num
  */
 export function mergeBot(
   humans: { name: string; score: number; accuracy: number | null; is_me: boolean }[],
-  bot: { score: number; accuracy: number | null },
+  bot: { score: number; accuracy: number | null } | null,
   me?: BoardMe,
 ): { rows: BoardRow[]; me?: BoardMe } {
+  if (!bot) {
+    // No bot row (a spot the caller has not solved): humans only, ranks as the database gave them.
+    const rows = humans.map((h, i) => ({ rank: i + 1, name: h.name, score: h.score, accuracy: h.accuracy, is_bot: false, is_me: h.is_me }));
+    const shown = rows.find((r) => r.is_me);
+    return me ? { rows, me: { ...me, rank: shown ? shown.rank : me.rank } } : { rows };
+  }
   const botRow: BoardRow = {
     rank: 0,
     name: BOT_NAME,
