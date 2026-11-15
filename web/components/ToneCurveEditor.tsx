@@ -1,13 +1,12 @@
 "use client";
 // Light intensity curve editor (PNL-06). One one-handle Bezier curve; the handle slides along the
 // anti-diagonal (drag, or arrow keys with Shift for big steps). The Stretch slider is the same bend,
-// continuous from -1 to 1, with the Linear, asinh and Log shapes marked at their own bend (asinh,
-// bend 0, is the default look and the reset).
+// continuous from -1 to 1 with no labels or ticks (bend 0, the asinh look, is the default and reset).
 //
 // Props: { value: Curve; onChange(c: Curve): void }
 
 import { type KeyboardEvent, type PointerEvent, useRef } from "react";
-import { applyCurve, bezierAt, clampBend, CURVE_PRESETS, type Curve, type CurvePreset, handleOf, isDefaultCurve, PRESET_BEND, presetCurve, presetOf } from "@/lib/toneCurve";
+import { applyCurve, bezierAt, clampBend, type Curve, type CurvePreset, handleOf, isDefaultCurve, presetCurve, presetOf } from "@/lib/toneCurve";
 import HelpImage from "./HelpImage";
 import InfoPopover from "./InfoPopover";
 
@@ -55,10 +54,9 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
     setBend(y - x); // projection onto the anti-diagonal
   };
 
-  // The slider is the bend itself (-1..1), the same value the handle sets; the stops are labelled
-  // at their own bend, so the slider position matches the real shape of the curve.
+  // The slider is the bend itself (-1..1), the same value the handle sets, with no ticks to snap to.
+  // Screen readers still hear the shape name when the bend sits exactly on one.
   const preset = presetOf(value);
-  const stopLeft = (p: CurvePreset) => `${Math.round(((PRESET_BEND[p] + 1) / 2) * 100)}%`;
   const stretchText = preset ? PRESET_LABEL[preset] : "Custom";
   const demo = isDefaultCurve(value) ? presetCurve("log") : value;
   const sc = rampScene();
@@ -69,9 +67,8 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         Light curve{" "}
         <InfoPopover label="Light curve" title="Light curve: how bright each level is drawn">
           <p>
-            The Stretch slider bends the curve smoothly, from darker faint end on the left to brighter on the right. Three shapes
-            are marked on it: Linear is brightness proportional to the signal, asinh is the default look and the reset, Log lifts
-            the faint end most. Between the marks the curve shows Custom.
+            The Stretch slider bends the curve smoothly: left darkens the faint end, right lifts it, and the middle is the
+            default look and the reset.
           </p>
           <p>
             On the curve, left-right is the brightness the picture has now, the height is the brightness it gets.
@@ -90,30 +87,11 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
           min={-1}
           max={1}
           step={0.01}
-          list="tone-presets"
           value={Math.round(clampBend(value.bend) * 100) / 100}
           aria-label="Stretch"
           aria-valuetext={stretchText}
           onChange={(e) => setBend(Number(e.target.value))}
         />
-        <datalist id="tone-presets">
-          {CURVE_PRESETS.map((p) => (
-            <option key={p} value={PRESET_BEND[p]} label={PRESET_LABEL[p]} />
-          ))}
-        </datalist>
-        {/* No "Stretch:" caption: the current stop's name is lit; none is lit for a custom bend. */}
-        <span style={{ position: "relative", height: "1.4em" }} aria-hidden="true">
-          {CURVE_PRESETS.map((p) => (
-            <span
-              key={p}
-              data-stop={p}
-              data-on={p === preset ? "true" : "false"}
-              style={{ position: "absolute", left: stopLeft(p), transform: "translateX(-50%)", ...(p === preset ? { color: "var(--cyan)" } : { opacity: 0.6 }) }}
-            >
-              {PRESET_LABEL[p]}
-            </span>
-          ))}
-        </span>
       </label>
       <svg
         ref={svgRef}

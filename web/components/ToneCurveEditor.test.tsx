@@ -17,11 +17,12 @@ describe("ToneCurveEditor", () => {
     expect(stretch.value).toBe("0"); // asinh
     expect(screen.getAllByRole("slider")).toHaveLength(2);
   });
-  it("orders the stop labels by how much they lift the faint end, placed at their bend", () => {
+  it("shows no stop names and no tick list under the stretch slider (nothing to snap to)", () => {
     const { container } = render(<ToneCurveEditor value={DEFAULT_CURVE} onChange={() => {}} />);
-    const labels = [...container.querySelectorAll<HTMLElement>("[data-stop]")];
-    expect(labels.map((l) => l.textContent)).toEqual(["Linear", "asinh", "Log"]);
-    expect(labels.map((l) => l.style.left)).toEqual(["28%", "50%", "77%"]);
+    const stretch = screen.getByRole("slider", { name: "Stretch" });
+    expect(stretch.getAttribute("list")).toBeNull();
+    expect(container.querySelector("datalist")).toBeNull();
+    for (const name of ["Linear", "asinh", "Log"]) expect(screen.queryByText(name)).toBeNull();
   });
   it("the stretch slider moves the bend continuously, not only to the stops", () => {
     const onChange = vi.fn();
