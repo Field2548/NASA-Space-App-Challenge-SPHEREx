@@ -577,3 +577,20 @@ def test_candidate_status_on_made_up_numbers():
     short = {"id": "901", "positions": [dict(p, in_grid=p["frame"] >= 4) for p in obj["positions"]]}
     assert st(cand(14, 18, 2, -1), mjds, t_ref, [short]) == {
         "status": "known", "object_id": "901", "near_object_frames": [4, 5]}
+
+
+def test_eros_answer_key_matches_recorded_horizons_reply():
+    """The key is where JPL Horizons puts Eros for SPHEREx as observer at mid-exposure
+    (reply recorded in ref/horizons_eros.json), mapped through the field's own WCS."""
+    from astropy.coordinates import SkyCoord
+    from astropy.wcs import WCS
+    with open(os.path.join(HERE, "ref", "horizons_eros.json"), encoding="utf-8") as f:
+        ref = json.load(f)
+    field, _, ans = load("eros")
+    c = field["wcs"]
+    w = WCS(naxis=2)
+    w.wcs.ctype, w.wcs.crval, w.wcs.crpix, w.wcs.cdelt = c["ctype"], c["crval"], c["crpix"], c["cdelt"]
+    x, y = w.world_to_pixel(SkyCoord(ref["RA"], ref["DEC"], unit="deg"))
+    y = field["size"][1] - 1 - y                  # the key is top-down, the WCS above bottom-up
+    for p, xk, yk in zip(ans["objects"][0]["positions"], x, y):
+        assert abs(p["x"] - xk) < 0.02 and abs(p["y"] - yk) < 0.02
