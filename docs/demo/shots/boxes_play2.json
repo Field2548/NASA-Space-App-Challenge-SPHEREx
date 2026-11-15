@@ -1,0 +1,38 @@
+{
+ "stack": {
+  "x": 25,
+  "y": 174,
+  "width": 279,
+  "height": 33
+ },
+ "shift": {
+  "x": 25,
+  "y": 221,
+  "width": 279,
+  "height": 33
+ },
+ "submit": {
+  "x": 1106,
+  "y": 117,
+  "width": 309,
+  "height": 34
+ },
+ "pad": {
+  "x": 16,
+  "y": 157,
+  "width": 297,
+  "height": 276
+ },
+ "marks": {
+  "x": 1106,
+  "y": 73,
+  "width": 309,
+  "height": 36
+ },
+ "result": {
+  "x": 0,
+  "y": 723.5,
+  "width": 1440,
+  "height": 176.5
+ }
+}

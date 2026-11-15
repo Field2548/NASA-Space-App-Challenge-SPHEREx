@@ -48,6 +48,7 @@ svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; poi
 .big { font-family: "Orbitron"; font-weight: 800; color: var(--green); }
 .dim { color: var(--dim); }
 .pill { display: inline-block; font-size: 40px; font-weight: 700; color: #05080f; background: var(--cyan); border-radius: 999px; padding: 12px 40px; }
+.lg { display:inline-grid; place-items:center; width:56px; height:44px; border-radius:8px; color:#fff; font-weight:800; font-size:28px; }
 </style>
 </head>
 <body>
@@ -80,34 +81,12 @@ svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; poi
   <div class="abs" style="left:760px; top:930px; width:1096px; font-size:28px; line-height:1.4; color:var(--dim);">Asteroid (433) Eros over 5 moments. Still stars stay white; the mover leaves coloured dots. Circles: where JPL says Eros was.</div>
 </section>
 
-<!-- 3 HOW IT WORKS -->
-<section class="slide" id="s3">
-  <div class="kicker">How it works</div><div class="num">3 / 7</div>
-  <h2>From raw images to a <em>detection</em></h2>
-  <div class="card" style="left:64px; top:236px; width:400px; height:200px;"><div class="n">1</div><h3>Download</h3><p>SPHEREx images from NASA IRSA</p></div>
-  <div class="chev" style="left:474px; top:292px;">›</div>
-  <div class="card" style="left:540px; top:236px; width:400px; height:200px;"><div class="n">2</div><h3>Align</h3><p>One burst = one moment, lined up</p></div>
-  <div class="chev" style="left:950px; top:292px;">›</div>
-  <div class="card" style="left:1016px; top:236px; width:400px; height:200px;"><div class="n">3</div><h3>Stack</h3><p>Onion skin: one colour per moment</p></div>
-  <div class="chev" style="left:1426px; top:292px;">›</div>
-  <div class="card" style="left:1492px; top:236px; width:364px; height:200px;"><div class="n">4</div><h3>Shift</h3><p>Lines up faint, slow movers</p></div>
-  <div id="s3shot"></div>
-  <svg class="ov" id="s3svg"></svg>
-  <div class="abs" style="left:1150px; top:490px; width:706px;">
-    <div class="dim" style="font-size:28px;">ERIS, A DWARF PLANET, FOUND BLIND</div>
-    <div class="big" style="font-size:96px; line-height:1.1; margin-top:6px;">6.9σ</div>
-    <div style="font-size:32px; line-height:1.35;">vs a <b style="color:var(--amber)">5.9σ noise bar</b> from a sign-flipped search.</div>
-    <div style="font-size:30px; line-height:1.4; margin-top:22px; color:var(--text);">Eris moves ~1.7 px between frames: too faint to see in any single one.</div>
-    <div style="font-size:30px; line-height:1.4; margin-top:18px; color:var(--dim);">Honest margin: about 1σ. The Cygnus control field has nothing above its bar.</div>
-  </div>
-</section>
-
 <!-- 4 DEMO 1 -->
-<section class="slide" id="s4">
-  <div class="kicker">Demo 1 · /map</div><div class="num">4 / 7</div>
+<section class="slide" id="s3">
+  <div class="kicker">Demo 1 · /map</div><div class="num">3 / 7</div>
   <h2>Explore the <em>whole sky</em></h2>
-  <div id="s4a"></div><div id="s4b"></div>
-  <svg class="ov" id="s4svg"></svg>
+  <div id="s3a"></div><div id="s3b"></div>
+  <svg class="ov" id="s3svg"></svg>
   <div class="abs" style="left:64px; top:880px; width:1792px; display:flex; align-items:center; justify-content:space-between; font-size:36px; font-weight:700;">
     <div class="card" style="position:static; padding:18px 30px;">Search or click the sky</div><div class="chev" style="position:static;">›</div>
     <div class="card" style="position:static; padding:18px 30px;">Pick a patch</div><div class="chev" style="position:static;">›</div>
@@ -118,16 +97,36 @@ svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; poi
 </section>
 
 <!-- 5 DEMO 2 -->
-<section class="slide" id="s5">
-  <div class="kicker">Demo 2 · /play</div><div class="num">5 / 7</div>
+<section class="slide" id="s4">
+  <div class="kicker">Demo 2 · /play</div><div class="num">4 / 7</div>
   <h2>Hunt a <em>mover</em></h2>
-  <div id="s5a"></div><div id="s5b"></div><div id="s5c"></div>
+  <div id="s4a"></div><div id="s4b"></div><div id="s4c"></div>
+  <svg class="ov" id="s4svg"></svg>
+</section>
+
+<!-- 5 TOOLKIT -->
+<section class="slide" id="s5">
+  <div class="kicker">Demo 3 · /play</div><div class="num">5 / 7</div>
+  <h2>Your <em>toolkit</em></h2>
+  <div id="s5a"></div><div id="s5b"></div><div id="s5c"></div><div id="s5d"></div>
   <svg class="ov" id="s5svg"></svg>
+  <div class="chip" style="left:64px; top:140px; display:none;"></div>
+  <div class="abs" style="left:64px; top:526px; width:940px; white-space:nowrap; display:flex; align-items:center; gap:10px; font-size:28px; color:var(--dim);">
+    <span style="margin-right:6px;">frame</span>
+    <span class="lg" style="background:#0072B2;">1</span><span class="lg" style="background:#56B4E9; color:#05080f;">2</span><span class="lg" style="background:#009E73;">3</span><span class="lg" style="background:#E69F00; color:#05080f;">4</span><span class="lg" style="background:#D55E00;">5</span>
+    <span style="margin-left:6px;">= colour (Okabe–Ito)</span>
+  </div>
+  <div class="abs body" style="left:1030px; top:190px; width:826px; font-size:32px;">
+    <p>Each moment gets <b>its own colour</b>.</p>
+    <p>Stars that did not move add up to <b>white</b>.</p>
+    <p>A mover leaves <b>one coloured dot per frame</b>: here frames 1, 2 and 3.</p>
+    <p>The colours are <b>colour-blind safe</b>.</p>
+  </div>
 </section>
 
 <!-- 6 DEMO 3 -->
 <section class="slide" id="s6">
-  <div class="kicker">Demo 3</div><div class="num">6 / 7</div>
+  <div class="kicker">Demo 4</div><div class="num">6 / 7</div>
   <h2>Check, inspect, <em>keep playing</em></h2>
   <div id="s6a"></div><div id="s6b"></div><div id="s6c"></div>
   <div class="abs" style="left:64px; top:955px; width:1792px; font-size:30px; color:var(--dim);">Leaderboard for signed-in players. Guests can play too.</div>
@@ -223,19 +222,11 @@ function annotate(slideId, items) {
     { n: 2, box: S.r([86, 424, 144, 114]), at: [1330, 850], cap: "Colour = one asteroid, 3 moments", maxw: 440, side: "r" },
   ]);
 }
-// ---- Slide 3 ----
+// ---- Slide 3 (map) ----
 {
-  const S = shot("s3shot", { src: "img/eris_stack.jpg", baseW: 1360, crop: [0, 40, 1360, 700], at: [64, 480], scale: 0.7 });
+  const A = shot("s3a", { src: "img/map_whole.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 300], scale: 0.62 });
+  const B = shot("s3b", { src: "img/zoom_cyg.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [978, 300], scale: 0.62 });
   annotate("s3", [
-    { n: 1, box: S.r([160, 227, 50, 50]), at: S.p(440, 455), cap: "Eris: 6.9σ", side: "l" },
-    { n: 2, box: S.r([361, 116, 305, 294]), pad: 2, at: S.p(700, 465), cap: "Noise only: top is 5.9σ", side: "r" },
-  ]);
-}
-// ---- Slide 4 ----
-{
-  const A = shot("s4a", { src: "img/map_whole.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 300], scale: 0.62 });
-  const B = shot("s4b", { src: "img/zoom_cyg.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [978, 300], scale: 0.62 });
-  annotate("s4", [
     { n: 1, box: A.r([30, 66, 300, 36]), at: A.p(430, 120), cap: "Type a place or coordinates", side: "r" },
     { n: 2, box: A.r([12, 775, 214, 54]), at: A.p(330, 705), cap: "Community patches legend", side: "r" },
     { n: 3, box: B.r([21, 132, 235, 34]), at: B.p(500, 215), cap: "Search finds a stage", side: "r" },
@@ -243,19 +234,42 @@ function annotate(slideId, items) {
     { n: 5, box: B.r([29, 614, 190, 34]), at: B.p(470, 700), cap: "Then play it", side: "r" },
   ]);
 }
-// ---- Slide 5 ----
+// ---- Slide 4 (hunt) ----
 {
-  const M = shot("s5a", { src: "img/play_stack_shift.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 235], scale: 0.88 });
-  const T = shot("s5b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 468], scale: 1.3 });
-  const C = shot("s5c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 815], scale: 1.3 });
-  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1400px; top:408px; font-size:28px;">Plain frame: where is it?</div>`);
-  annotate("s5", [
+  const M = shot("s4a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [364, 235], scale: 0.77 });
+  const T = shot("s4b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1490, 468], scale: 1.22 });
+  const C = shot("s4c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1490, 815], scale: 1.22 });
+  document.getElementById("s4b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1490px; top:408px; font-size:28px;">Plain frame: where?</div>`);
+  annotate("s4", [
     { n: 1, box: M.r([122, 693, 591, 142]), at: M.p(790, 790), cap: "Flip through the frames", side: "r" },
-    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(345, 200), cap: "Stack", side: "r" },
-    { n: 3, box: M.r([25, 220, 279, 32]), at: M.p(345, 300), cap: "Shift: line up<br>a slow mover", side: "r" },
-    { n: 4, box: C.r([606, 282, 205, 170]), at: [1425, 745], cap: "Coloured dots<br>= the mover", side: "r" },
-    { n: 5, box: M.r([1106, 163, 309, 34]), at: [1400, 352], cap: "Mark it, then Submit", side: "r" },
+    { n: 2, box: M.r([25, 174, 279, 33]), at: [335, 300], cap: "Stack", side: "l" },
+    { n: 3, box: M.r([25, 221, 279, 33]), at: [335, 440], cap: "Shift: line up a slow mover", side: "l", maxw: 215 },
+    { n: 4, box: C.r([606, 282, 205, 170]), at: [1520, 752], cap: "Stack: dots<br>= the mover", side: "r", maxw: 300 },
+    { n: 5, box: M.r([1106, 117, 309, 34]), at: [1505, 301], cap: "Mark it, then Submit", side: "r", maxw: 250 },
   ]);
+  { const b = M.r([598, 268, 230, 200]); document.getElementById("s4svg").insertAdjacentHTML("beforeend", `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="none" stroke="#ffb000" stroke-width="5"/>`); }
+}
+// ---- Slide 5 (toolkit) ----
+{
+  const B = shot("s5a", { src: "img/play_f1.jpg", baseW: 1440, crop: [560, 262, 300, 200], at: [64, 236], scale: 1.35 });
+  const A = shot("s5b", { src: "img/play_color.jpg", baseW: 1440, crop: [560, 262, 300, 200], at: [520, 236], scale: 1.35 });
+  document.getElementById("s5a").insertAdjacentHTML("beforeend", `<div class="chip" style="left:64px; top:180px;">Before: plain frame</div>`);
+  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:520px; top:180px; border-color:var(--amber); color:var(--amber);">After: Stack</div>`);
+  const L = shot("s5c", { src: "img/tool_color.jpg", baseW: 1440, crop: [0, 72, 330, 640], at: [64, 590], scale: 0.7 });
+  const Bt = shot("s5d", { src: "img/tool_color.jpg", baseW: 1440, crop: [0, 925, 800, 255], at: [900, 790], scale: 0.9 });
+  annotate("s5", [
+    { n: 1, box: L.r([25, 89, 279, 35]), at: [350, 610], cap: "Inspect any pixel (key I)", side: "r" },
+    { n: 2, box: L.r([25, 221, 279, 33]), at: [350, 725], cap: "Shift: line up a slow mover", side: "r", maxw: 420 },
+    { n: 3, box: L.r([16, 457, 297, 160]), at: [350, 880], cap: "Filter by wavelength band", side: "r" },
+    { n: 4, box: L.r([25, 658, 279, 33]), at: [350, 1000], cap: "Known asteroids: opens after you submit", side: "r", maxw: 470 },
+    { n: 5, box: Bt.r([17, 931, 184, 32]), at: [1000, 700], cap: "Blink or step through frames", side: "r" },
+    { n: 6, box: Bt.r([120, 1057, 595, 56]), at: [1580, 905], cap: "Choose frame ranges", side: "r", maxw: 230 },
+  ]);
+  // numbered dot markers on the After picture: where the mover was in frames 1, 2, 3
+  const dots = [[801, 437, 1], [683, 339, 2], [625, 292, 3]];
+  let g = "";
+  for (const [x, y, n] of dots) { const [X, Y] = A.p(x, y); g += `<circle cx="${X}" cy="${Y}" r="20" fill="none" stroke="#ffb000" stroke-width="4"/><text x="${X + 30}" y="${Y - 18}" font-family="JetBrains Mono" font-weight="800" font-size="30" fill="#ffb000" stroke="#05080f" stroke-width="5" paint-order="stroke">${n}</text>`; }
+  document.getElementById("s5svg").insertAdjacentHTML("beforeend", g);
 }
 // ---- Slide 6 ----
 {
