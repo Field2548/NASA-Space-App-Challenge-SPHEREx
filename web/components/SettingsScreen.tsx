@@ -37,7 +37,7 @@ export default function SettingsScreen() {
         />
         <p>Changes the colours of your marks in the game so the order of frames stays easy to read.</p>
       </section>
-      <section className="panel" data-part="Music">
+      <section className="panel" data-part="SET-02 // MUSIC">
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="checkbox" checked={music.on} onChange={(e) => changeMusic({ on: e.target.checked })} />
           Play music
