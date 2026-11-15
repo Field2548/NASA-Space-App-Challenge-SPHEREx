@@ -33,7 +33,7 @@
 .body {
   position: relative;
   display: grid;
-  grid-template-columns: var(--left-w, 220px) minmax(0, 1fr) var(--right-w, 240px);
+  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr) var(--right-w, 360px);
   grid-template-rows: 1fr 170px;
   grid-template-areas:
     "left center right"
@@ -42,12 +42,12 @@
 }
 
 .scoreClosed {
-  grid-template-columns: var(--left-w, 220px) minmax(0, 1fr) 40px;
+  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr) 40px;
 }
 
 /* No scoreboard yet (tutorial level 0): the right column goes away. */
 .noRight {
-  grid-template-columns: var(--left-w, 220px) minmax(0, 1fr);
+  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr);
   grid-template-areas:
     "left center"
     "bottom bottom";
@@ -265,11 +265,11 @@
 }
 
 .resizer[data-side="left"] {
-  left: calc(var(--left-w, 220px) - 4px);
+  left: calc(var(--left-w, 330px) - 4px);
 }
 
 .resizer[data-side="right"] {
-  right: calc(var(--right-w, 240px) - 4px);
+  right: calc(var(--right-w, 360px) - 4px);
 }
 
 .resizer:hover,

@@ -1,12 +1,12 @@
 "use client";
-// Light intensity curve editor (PNL-06). A 3-stop slider picks the base stretch (Linear, Log,
-// asinh; asinh is the default look and the reset). Below it a one-handle Bezier bends the result:
-// the handle slides along the anti-diagonal (drag, or arrow keys with Shift for big steps).
+// Light intensity curve editor (PNL-06). One one-handle Bezier curve; the handle slides along the
+// anti-diagonal (drag, or arrow keys with Shift for big steps). The 3-stop Stretch slider (Linear,
+// Log, asinh; asinh is the default look and the reset) sets that same curve to a preset shape.
 //
 // Props: { value: Curve; onChange(c: Curve): void }
 
 import { type KeyboardEvent, type PointerEvent, useRef } from "react";
-import { applyCurve, bezierAt, clampBend, CURVE_PRESETS, type Curve, type CurvePreset, handleOf, isDefaultCurve, presetCurve } from "@/lib/toneCurve";
+import { applyCurve, bezierAt, clampBend, CURVE_PRESETS, type Curve, type CurvePreset, handleOf, isDefaultCurve, PRESET_BEND, presetCurve, presetOf } from "@/lib/toneCurve";
 import HelpImage from "./HelpImage";
 import InfoPopover from "./InfoPopover";
 
@@ -34,7 +34,7 @@ export interface ToneCurveEditorProps {
 export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
-  const setBend = (b: number) => onChange({ ...value, bend: clampBend(b) });
+  const setBend = (b: number) => onChange({ bend: clampBend(b) });
 
   const path = Array.from({ length: 41 }, (_, i) => `${i ? "L" : "M"}${sx(i / 40).toFixed(1)} ${sy(bezierAt(value.bend, i / 40)).toFixed(1)}`).join("");
   const h = handleOf(value.bend);
@@ -54,8 +54,12 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
     setBend(y - x); // projection onto the anti-diagonal
   };
 
-  const presetIdx = CURVE_PRESETS.indexOf(value.preset);
-  const demo = isDefaultCurve(value) ? { preset: "asinh" as const, bend: 0.5 } : value;
+  // The slider sits on the matching stop, or on the nearest one when the handle was dragged off.
+  const preset = presetOf(value);
+  const nearest = CURVE_PRESETS.reduce((a, p) => (Math.abs(PRESET_BEND[p] - value.bend) < Math.abs(PRESET_BEND[a] - value.bend) ? p : a));
+  const presetIdx = CURVE_PRESETS.indexOf(preset ?? nearest);
+  const stretchText = preset ? PRESET_LABEL[preset] : "Custom";
+  const demo = isDefaultCurve(value) ? presetCurve("log") : value;
   const sc = rampScene();
 
   return (
@@ -64,11 +68,11 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         Light curve{" "}
         <InfoPopover label="Light curve" title="Light curve: how bright each level is drawn">
           <p>
-            The picture is first stretched so faint things show. The slider picks that stretch: asinh is the default look and the
-            reset, Linear is brightness proportional to the signal, Log lifts the faint end.
+            The Stretch slider sets the curve to a ready shape: asinh is the default look and the reset, Linear is brightness
+            proportional to the signal, Log lifts the faint end. Moving the dot off a shape shows Custom.
           </p>
           <p>
-            The curve then bends the result: left-right is the brightness the picture has now, the height is the brightness it gets.
+            On the curve, left-right is the brightness the picture has now, the height is the brightness it gets.
             Drag the dot up-left to brighten faint things, down-right to darken them, or focus it and press the arrow keys (Shift for
             bigger steps). Everything stays in order, brighter never turns darker than dimmer.
           </p>
@@ -79,7 +83,7 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         </InfoPopover>
       </div>
       <label style={{ display: "grid", gap: 2 }}>
-        <span>Stretch: {PRESET_LABEL[value.preset]}</span>
+        <span>Stretch: {stretchText}</span>
         <input
           type="range"
           min={0}
@@ -88,8 +92,8 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
           list="tone-presets"
           value={presetIdx}
           aria-label="Stretch"
-          aria-valuetext={PRESET_LABEL[value.preset]}
-          onChange={(e) => onChange({ ...value, preset: CURVE_PRESETS[Number(e.target.value)] ?? "asinh" })}
+          aria-valuetext={stretchText}
+          onChange={(e) => onChange(presetCurve(CURVE_PRESETS[Number(e.target.value)] ?? "asinh"))}
         />
         <datalist id="tone-presets">
           {CURVE_PRESETS.map((p, i) => (
@@ -138,11 +142,6 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
           }}
         />
       </svg>
-      <div>
-        <button type="button" onClick={() => onChange(presetCurve(value.preset))} disabled={Math.abs(value.bend) < 1e-9}>
-          Straighten
-        </button>
-      </div>
     </div>
   );
 }

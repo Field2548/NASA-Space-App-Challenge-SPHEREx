@@ -1,38 +1,39 @@
 // Tone curve: output brightness as a function of the brightness the viewer already shows
-// (0..1 after the asinh stretch). Two stages:
-// 1. a base stretch picked on a 3-stop slider: Linear, Log or asinh (asinh = no change);
-// 2. a quadratic Bezier from (0,0) to (1,1) with one handle on the anti-diagonal x + y = 1.
-//    The single parameter `bend` in -1..1 places the handle at ((1 - bend)/2, (1 + bend)/2):
-//    0 is the straight line (no change), > 0 lifts faint levels, < 0 darkens them.
-//    A handle inside the unit square keeps the curve non-decreasing.
-// The default (asinh, bend 0) is the identity: applyCurve returns the same array.
+// (0..1 after the asinh stretch). One quadratic Bezier from (0,0) to (1,1) with one handle on
+// the anti-diagonal x + y = 1. The single parameter `bend` in -1..1 places the handle at
+// ((1 - bend)/2, (1 + bend)/2): 0 is the straight line (no change), > 0 lifts faint levels,
+// < 0 darkens them. A handle inside the unit square keeps the curve non-decreasing.
+//
+// The Stretch stops are bend values of this same curve, least-squares fits (201 points on 0..1):
+//   asinh  0      the picture as drawn (identity)
+//   log    +0.54 fit to log10(1 + 9y), rms 0.012
+//   linear -0.44 fit to sinh(y asinh 5)/5 (undoes the asinh), rms 0.004
+// The default (bend 0) is the identity: applyCurve returns the same array.
 
 export const CURVE_PRESETS = ["linear", "log", "asinh"] as const;
 export type CurvePreset = (typeof CURVE_PRESETS)[number];
 export interface Curve {
-  preset: CurvePreset;
   bend: number;
 }
 
-export const DEFAULT_CURVE: Curve = { preset: "asinh", bend: 0 };
+export const PRESET_BEND: Record<CurvePreset, number> = { linear: -0.44, log: 0.54, asinh: 0 };
+
+export const DEFAULT_CURVE: Curve = { bend: 0 };
 
 const EPS = 1e-9;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 export const clampBend = (b: number) => Math.min(1, Math.max(-1, Number.isFinite(b) ? b : 0));
 
-export const isDefaultCurve = (c: Curve) => c.preset === "asinh" && Math.abs(c.bend) < EPS;
+export const isDefaultCurve = (c: Curve) => Math.abs(c.bend) < EPS;
 
-const A = 5;
-const PRESET_FN: Record<CurvePreset, (y: number) => number> = {
-  asinh: (y) => y,
-  // undo the asinh: brightness proportional to the signal
-  linear: (y) => Math.sinh(y * Math.asinh(A)) / A,
-  log: (y) => Math.log1p(9 * y) / Math.log(10),
-};
-
-/** A preset with a straight Bezier (the slider's stops). */
+/** The curve a Stretch stop sets. */
 export function presetCurve(name: CurvePreset): Curve {
-  return { preset: name, bend: 0 };
+  return { bend: PRESET_BEND[name] };
+}
+
+/** The stop whose bend this curve has, or null when the handle was moved off every stop. */
+export function presetOf(c: Curve): CurvePreset | null {
+  return CURVE_PRESETS.find((p) => Math.abs(PRESET_BEND[p] - c.bend) < 1e-6) ?? null;
 }
 
 /** Bezier handle position for a bend value. */
@@ -51,9 +52,9 @@ export function bezierAt(bend: number, x: number): number {
   return clamp01(2 * u * (1 - u) * py + u * u);
 }
 
-/** Curve height at input x in 0..1: base stretch, then the Bezier. */
+/** Curve height at input x in 0..1. */
 export function curveAt(c: Curve, x: number): number {
-  return bezierAt(c.bend, clamp01(PRESET_FN[c.preset](clamp01(x))));
+  return bezierAt(c.bend, x);
 }
 
 const LUT_SIZE = 1024;
