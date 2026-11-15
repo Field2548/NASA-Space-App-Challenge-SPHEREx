@@ -77,7 +77,7 @@ svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; poi
   </div>
   <div id="s2shot"></div>
   <svg class="ov" id="s2svg"></svg>
-  <div class="abs" style="left:760px; top:858px; width:1096px; font-size:28px; line-height:1.4; color:var(--dim);">Asteroid (433) Eros over 5 moments. Still stars stay white; the mover leaves coloured dots. Circles: where JPL says Eros was.</div>
+  <div class="abs" style="left:760px; top:930px; width:1096px; font-size:28px; line-height:1.4; color:var(--dim);">Asteroid (433) Eros over 5 moments. Still stars stay white; the mover leaves coloured dots. Circles: where JPL says Eros was.</div>
 </section>
 
 <!-- 3 HOW IT WORKS -->
@@ -129,7 +129,8 @@ svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; poi
 <section class="slide" id="s6">
   <div class="kicker">Demo 3</div><div class="num">6 / 7</div>
   <h2>Check, inspect, <em>keep playing</em></h2>
-  <div id="s6a"></div><div id="s6b"></div><div id="s6c"></div><div id="s6d"></div>
+  <div id="s6a"></div><div id="s6b"></div><div id="s6c"></div>
+  <div class="abs" style="left:64px; top:955px; width:1792px; font-size:30px; color:var(--dim);">Leaderboard for signed-in players. Guests can play too.</div>
   <svg class="ov" id="s6svg"></svg>
 </section>
 
@@ -211,66 +212,62 @@ function annotate(slideId, items) {
 
 // ---- Slide 1 ----
 {
-  const S = shot("s1shot", { src: "img/play_color.jpg", baseW: 1440, crop: [330, 48, 690, 580], at: [1040, 250], scale: 1.1 });
-  annotate("s1", [{ n: 1, box: S.r([595, 265, 235, 200]), at: S.p(470, 520), cap: "Coloured dots = a moving asteroid", maxw: 360, side: "r" }]);
+  const S = shot("s1shot", { src: "img/play_color.jpg", baseW: 1440, crop: [330, 48, 690, 480], at: [1040, 250], scale: 1.1 });
+  annotate("s1", [{ n: 1, box: S.r([595, 265, 235, 200]), at: [1290, 860], cap: "Coloured dots = a moving asteroid", maxw: 400, side: "r" }]);
 }
 // ---- Slide 2 ----
 {
-  const S = shot("s2shot", { src: "img/eros_summary.jpg", baseW: 1440, crop: [0, 0, 1440, 630], at: [760, 300], scale: 0.76 });
+  const S = shot("s2shot", { src: "img/eros_summary.jpg", baseW: 1440, crop: [0, 0, 1440, 630], at: [760, 290], scale: 0.76 });
   annotate("s2", [
-    { n: 1, box: S.r([76, 392, 26, 26]), at: S.p(330, 330), cap: "White = did not move", side: "r" },
-    { n: 2, box: S.r([86, 424, 144, 114]), at: S.p(380, 585), cap: "Colour = one asteroid, 3 moments", maxw: 420, side: "r" },
+    { n: 1, box: S.r([76, 392, 26, 26]), at: [830, 850], cap: "White = did not move", side: "r" },
+    { n: 2, box: S.r([86, 424, 144, 114]), at: [1330, 850], cap: "Colour = one asteroid, 3 moments", maxw: 440, side: "r" },
   ]);
 }
 // ---- Slide 3 ----
 {
   const S = shot("s3shot", { src: "img/eris_stack.jpg", baseW: 1360, crop: [0, 40, 1360, 700], at: [64, 480], scale: 0.7 });
-  // coordinates inside the image are native px; crop y offset 40
   annotate("s3", [
-    { n: 1, box: S.r([160, 227, 50, 50]), at: S.p(120, 465), cap: "Eris found: 6.9σ", side: "r" },
-    { n: 2, box: S.r([361, 104, 305, 306]), at: S.p(700, 465), cap: "Noise only: top is 5.9σ", side: "r" },
+    { n: 1, box: S.r([160, 227, 50, 50]), at: S.p(440, 455), cap: "Eris: 6.9σ", side: "l" },
+    { n: 2, box: S.r([361, 116, 305, 294]), pad: 2, at: S.p(700, 465), cap: "Noise only: top is 5.9σ", side: "r" },
   ]);
 }
 // ---- Slide 4 ----
 {
-  const A = shot("s4a", { src: "img/map_whole.jpg", baseW: 1440, crop: [0, 48, 1440, 800], at: [64, 300], scale: 0.62 });
-  const B = shot("s4b", { src: "img/map_zoom.jpg", baseW: 1440, crop: [0, 48, 1440, 800], at: [978, 300], scale: 0.62 });
+  const A = shot("s4a", { src: "img/map_whole.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 300], scale: 0.62 });
+  const B = shot("s4b", { src: "img/zoom_cyg.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [978, 300], scale: 0.62 });
   annotate("s4", [
     { n: 1, box: A.r([30, 66, 300, 36]), at: A.p(430, 120), cap: "Type a place or coordinates", side: "r" },
     { n: 2, box: A.r([12, 775, 214, 54]), at: A.p(330, 705), cap: "Community patches legend", side: "r" },
-    { n: 3, box: B.r([21, 132, 225, 34]), at: B.p(470, 215), cap: "Search finds a stage", side: "r" },
-    { n: 4, box: B.r([618, 356, 204, 204]), at: B.p(960, 330), cap: "Pick a patch of sky", side: "r", maxw: 250 },
+    { n: 3, box: B.r([21, 132, 235, 34]), at: B.p(500, 215), cap: "Search finds a stage", side: "r" },
+    { n: 4, box: B.r([646, 385, 150, 150]), at: B.p(960, 330), cap: "Pick a patch of sky", side: "r", maxw: 250 },
     { n: 5, box: B.r([29, 614, 190, 34]), at: B.p(470, 700), cap: "Then play it", side: "r" },
   ]);
 }
 // ---- Slide 5 ----
 {
-  const M = shot("s5a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 852], at: [64, 200], scale: 0.886 });
-  const T = shot("s5b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 250, 300, 230], at: [1396, 262], scale: 1.45 });
-  const C = shot("s5c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 250, 300, 230], at: [1396, 660], scale: 1.45 });
-  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1396px; top:204px;">Plain frame: where is it?</div>`);
-  document.getElementById("s5c").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1396px; top:602px; border-color:var(--amber); color:var(--amber);">Colour by time: found</div>`);
+  const M = shot("s5a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 235], scale: 0.88 });
+  const T = shot("s5b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 468], scale: 1.3 });
+  const C = shot("s5c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 815], scale: 1.3 });
+  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1400px; top:408px; font-size:28px;">Plain frame: where is it?</div>`);
   annotate("s5", [
-    { n: 1, box: M.r([122, 693, 591, 142]), at: M.p(790, 830), cap: "Flip through the frames", side: "r" },
-    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(375, 150), cap: "Colour by time", side: "r" },
-    { n: 3, box: M.r([598, 268, 230, 200]), at: M.p(690, 540), cap: "Coloured dots = the mover", side: "r" },
-    { n: 4, box: M.r([1106, 163, 309, 34]), at: M.p(1015, 190), cap: "Mark it, then Submit", side: "l", maxw: 250 },
+    { n: 1, box: M.r([122, 693, 591, 142]), at: M.p(790, 790), cap: "Flip through the frames", side: "r" },
+    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(345, 262), cap: "Colour<br>by time", side: "r" },
+    { n: 3, box: C.r([606, 282, 205, 170]), at: [1425, 745], cap: "Coloured dots<br>= the mover", side: "r" },
+    { n: 4, box: M.r([1106, 163, 309, 34]), at: [1400, 352], cap: "Mark it, then Submit", side: "r" },
   ]);
-  { const b = C.r([606, 272, 205, 185]); document.getElementById("s5svg").insertAdjacentHTML("beforeend", `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="none" stroke="#ffb000" stroke-width="5"/>`); }
+  { const b = M.r([598, 268, 230, 200]); document.getElementById("s5svg").insertAdjacentHTML("beforeend", `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="none" stroke="#ffb000" stroke-width="5"/>`); }
 }
 // ---- Slide 6 ----
 {
-  const R = shot("s6a", { src: "img/play_result.jpg", baseW: 1440, crop: [360, 90, 1080, 810], at: [64, 220], scale: 0.86 });
-  const A = shot("s6b", { src: "img/achievements.jpg", baseW: 1440, crop: [50, 200, 1340, 230], at: [1010, 220], scale: 0.63 });
-  const S = shot("s6c", { src: "img/settings.jpg", baseW: 1440, crop: [250, 170, 940, 95], at: [1010, 400], scale: 0.9 });
-  const L = shot("s6d", { src: "img/leaderboard.jpg", baseW: 1440, crop: [120, 150, 1210, 490], at: [1010, 535], scale: 0.7 });
+  const R = shot("s6a", { src: "img/play_result.jpg", baseW: 1440, crop: [360, 90, 1080, 690], at: [64, 220], scale: 0.86 });
+  const A = shot("s6b", { src: "img/achievements.jpg", baseW: 1440, crop: [50, 200, 710, 380], at: [1000, 220], scale: 1.2 });
+  const S = shot("s6c", { src: "img/settings.jpg", baseW: 1440, crop: [250, 170, 940, 95], at: [964, 790], scale: 0.95 });
   annotate("s6", [
-    { n: 1, box: R.r([376, 742, 430, 36]), at: R.p(470, 690), cap: "Scored on the server", side: "r" },
-    { n: 2, box: R.r([814, 261, 378, 150]), at: R.p(650, 185), cap: "Inspect: where, when, S/N", side: "r" },
-    { n: 3, box: R.r([768, 403, 64, 64]), at: R.p(560, 520), cap: "The mover it found", side: "r" },
-    { n: 4, box: A.r([58, 277, 319, 141]), at: A.p(520, 222), cap: "Achievements unlock", side: "r" },
-    { n: 5, box: S.r([407, 199, 236, 31]), at: S.p(700, 215), cap: "Colour-vision modes", side: "r" },
-    { n: 6, box: L.r([149, 541, 534, 48]), at: L.p(900, 330), cap: "Leaderboard", side: "r" },
+    { n: 1, box: R.r([376, 742, 430, 36]), at: [200, 880], cap: "Scored on the server", side: "r" },
+    { n: 2, box: R.r([814, 261, 378, 150]), at: R.p(560, 175), cap: "Inspect pop-up", side: "r" },
+    { n: 3, box: R.r([768, 403, 64, 64]), at: R.p(520, 500), cap: "The mover it found", side: "r" },
+    { n: 4, box: A.r([58, 277, 319, 141]), at: A.p(330, 222), cap: "Achievements unlock", side: "r" },
+    { n: 5, box: S.r([410, 201, 231, 27]), pad: 3, at: S.p(700, 185), cap: "Colour-vision modes", side: "r" },
   ]);
 }
 </script>
