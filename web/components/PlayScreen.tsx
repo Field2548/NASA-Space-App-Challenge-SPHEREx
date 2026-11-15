@@ -29,6 +29,7 @@ import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallba
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
+import { cueSolved } from "@/lib/music";
 import { loadVision } from "@/lib/settings";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
@@ -365,6 +366,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const onResult = (res: CheckResponse) => {
     // A wrong answer leaves the spot locked (api.md 3), so the name stays hidden for a retry.
     if (res.unlocked) setVerdictIn(true);
+    if (res.unlocked && !res.practice) cueSolved();
     if (res.unlocked) setRevealTitle(res.spot_reveal?.title ?? res.verdict.object_name ?? field.title);
     if (res.unlocked && res.reveal) setRevealName(res.spot_reveal?.title ?? res.verdict.object_name ?? null);
     setVerdicts((v) => v + 1);

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Orbitron } from "next/font/google";
 import type { CSSProperties } from "react";
 import AccountControl from "@/components/AccountControl";
+import MusicPlayer from "@/components/MusicPlayer";
 import NavTracker from "@/components/NavTracker";
 import SiteFooter from "@/components/SiteFooter";
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <NavTracker />
         <AccountControl />
         {children}
+        <MusicPlayer />
         <SiteFooter />
       </body>
     </html>
