@@ -44,7 +44,7 @@ describe("ToneCurveEditor", () => {
   it("keeps detail in the (i) popup with before/after example images", () => {
     render(<ToneCurveEditor value={DEFAULT_CURVE} onChange={() => {}} />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "About Light curve" }));
+    fireEvent.click(screen.getByRole("button", { name: "About Tone curve" }));
     expect(screen.getByRole("dialog").textContent).toMatch(/brightness/i);
     expect(screen.getByRole("img", { name: /before/i })).toBeTruthy();
     expect(screen.getByRole("img", { name: /after/i })).toBeTruthy();

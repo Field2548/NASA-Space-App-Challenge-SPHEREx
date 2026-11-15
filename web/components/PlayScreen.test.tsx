@@ -471,7 +471,7 @@ describe("PlayScreen tools (more)", () => {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
     expect(screen.queryByRole("slider", { name: "Onion range end" })).toBeNull();
-    expect(screen.queryByRole("complementary", { name: "Scoreboard panel" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "Answer" })).toBeNull();
     expect(document.querySelector('[data-slot="coordinate-box"], [data-slot="show-work"]')).toBeNull();
     const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim());
     expect(names).toEqual(ALLOWED_AT_LEVEL_0);
@@ -639,7 +639,7 @@ describe("PlayScreen round mode", () => {
 
   it("the tutorial shows no scoreboard", async () => {
     await loadGame({ showTitle: true, objectName: "433 Eros" });
-    expect(screen.getByRole("complementary", { name: "Scoreboard panel" })).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: "Answer" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
   });
 

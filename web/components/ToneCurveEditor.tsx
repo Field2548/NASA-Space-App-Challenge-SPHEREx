@@ -1,5 +1,5 @@
 "use client";
-// Light intensity curve editor (PNL-06): input brightness (what the picture shows now) on the
+// Light intensity curve editor: input brightness (what the picture shows now) on the
 // horizontal axis, output brightness on the vertical. Five points move up and down (drag or
 // arrow keys, Shift for big steps); presets Linear, Log, asinh (the default look and the reset).
 //
@@ -62,8 +62,8 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
   return (
     <div style={{ display: "grid", gap: "var(--space-2)", fontSize: 12 }}>
       <div>
-        Light curve{" "}
-        <InfoPopover label="Light curve" title="Light curve: how bright each level is drawn">
+        Tone curve{" "}
+        <InfoPopover label="Tone curve" title="Tone curve: how bright each level is drawn">
           <p>
             The picture is first stretched so faint things show (the asinh look). This curve then decides how bright each level is
             drawn: the left-right position is the brightness the picture has now, the height is the brightness it gets. Raise the
