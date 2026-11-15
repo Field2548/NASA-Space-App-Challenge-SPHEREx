@@ -7,12 +7,12 @@
 // The dice in the coordinate box picks a point uniform on the sphere. Zoomed in to PATCH_SHOW_FOV, patches other
 // players already solved are drawn (GET /api/patches), so nobody plays the same patch twice.
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
 import { patchFromPoint, type Patch } from "@/lib/patch";
 import type { FieldSummary } from "@/lib/types";
+import BackLink from "./BackLink";
 import { CoordinateBox } from "./CoordinateBox";
 import styles from "./MapScreen.module.css";
 import { PATCH_SHOW_FOV, SkyMap, type SkyPatch } from "./SkyMap";
@@ -85,7 +85,7 @@ export default function MapScreen() {
   return (
     <div className={styles.screen}>
       <header className={styles.top}>
-        <Link href="/">Back to the start</Link>
+        <BackLink />
         <h1 className={styles.title}>Sky map</h1>
       </header>
       <main className={styles.map}>

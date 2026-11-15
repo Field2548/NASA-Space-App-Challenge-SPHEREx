@@ -27,6 +27,7 @@
 import Link from "next/link";
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
+import BrandMark from "./BrandMark";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
 import { cueSolved } from "@/lib/music";
@@ -169,11 +170,7 @@ export default function PlayScreen({ spot, patch, badPatch = false, loading = fa
     <div className={styles.screen}>
       <header className={styles.top}>
         <Link href="/" className={styles.logo}>
-          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-            <circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <circle cx="11" cy="11" r="4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M11 0v5M11 17v5M0 11h5M17 11h5" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
+          <BrandMark size={26} />
           <span>{PROJECT_NAME}</span>
         </Link>
         <Link href="/stages">Stages</Link>
