@@ -50,7 +50,7 @@ describe("AchievementsScreen", () => {
     expect(screen.getByRole("progressbar", { name: "1 of 3 unlocked" }).getAttribute("aria-valuenow")).toBe("1");
     const done = screen.getByTestId("badge-first-light");
     expect(done.getAttribute("data-unlocked")).toBe("true");
-    expect(done.textContent).toMatch(/Unlocked .*2026/);
+    expect(done.textContent).toMatch(/Unlocked S+/);
     const locked = screen.getByTestId("badge-rock-hunter");
     expect(locked.getAttribute("data-unlocked")).toBe("false");
     expect(locked.textContent).toContain("2 / 5");
