@@ -11,14 +11,32 @@
   position: absolute;
   left: 38%;
   top: 50%;
-  width: 190vmax;
-  height: 190vmax;
-  margin: -95vmax 0 0 -95vmax;
+  --sky-size: 190vmax;
+  width: var(--sky-size);
+  height: var(--sky-size);
+  margin: calc(var(--sky-size) / -2) 0 0 calc(var(--sky-size) / -2);
   pointer-events: none;
   user-select: none;
-  animation: sway 160s ease-in-out infinite alternate;
+  /* 640 steps: a new angle 4 times a second, under 0.3 px at the screen edge, so it still reads as
+     a smooth drift while the compositor sits idle between steps instead of redrawing every frame. */
+  animation: sway 160s steps(640) infinite alternate;
 }
 
+.skyLayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* A bright star glyph centred on its place, matching the SVG text it replaces. */
+.star {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  color: var(--text);
+  font-family: var(--font-mono-stack);
+}
 @keyframes sway {
   from {
     transform: rotate(-4deg);
@@ -62,8 +80,8 @@
   font-family: var(--font-mono-stack);
 }
 
-.hot {
-  fill: var(--cyan);
+.star.hot {
+  color: var(--cyan);
 }
 
 .shootingSky {
@@ -124,7 +142,8 @@
 .tw1,
 .tw2,
 .tw3 {
-  animation: twinkle 3.2s ease-in-out infinite;
+  /* 10 steps per fade: any change under the swaying sky redraws it, so fewer redraws per second. */
+  animation: twinkle 3.2s steps(10) infinite;
 }
 
 .tw2 {
