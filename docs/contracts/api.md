@@ -334,3 +334,34 @@ authHeader(): Promise<Record<string, string>>    // { Authorization: "Bearer ...
 | `UNLOCK_SECRET` | server only, **REQUIRED in production** | signing the `unlock` cookie (section 2). Set it once: adding or changing it, `CRON_SECRET` or `SUPABASE_SERVICE_ROLE_KEY` while one of them signs the cookie invalidates every cookie already handed out. |
 
 All of them missing = guest mode: `/api/check` scores from the answer key, the scoreboard shows the snapshot, the density layers are empty. In production, set at least `UNLOCK_SECRET`, or spots never unlock.
+
+## 14. `POST /api/patch-check`
+
+A picked patch (`web/lib/patch.ts`: HEALPix order-11 nested cell, id `p11-<ipix>`, 41 px quick-look grid at the cell centre) has no answer key on disk. The server rebuilds the geometry from the id, checks each frame time against IRSA's exposure list for the patch (inside a burst, +-2 min; else `400`), asks JPL sb_ident (geocentric `xobs=0,0,0,0,0,0`, two-pass) at the marked frames' times (`nothing`: first and last frame), and scores with the same `scoreSubmission` as `/api/check` (`known` = 100 points). Rate limit 10/min.
+
+```ts
+// request
+{ patch: "p11-N", answer: "track", marks: Mark[] /* 2..32 */, frames: { i: number; mjd: number }[] /* 2..16 */ }
+{ patch: "p11-N", answer: "nothing", frames: [...] }
+// response: the /api/check body (section 3, persisted always false) plus
+{ patch: { id, ra, dec },
+  objects?: { ra, dec }[],          // correct answers only: known objects' positions, no names
+  known_objects?: { asteroids: OverlayAsteroid[], stars: [] }, // correct answers only, for the overlay
+  report?: { saved: boolean, positions: { ra, dec }[] },       // `candidate` only: saved as a possible new mover
+  solve_saved: boolean }
+```
+
+`nothing`: `nothing_wrong` when a known object with V <= 18 is inside the picture, else `nothing_correct` with 0 points (unknown movers cannot be ruled out). No name appears in any answer before a correct verdict. One JPL call takes 35 to 110 s (measured), so an answer can take up to about 2.5 min; the JPL timeout is 150 s and the route's limit 180 s. JPL or IRSA failing or timing out is `502 upstream_failed` with `details.service` `"jpl"` or `"irsa"`, never a score. With a database (service role), a correct answer writes `patch_solves` (once per player; a repeat is practice, 0 points) and a `candidate` writes `patch_reports`; without one the answer is the same and the client keeps the solve in localStorage (`onionsky:patches:v1`).
+
+## 15. `GET /api/patches?ra=&dec=&r=`
+
+Picked patches whose centre is within `r` degrees (default 1, at most 5) of the point, solved or with reports only (`solved_at: null`). Never names. `Cache-Control: public, s-maxage=60`. Rate limit 60/min. No database: `{ patches: [], offline: true }`.
+
+```ts
+{ patches: { id, ra, dec, size_deg, corners: [ra, dec][4] /* the 41 px picture: TL, TR, BR, BL */,
+             solved_at: string | null, objects: { ra, dec }[] /* per object per checked frame */,
+             reports: { ra, dec }[] }[],
+  offline?: true }
+```
+
+`loadLocalPatchSolves()` in `web/lib/patchSolves.ts` returns the same patch objects for this device's own solves and reports.

@@ -32,6 +32,11 @@ export interface SubmitBarProps {
   /** Training round: the result sheet has no stage numbers or next-stage link. */
   tutorial?: boolean;
   onResult?(res: CheckResponse): void;
+  /**
+   * Sends the request instead of POST /api/check (a picked patch uses /api/patch-check). With it,
+   * the guest replay and guest find list are skipped: they hold ready spots only.
+   */
+  submitter?(req: CheckRequest): Promise<CheckResponse>;
 }
 
 type State =
@@ -59,7 +64,7 @@ export function errorText(e: unknown): string {
   return e.message || OFFLINE_TEXT;
 }
 
-export default function SubmitBar({ spot, marks, fetcher, tutorial, onResult }: SubmitBarProps) {
+export default function SubmitBar({ spot, marks, fetcher, tutorial, onResult, submitter }: SubmitBarProps) {
   const [state, setState] = useState<State>({ s: "idle" });
   const pending = state.s === "pending";
   const valid = validateMarks(marks) === null;
@@ -68,9 +73,9 @@ export default function SubmitBar({ spot, marks, fetcher, tutorial, onResult }: 
   const send = async (req: CheckRequest) => {
     setState({ s: "pending" });
     try {
-      const res = await submitCheck(req, fetcher ?? fetch);
+      const res = submitter ? await submitter(req) : await submitCheck(req, fetcher ?? fetch);
       if (!res || typeof res !== "object" || !res.verdict) throw new Error("no verdict");
-      if (!res.persisted) {
+      if (!res.persisted && !submitter) {
         // Guest: keep the request so sign-in can replay it (the server re-scores it).
         saveGuestSubmission(req);
         if (FIND_KINDS.includes(res.verdict.kind)) recordFind(spot, res.verdict.kind, res.verdict.points);

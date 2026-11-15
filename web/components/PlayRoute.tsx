@@ -5,11 +5,15 @@
 // exists in PlayScreen but is not written to the URL.
 
 import { useCallback, useMemo } from "react";
+import { patchFromParams } from "@/lib/patch";
 import PlayScreen from "./PlayScreen";
 import { applyView, parseView, type RawParams, type ViewState } from "./viewState";
 
 export default function PlayRoute({ spot, params }: { spot?: string; params: RawParams }) {
   const initialView = useMemo(() => parseView(params), [params]);
+  // ?patch=p11-N, or ?ra=&dec= snapped to its patch (lib/patch.ts). A spot wins.
+  const patch = useMemo(() => (spot ? null : patchFromParams(params)), [spot, params]);
+  const askedPatch = !spot && (params.patch !== undefined || params.ra !== undefined || params.dec !== undefined);
   const onViewChange = useCallback(
     (v: ViewState) => {
       const current = new URLSearchParams(window.location.search);
@@ -22,5 +26,13 @@ export default function PlayRoute({ spot, params }: { spot?: string; params: Raw
     },
     [],
   );
-  return <PlayScreen spot={spot} initialView={initialView} onViewChange={onViewChange} />;
+  return (
+    <PlayScreen
+      spot={spot}
+      patch={patch ?? undefined}
+      badPatch={askedPatch && !patch}
+      initialView={initialView}
+      onViewChange={onViewChange}
+    />
+  );
 }
