@@ -29,11 +29,19 @@ export interface AladinSource<D> {
   ra: number;
   dec: number;
   data: D;
+  /** Screen position, set by Aladin while it draws. */
+  x?: number;
+  y?: number;
 }
 
 export interface AladinCatalog {
   addSources(sources: AladinSource<unknown>[]): void;
+  /** Remove every source. */
+  clear(): void;
 }
+
+/** A shape function with two or more parameters draws straight onto the canvas (Aladin checks `fn.length > 1`). */
+export type AladinShapeFn = (source: AladinSource<unknown>, ctx: CanvasRenderingContext2D, view?: unknown) => void;
 
 export interface AladinShape {
   readonly __shape?: never;
@@ -41,6 +49,8 @@ export interface AladinShape {
 
 export interface AladinOverlay {
   addFootprints(shapes: AladinShape[]): void;
+  /** Remove every footprint. */
+  removeAll(): void;
 }
 
 export interface AladinHiPS {
@@ -58,7 +68,7 @@ export interface AladinStatic {
   ): AladinHiPS;
   catalog(options: {
     name: string;
-    shape: HTMLCanvasElement | string;
+    shape: HTMLCanvasElement | string | AladinShapeFn;
     sourceSize?: number;
     color?: string;
     onClick?: ((source: AladinSource<unknown>) => void) | "showTable" | "showPopup";

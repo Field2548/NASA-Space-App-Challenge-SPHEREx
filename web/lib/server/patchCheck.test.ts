@@ -43,6 +43,8 @@ function fakeStore(o: { solved?: boolean; others?: { user_id: string | null; mar
     saveReport: async (r) => (reports.push(r), true),
     near: async () => [],
     reportsFor: async () => o.others ?? [],
+    tileDensity: async () => [],
+    tilePatches: async () => [],
   };
   return { store, solves, reports };
 }
