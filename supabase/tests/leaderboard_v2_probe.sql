@@ -1,4 +1,4 @@
--- Probes for supabase/migrations/20261117000000_leaderboard_v2.sql (weekly window, local boards,
+-- Probes for supabase/migrations/20261118000000_leaderboard_v2.sql (weekly window, local boards,
 -- per-player stats).
 --
 -- Run as the `postgres` role after the migrations (init, patches, leaderboard_v2):
@@ -337,6 +337,7 @@ begin
   -- A caller token with no user (nothing in the session) changes nothing.
   set local role authenticated;
   perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claims', '', true);
   perform public.set_my_country('JP');
   reset role;
   if exists (select 1 from public.profiles where country = 'JP') then
@@ -455,6 +456,7 @@ begin
   -- A caller with no user (no sub) is a guest: nothing credited, nothing written.
   set local role authenticated;
   perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claims', '', true);
   if public.add_play_time(60) <> 0 then raise exception 'FAIL: a caller with no user was credited'; end if;
   reset role;
 

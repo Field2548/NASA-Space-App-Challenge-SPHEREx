@@ -7,13 +7,13 @@ Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts
 
 **Changes in 1.6** (2026-11-15, play time):
 
-- New `POST /api/playtime` (section 7b) saves a logged-in player's play time; `GET /api/player` gains `seconds_played` and `seconds_week` (section 7a). Database: `play_time`, `add_play_time` and two new `player_stats` columns, in `supabase/migrations/20261117000000_leaderboard_v2.sql`.
+- New `POST /api/playtime` (section 7b) saves a logged-in player's play time; `GET /api/player` gains `seconds_played` and `seconds_week` (section 7a). Database: `play_time`, `add_play_time` and two new `player_stats` columns, in `supabase/migrations/20261118000000_leaderboard_v2.sql`.
 
 **Changes in 1.5** (2026-11-15, leaderboard v2):
 
 - `GET /api/leaderboard` gains `period=all|week`, `region=global|local`, `country=XX` and the response keys `period`, `region`, `country`, `detected_country`, `available`, `reason`, `countries`, and `finds` on rows and `me` (section 7). Old queries answer as before, with the new keys added.
 - New `GET /api/player?name=` (section 7a).
-- Database: `profiles.country`, `set_my_country`, `leaderboard_v2`, `leaderboard_countries`, `player_stats` (`supabase/migrations/20261117000000_leaderboard_v2.sql`). A player's country is saved from the `x-vercel-ip-country` header when a logged-in player's answer is saved or the leaderboard is opened; only the two letters are stored.
+- Database: `profiles.country`, `set_my_country`, `leaderboard_v2`, `leaderboard_countries`, `player_stats` (`supabase/migrations/20261118000000_leaderboard_v2.sql`). A player's country is saved from the `x-vercel-ip-country` header when a logged-in player's answer is saved or the leaderboard is opened; only the two letters are stored.
 
 **Changes in 1.3** (2026-11-15, after a second adversarial review):
 
@@ -295,7 +295,7 @@ Extra query parameters, all optional: `period=all|week` (default `all`; `week` =
 - Local = players whose profile country equals `country`. A logged-in caller's detected country is saved (best effort, after the response, never affecting it) with `set_my_country` and the caller's token, only on `region=local` requests (and after a saved answer, `POST /api/check` / `/api/complete`); global boards write nothing.
 - The country is taken from the host's IP-country header, but a logged-in player can also set their own country through `set_my_country`, so local boards are a convenience, not proof of location.
 - The default board (`period=all&region=global`): when `leaderboard_v2` fails with any database error other than a timeout, the route tries the old `leaderboard` function before the snapshot; a timeout goes straight to the snapshot (the worst case stays one 5 s wait).
-- Migration `20261117000000_leaderboard_v2.sql` adds an index on `finds(created_at)` without `concurrently` (fine at the current table size, the table is small).
+- Migration `20261118000000_leaderboard_v2.sql` adds an index on `finds(created_at)` without `concurrently` (fine at the current table size, the table is small).
 
 ## 7a. `GET /api/player?name=<display name>`
 

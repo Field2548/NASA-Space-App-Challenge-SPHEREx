@@ -1,6 +1,6 @@
 // POST /api/playtime: a logged-in player reports play time (owner: SERVER). Server only.
 // Contract: docs/contracts/api.md section 7b. Database: add_play_time() in
-// supabase/migrations/20261117000000_leaderboard_v2.sql, which caps the credit by the real time since
+// supabase/migrations/20261118000000_leaderboard_v2.sql, which caps the credit by the real time since
 // the player's last report, so this route cannot be used to add more than elapsed time.
 //
 // The call is made with the CALLER's token on the anon client (never the service client), so

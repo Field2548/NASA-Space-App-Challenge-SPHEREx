@@ -1,5 +1,5 @@
 // GET /api/leaderboard: the board logic (owner: SERVER). Server only.
-// Contract: docs/contracts/api.md section 7. Database: supabase/migrations/20261117000000_leaderboard_v2.sql.
+// Contract: docs/contracts/api.md section 7. Database: supabase/migrations/20261118000000_leaderboard_v2.sql.
 //
 // Boards: period (all time or the last 7 days) x region (global or one country). The default board
 // (all time, global) behaves exactly as before: the same spot 404 rule, the same bot unlock rule,

@@ -1,6 +1,6 @@
 // GET /api/player?name=: one player's public numbers (owner: SERVER). Server only.
 // Contract: docs/contracts/api.md section 7a. Database: player_stats() in
-// supabase/migrations/20261117000000_leaderboard_v2.sql, which never returns a user id or an email.
+// supabase/migrations/20261118000000_leaderboard_v2.sql, which never returns a user id or an email.
 //
 // The database knows which spots a player solved, but only player_spots() says so and only the service
 // role may call it (player_stats is callable with the public anon key, so it carries no slugs). This
