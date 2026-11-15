@@ -1,4 +1,4 @@
-// GET /api/leaderboard?scope=spot|all&slug=&period=all|week&region=global|local&country=
+// GET /api/leaderboard?scope=spot|all&slug=&period=all|week&region=global|local&metric=points|movers&country=
 // Contract: docs/contracts/api.md section 7. Thin: rate limit, validation, then
 // lib/server/leaderboard.ts builds the board. Only HTTP handlers are exported from this file.
 
@@ -17,6 +17,8 @@ const Query = z
     slug: z.string().regex(/^[a-z0-9-]{1,40}$/).optional(),
     period: z.preprocess(blank, z.enum(["all", "week"]).default("all")),
     region: z.preprocess(blank, z.enum(["global", "local"]).default("global")),
+    // Missing = points, the original board; the leaderboard page asks for movers explicitly.
+    metric: z.preprocess(blank, z.enum(["points", "movers"]).default("points")),
     country: z.preprocess(blank, z.string().regex(/^[A-Za-z]{2}$/, "Use a two-letter country code.").optional()),
   })
   .refine((q) => q.scope === "all" || q.slug !== undefined, {

@@ -20,19 +20,26 @@ export type Scope = "spot" | "all";
 export type Period = "all" | "week";
 export type Region = "global" | "local";
 export type Reason = "no_database" | "no_country" | "not_installed";
+/** What the board ranks by: points (the original board) or movers found (distinct real movers). */
+export type Metric = "points" | "movers";
 
 export type BoardQuery = {
   scope: Scope;
   slug?: string;
   period: Period;
   region: Region;
+  /** From `?metric=`; missing means points, so every older caller gets the board it always got. */
+  metric?: Metric;
   /** From `?country=`, already validated as two letters, any case. */
   country?: string;
 };
 
-/** A row of the response. `finds` is null for the bot and may be absent (old function, snapshot). */
-export type RankedRow = BoardRow & { finds?: number | null };
-export type RankedMe = BoardMe & { finds?: number | null };
+/**
+ * A row of the response. `finds` is null for the bot and may be absent (old function, snapshot).
+ * `movers` is present only on a movers board (`score` is still the player's points there).
+ */
+export type RankedRow = BoardRow & { finds?: number | null; movers?: number | null };
+export type RankedMe = BoardMe & { finds?: number | null; movers?: number | null };
 
 export type Board = {
   scope: Scope;
@@ -41,6 +48,7 @@ export type Board = {
   updated_at: string;
   period: Period;
   region: Region;
+  metric: Metric;
   country: string | null;
   detected_country: string | null;
   available: boolean;
@@ -115,6 +123,7 @@ type DbRow = {
   score: number | string;
   accuracy: number | string | null;
   finds?: number | string | null;
+  movers?: number | string | null;
   is_me: boolean;
 };
 
@@ -161,6 +170,7 @@ function normalise(rows: DbRow[]) {
       score: Number(r.score),
       accuracy: numOrNull(r.accuracy),
       finds: r.finds === undefined ? undefined : numOrNull(r.finds),
+      movers: r.movers === undefined ? undefined : numOrNull(r.movers),
       is_me: Boolean(r.is_me),
     }))
     .sort((a, b) => a.rank - b.rank);
@@ -178,6 +188,9 @@ function normaliseCountries(rows: unknown[]): { code: string; players: number }[
 // ------------------------------------------------------------------ snapshot (no database)
 
 // A snapshot file carries its own scope, slug and source; the response overrides them as before.
+// On a movers board the saved rows are ranked by their `movers` count. A saved bot row without one
+// gets it from the answer keys (the number of known objects the bot reaches); a saved human row
+// without one cannot be derived and is left out.
 async function snapshotBoard(base: Omit<Board, "rows" | "updated_at" | "source">, showBot: boolean): Promise<Board> {
   if (base.scope === "all") {
     try {
@@ -185,14 +198,40 @@ async function snapshotBoard(base: Omit<Board, "rows" | "updated_at" | "source">
       const file = JSON.parse(raw) as { rows?: RankedRow[]; updated_at?: string };
       if (Array.isArray(file.rows)) {
         const updated = typeof file.updated_at === "string" ? file.updated_at : new Date().toISOString();
-        return { ...base, source: "snapshot", updated_at: updated, rows: file.rows };
+        const rows = base.metric === "movers" ? await moversFromSaved(file.rows) : file.rows;
+        return { ...base, source: "snapshot", updated_at: updated, rows };
       }
     } catch {
       // fall through: build the same thing from the answer keys
     }
   }
   const bot = showBot ? await botScore(base.slug ? [base.slug] : undefined) : null;
-  return { ...base, source: "snapshot", updated_at: new Date().toISOString(), rows: mergeBot([], bot).rows };
+  const rows = base.metric === "movers" ? moversBotRows(bot) : mergeBot([], bot).rows;
+  return { ...base, source: "snapshot", updated_at: new Date().toISOString(), rows };
+}
+
+/** The bot as the only row of a movers board (none when it reaches no known object). */
+function moversBotRows(bot: Awaited<ReturnType<typeof botScore>> | null): RankedRow[] {
+  const row = mergeBot([], bot).rows[0];
+  return row && bot && bot.matched > 0 ? [{ ...row, movers: bot.matched }] : [];
+}
+
+/** Saved rows as a movers board: keep rows that carry `movers` (or the bot, derived), best first. */
+async function moversFromSaved(saved: RankedRow[]): Promise<RankedRow[]> {
+  const out: RankedRow[] = [];
+  for (const r of saved) {
+    if (typeof r.movers === "number") out.push(r);
+    else if (r.is_bot) out.push(...moversBotRows(await botScore()).map((b) => ({ ...r, movers: b.movers })));
+  }
+  return rankByMovers(out);
+}
+
+/** Order by movers, then points; number the rows 1, 2, 3 (a saved copy has no finer tie data). */
+export function rankByMovers<T extends { movers?: number | null; score: number; rank: number }>(rows: T[]): T[] {
+  return rows
+    .filter((r) => (r.movers ?? 0) > 0)
+    .sort((a, b) => (b.movers ?? 0) - (a.movers ?? 0) || b.score - a.score)
+    .map((r, i) => ({ ...r, rank: i + 1 }));
 }
 
 // ------------------------------------------------------------------ the board
@@ -200,6 +239,7 @@ async function snapshotBoard(base: Omit<Board, "rows" | "updated_at" | "source">
 /** Everything the caller needs to know to rank people: the answer for one query. */
 export async function answerBoard(request: Request, q: BoardQuery): Promise<Board> {
   const slug = q.scope === "spot" ? (q.slug as string) : null;
+  const metric: Metric = q.metric === "movers" ? "movers" : "points";
   // A spot that is not ready (not in public/fields/index.json) is unknown. `fixture` is the test-only spot.
   if (slug !== null && slug !== "fixture" && !(await readySlugs()).includes(slug)) {
     throw new ApiFail("not_found", `No spot called "${slug}".`);
@@ -217,6 +257,7 @@ export async function answerBoard(request: Request, q: BoardQuery): Promise<Boar
     slug,
     period: q.period,
     region: q.region,
+    metric,
     country,
     detected_country: detected,
     available: true,
@@ -257,14 +298,17 @@ export async function answerBoard(request: Request, q: BoardQuery): Promise<Boar
   }
 
   const [v2, countriesRes] = await Promise.all([
-    call(sb, "leaderboard_v2", { ...args, p_limit: MAX_ROWS }),
+    call(sb, metric === "movers" ? "leaderboard_movers" : "leaderboard_v2", { ...args, p_limit: MAX_ROWS }),
     countriesCall,
   ]);
 
   if (!v2.ok) {
     // The default board never goes unavailable: any database error except a timeout tries the old
     // `leaderboard` function (a timeout goes straight to the snapshot, so the wait stays one 5 s).
-    if (isDefault) return v2.timedOut ? snapshotBoard(base, showBot) : oldBoard(sb, base, slug, showBot);
+    // The old function knows nothing about movers, so a movers board goes to the snapshot.
+    if (isDefault) {
+      return v2.timedOut || metric === "movers" ? snapshotBoard(base, showBot) : oldBoard(sb, base, slug, showBot);
+    }
     return v2.missing ? unavailable("not_installed") : unavailable("no_database");
   }
 
@@ -287,16 +331,57 @@ export async function answerBoard(request: Request, q: BoardQuery): Promise<Boar
         score: h.score,
         accuracy: h.accuracy,
         finds: h.finds ?? null,
+        ...(metric === "movers" ? { movers: h.movers ?? 0 } : {}),
         is_bot: false,
         is_me: h.is_me,
       })),
       ...(mine
-        ? { me: { rank: mine.rank, name: mine.name, score: mine.score, accuracy: mine.accuracy, finds: mine.finds ?? null } }
+        ? {
+            me: {
+              rank: mine.rank,
+              name: mine.name,
+              score: mine.score,
+              accuracy: mine.accuracy,
+              finds: mine.finds ?? null,
+              ...(metric === "movers" ? { movers: mine.movers ?? 0 } : {}),
+            },
+          }
         : {}),
     };
   }
 
-  return defaultBoard(base, humans, mine, findsByName, showBot, slug);
+  return metric === "movers" ? moversDefaultBoard(base, humans, mine, showBot, slug) : defaultBoard(base, humans, mine, findsByName, showBot, slug);
+}
+
+/**
+ * The all-time global movers board: humans by movers, plus the bot (when allowed and it reaches at
+ * least one known object). A human with the same movers count stays above the bot.
+ */
+async function moversDefaultBoard(
+  base: Omit<Board, "rows" | "updated_at" | "source">,
+  humans: ReturnType<typeof normalise>,
+  mine: ReturnType<typeof normalise>[number] | undefined,
+  showBot: boolean,
+  slug: string | null,
+): Promise<Board> {
+  const bot = showBot ? await botScore(slug ? [slug] : undefined) : null;
+  const useBot = bot && bot.matched > 0 ? bot : null;
+  const byName = new Map(humans.map((h) => [h.name, h]));
+  const merged = mergeBot(
+    humans.map((h) => ({ name: h.name, score: h.movers ?? 0, accuracy: h.accuracy, is_me: h.is_me })),
+    useBot ? { score: useBot.matched, accuracy: useBot.accuracy } : null,
+    mine ? { rank: mine.rank, name: mine.name, score: mine.movers ?? 0, accuracy: mine.accuracy } : undefined,
+  );
+  const rows: RankedRow[] = merged.rows.map((r) => {
+    const h = byName.get(r.name);
+    if (r.is_bot && useBot) return { ...r, score: useBot.score, movers: useBot.matched, finds: null };
+    return { ...r, score: h?.score ?? 0, movers: h?.movers ?? 0, finds: h?.finds ?? null };
+  });
+  const me: RankedMe | undefined =
+    merged.me && mine
+      ? { rank: merged.me.rank, name: mine.name, score: mine.score, accuracy: mine.accuracy, movers: mine.movers ?? 0, finds: mine.finds ?? null }
+      : undefined;
+  return { ...base, source: "db", updated_at: new Date().toISOString(), rows, ...(me ? { me } : {}) };
 }
 
 /** The all-time global board: humans plus (when allowed) the bot, exactly as the route always built it. */

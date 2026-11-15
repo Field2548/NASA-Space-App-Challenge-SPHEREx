@@ -11,16 +11,13 @@ import {
   PlayerError,
   relativeTime,
   splitPodium,
-  stageTabs,
+  DEFAULT_METRIC,
+  parseMetric,
 } from "./leaderboard";
-import type { FieldSummary } from "./types";
 
 vi.mock("./supabase", () => ({ authHeader: async () => ({ Authorization: "Bearer t" }) }));
 
 afterEach(() => vi.unstubAllGlobals());
-
-const spot = (slug: string, difficulty: FieldSummary["difficulty"]) =>
-  ({ slug, title: "Field", ra: 1, dec: 2, fov_deg: 0.1, difficulty, kind: "spot", thumbnail: "t.webp" }) as FieldSummary;
 
 describe("flagEmoji and countryName", () => {
   it("builds regional indicator letters", () => {
@@ -72,29 +69,30 @@ describe("splitPodium", () => {
   });
 });
 
-describe("stageTabs and difficultyRows", () => {
-  it("names stages by number and difficulty in stage order", () => {
-    const tabs = stageTabs([spot("eris", "boss"), spot("eros", "easy"), spot("hektor", "medium")]);
-    expect(tabs).toEqual([
-      { slug: null, label: "All stages" },
-      { slug: "eros", label: "Stage 1 (easy)" },
-      { slug: "hektor", label: "Stage 2 (medium)" },
-      { slug: "eris", label: "Stage 3 (boss)" },
-    ]);
-    expect(stageTabs([])).toEqual([{ slug: null, label: "All stages" }]);
-  });
+describe("difficultyRows", () => {
   it("orders difficulties and drops empty ones", () => {
     const rows = difficultyRows({ boss: { done: 0, total: 1 }, easy: { done: 1, total: 1 }, tool: { done: 3, total: 6 }, hard: { done: 0, total: 0 } });
     expect(rows.map((r) => `${r.key}:${r.done}/${r.total}`)).toEqual(["easy:1/1", "boss:0/1", "tool:3/6"]);
   });
 });
 
+describe("metric", () => {
+  it("opens on movers", () => {
+    expect(DEFAULT_METRIC).toBe("movers");
+  });
+  it("parses the two known values and falls back to the default for anything else", () => {
+    expect(parseMetric("points")).toBe("points");
+    expect(parseMetric("movers")).toBe("movers");
+    for (const bad of ["", "POINTS", "stage", null, undefined, 3, {}]) expect(parseMetric(bad)).toBe("movers");
+  });
+});
+
 describe("boardUrl", () => {
   it("builds global and local queries", () => {
     expect(boardUrl({ period: "all", region: "global" })).toBe("/api/leaderboard?period=all&region=global");
-    expect(boardUrl({ period: "week", region: "global", slug: "eros" })).toBe("/api/leaderboard?period=week&region=global&scope=spot&slug=eros");
+    expect(boardUrl({ period: "week", region: "global", metric: "movers" })).toBe("/api/leaderboard?period=week&region=global&metric=movers");
     expect(boardUrl({ period: "week", region: "local" })).toBe("/api/leaderboard?period=week&region=local");
-    expect(boardUrl({ period: "all", region: "local", country: "TH", slug: "eros" })).toBe("/api/leaderboard?period=all&region=local&country=TH&scope=spot&slug=eros");
+    expect(boardUrl({ period: "all", region: "local", country: "TH", metric: "points" })).toBe("/api/leaderboard?period=all&region=local&country=TH&metric=points");
     // The country only applies to local boards.
     expect(boardUrl({ period: "all", region: "global", country: "TH" })).toBe("/api/leaderboard?period=all&region=global");
   });

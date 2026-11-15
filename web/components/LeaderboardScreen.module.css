@@ -380,3 +380,12 @@
     font-size: 26px;
   }
 }
+
+/* Movers mode: the points line under the big movers number on a podium card. */
+.cardSub {
+  display: block;
+  text-align: right;
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+}

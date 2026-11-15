@@ -1,27 +1,27 @@
 "use client";
-// /leaderboard: a dashboard. Header controls (time range, stage filter) apply to everything below:
-//  1. "Your standing": my rank, points, accuracy and classifications, from the Global or the Local board.
+// /leaderboard: a dashboard. Header controls (ranking metric, time range) apply to everything below.
+// The page opens on "Movers found" (distinct real moving objects a player identified); "Points" is
+// the other metric. Every board covers all stages.
+//  1. "Your standing": my rank and numbers for the chosen metric, from the Global or the Local board.
 //  2. A global board and a local (my country) board, each with a podium for the top 3 and a table.
 //  3. Clicking any player's name opens a stats window (PlayerStatsDialog).
 // Both boards load at once (no waterfall). Each request is tied to the selection that started it, so
-// a late answer for an older selection is never shown. Spots are named by stage number and
-// difficulty only, never by object.
+// a late answer for an older selection is never shown.
 
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { loadFieldIndex } from "@/lib/fields";
 import {
   countryName,
+  DEFAULT_METRIC,
   fetchBoardV2,
   flagEmoji,
   splitPodium,
-  stageTabs,
   type BoardMe,
   type BoardResult,
   type BoardRow,
   type BoardV2,
+  type Metric,
   type Period,
   type Region,
-  type StageTab,
 } from "@/lib/leaderboard";
 import { formatAccuracy } from "@/lib/scoreboard";
 import BackLink from "./BackLink";
@@ -32,6 +32,10 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "all", label: "All time" },
   { value: "week", label: "This week" },
 ];
+const METRICS: { value: Metric; label: string }[] = [
+  { value: "movers", label: "Movers found" },
+  { value: "points", label: "Points" },
+];
 const MEDALS = ["gold", "silver", "bronze"] as const;
 
 /** The latest answer for one board; `key` says which selection asked for it. */
@@ -39,6 +43,7 @@ type View = { key: string; result: { ok: true; data: BoardResult } | { ok: false
 type OpenPlayer = (name: string, button: HTMLElement) => void;
 
 const count = (n: number | null | undefined) => (n === null || n === undefined ? "–" : String(n));
+const moversText = (n: number | null | undefined) => `${n ?? 0} ${n === 1 ? "mover" : "movers"}`;
 
 // ----- pieces ---------------------------------------------------------------------------------
 
@@ -71,7 +76,7 @@ function Tags({ row }: { row: { is_bot?: boolean; is_me?: boolean } }) {
   );
 }
 
-function Podium({ rows, onOpen }: { rows: BoardRow[]; onOpen: OpenPlayer }) {
+function Podium({ rows, onOpen, metric }: { rows: BoardRow[]; onOpen: OpenPlayer; metric: Metric }) {
   return (
     <ol className={styles.podium}>
       {rows.map((r, i) => (
@@ -82,7 +87,18 @@ function Podium({ rows, onOpen }: { rows: BoardRow[]; onOpen: OpenPlayer }) {
             <Tags row={r} />
           </span>
           <span className={styles.cardPoints}>
-            {r.score} <span className={styles.unit}>pts</span>
+            {metric === "movers" ? (
+              <>
+                {moversText(r.movers)}
+                <span className={styles.cardSub}>
+                  {r.score} <span className={styles.unit}>pts</span>
+                </span>
+              </>
+            ) : (
+              <>
+                {r.score} <span className={styles.unit}>pts</span>
+              </>
+            )}
           </span>
         </li>
       ))}
@@ -90,11 +106,12 @@ function Podium({ rows, onOpen }: { rows: BoardRow[]; onOpen: OpenPlayer }) {
   );
 }
 
-function BoardTable({ label, rows, me, meShown, onOpen }: { label: string; rows: BoardRow[]; me: BoardMe | null; meShown: boolean; onOpen: OpenPlayer }) {
+function BoardTable({ label, rows, me, meShown, onOpen, metric }: { label: string; rows: BoardRow[]; me: BoardMe | null; meShown: boolean; onOpen: OpenPlayer; metric: Metric }) {
+  const movers = metric === "movers";
   // I am pinned at the bottom only when I am not among the rows already shown (podium or table).
   const pinned = me && !meShown ? me : null;
   if (rows.length === 0 && !pinned) return null;
-  const line = (r: { rank: number; name: string; score: number; accuracy: number | null; finds?: number | null; is_bot?: boolean; is_me?: boolean }) => (
+  const line = (r: { rank: number; name: string; score: number; accuracy: number | null; finds?: number | null; movers?: number | null; is_bot?: boolean; is_me?: boolean }) => (
     <tr key={`${r.rank}-${r.name}`} data-me={r.is_me ? "true" : "false"}>
       <td className={styles.num}>{r.rank}</td>
       <td className={styles.player}>
@@ -103,9 +120,10 @@ function BoardTable({ label, rows, me, meShown, onOpen }: { label: string; rows:
           <Tags row={r} />
         </span>
       </td>
+      {movers && <td className={styles.num}>{r.movers ?? 0}</td>}
       <td className={styles.num}>{r.score}</td>
       <td className={`${styles.num} ${styles.hideNarrow}`}>{formatAccuracy(r.accuracy)}</td>
-      <td className={`${styles.num} ${styles.hideNarrow}`}>{count(r.finds)}</td>
+      {!movers && <td className={`${styles.num} ${styles.hideNarrow}`}>{count(r.finds)}</td>}
     </tr>
   );
   return (
@@ -115,13 +133,16 @@ function BoardTable({ label, rows, me, meShown, onOpen }: { label: string; rows:
           <tr>
             <th scope="col">Rank</th>
             <th scope="col">Player</th>
+            {movers && <th scope="col">Movers</th>}
             <th scope="col">Points</th>
             <th scope="col" className={styles.hideNarrow}>
               Accuracy
             </th>
-            <th scope="col" className={styles.hideNarrow}>
-              Classifications
-            </th>
+            {!movers && (
+              <th scope="col" className={styles.hideNarrow}>
+                Classifications
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -141,28 +162,33 @@ function BoardTable({ label, rows, me, meShown, onOpen }: { label: string; rows:
 }
 
 /** Podium + table for one available board, or an honest empty line. */
-function BoardRows({ label, board, onOpen, period }: { label: string; board: BoardV2; onOpen: OpenPlayer; period: Period }) {
+function BoardRows({ label, board, onOpen, period, metric }: { label: string; board: BoardV2; onOpen: OpenPlayer; period: Period; metric: Metric }) {
   const { podium, rest } = splitPodium(board.rows);
-  if (board.rows.length === 0 && !board.me) return <p className={styles.note}>{period === "week" ? "No scores this week yet." : "No scores yet."}</p>;
+  if (board.rows.length === 0 && !board.me) {
+    const what = metric === "movers" ? "movers found" : "scores";
+    return <p className={styles.note}>{period === "week" ? `No ${what} this week yet.` : `No ${what} yet.`}</p>;
+  }
   return (
     <>
-      {podium.length > 0 && <Podium rows={podium} onOpen={onOpen} />}
-      <BoardTable label={label} rows={rest} me={board.me} meShown={board.rows.some((r) => r.is_me)} onOpen={onOpen} />
+      {podium.length > 0 && <Podium rows={podium} onOpen={onOpen} metric={metric} />}
+      <BoardTable label={label} rows={rest} me={board.me} meShown={board.rows.some((r) => r.is_me)} onOpen={onOpen} metric={metric} />
     </>
   );
 }
 
-function unavailableText(reason: BoardV2["reason"]): string {
-  if (reason === "not_installed") return "Weekly and local boards are being set up. All-time global scores are shown.";
+function unavailableText(reason: BoardV2["reason"], metric: Metric): string {
+  if (reason === "not_installed") {
+    return metric === "movers" ? "The movers ranking is being set up. Switch to Points to see scores." : "Weekly and local boards are being set up. All-time global scores are shown.";
+  }
   return "Live scores are unavailable right now.";
 }
 
 // ----- the page -------------------------------------------------------------------------------
 
-export default function LeaderboardScreen() {
-  const [tabs, setTabs] = useState<StageTab[]>(() => stageTabs([]));
+/** `initialMetric` is for tests; the page always opens on DEFAULT_METRIC (movers). */
+export default function LeaderboardScreen({ initialMetric = DEFAULT_METRIC }: { initialMetric?: Metric } = {}) {
+  const [metric, setMetric] = useState<Metric>(initialMetric);
   const [period, setPeriod] = useState<Period>("all");
-  const [slug, setSlug] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null); // chosen by me; null = detected
   const [mine, setMine] = useState<Region>("global");
   const [globalView, setGlobalView] = useState<View | null>(null);
@@ -171,34 +197,24 @@ export default function LeaderboardScreen() {
   const [picker, setPicker] = useState<{ countries: { code: string; players: number }[]; detected: string | null; shown: string | null }>({ countries: [], detected: null, shown: null });
   const [openName, setOpenName] = useState<string | null>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const ids = { standing: useId(), global: useId(), local: useId(), country: useId(), stage: useId() };
+  const ids = { standing: useId(), global: useId(), local: useId(), country: useId() };
 
-  useEffect(() => {
-    let live = true;
-    loadFieldIndex()
-      .then((index) => live && setTabs(stageTabs(index)))
-      .catch(() => undefined); // "All stages" still works
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  const globalKey = `${period}|${slug ?? ""}`;
+  const globalKey = `${metric}|${period}`;
   const localKey = `${globalKey}|${country ?? ""}`;
 
   useEffect(() => {
     let live = true;
-    fetchBoardV2({ period, region: "global", slug })
+    fetchBoardV2({ metric, period, region: "global" })
       .then((data) => live && setGlobalView({ key: globalKey, result: { ok: true, data } }))
       .catch(() => live && setGlobalView({ key: globalKey, result: { ok: false } }));
     return () => {
       live = false;
     };
-  }, [period, slug, globalKey]);
+  }, [metric, period, globalKey]);
 
   useEffect(() => {
     let live = true;
-    fetchBoardV2({ period, region: "local", slug, country })
+    fetchBoardV2({ metric, period, region: "local", country })
       .then((data) => {
         if (!live) return;
         setLocalView({ key: localKey, result: { ok: true, data } });
@@ -208,7 +224,7 @@ export default function LeaderboardScreen() {
     return () => {
       live = false;
     };
-  }, [period, slug, country, localKey]);
+  }, [metric, period, country, localKey]);
 
   const globalNow = globalView?.key === globalKey ? globalView.result : null;
   const localNow = localView?.key === localKey ? localView.result : null;
@@ -225,7 +241,7 @@ export default function LeaderboardScreen() {
   };
 
   const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? "";
-  const stageLabel = tabs.find((t) => t.slug === slug)?.label ?? "All stages";
+  const metricLabel = METRICS.find((m) => m.value === metric)?.label ?? "";
 
   const localCountry = country ?? (localNow?.ok ? localNow.data.board.country : null) ?? picker.shown;
   const pickerValue = country ?? picker.shown ?? picker.detected ?? "";
@@ -273,6 +289,12 @@ export default function LeaderboardScreen() {
             <dt>Rank</dt>
             <dd className={styles.rankBig}>#{me.rank}</dd>
           </div>
+          {metric === "movers" && (
+            <div className={styles.kpi}>
+              <dt>Movers found</dt>
+              <dd>{me.movers ?? 0}</dd>
+            </div>
+          )}
           <div className={styles.kpi}>
             <dt>Points</dt>
             <dd>{me.score}</dd>
@@ -281,20 +303,23 @@ export default function LeaderboardScreen() {
             <dt>Accuracy</dt>
             <dd>{formatAccuracy(me.accuracy)}</dd>
           </div>
-          <div className={styles.kpi}>
-            <dt>Classifications</dt>
-            <dd>{count(me.finds)}</dd>
-          </div>
+          {metric === "points" && (
+            <div className={styles.kpi}>
+              <dt>Classifications</dt>
+              <dd>{count(me.finds)}</dd>
+            </div>
+          )}
         </dl>
       );
     } else if (board.source === "snapshot") {
       standing = <p className={styles.note}>Your rank is not in the saved copy. It will show when live scores are back.</p>;
     } else {
-      standing = <p className={styles.msg}>{period === "week" ? "You have no points this week yet." : "You have no points yet."} Classify a field to get on the board.</p>;
+      const what = metric === "movers" ? "movers found" : "points";
+      standing = <p className={styles.msg}>{period === "week" ? `You have no ${what} this week yet.` : `You have no ${what} yet.`} Classify a field to get on the board.</p>;
     }
   }
   const guest = standingView?.ok === true && !standingView.data.signedIn;
-  const standingCaption = `${mine === "global" ? "Global" : localCountry ? `Local, ${countryName(localCountry)}` : "Local"} · ${periodLabel} · ${stageLabel}`;
+  const standingCaption = `${mine === "global" ? "Global" : localCountry ? `Local, ${countryName(localCountry)}` : "Local"} · ${periodLabel} · ${metricLabel}`;
 
   // ----- boards
   let globalBody: ReactNode;
@@ -305,7 +330,7 @@ export default function LeaderboardScreen() {
     globalBody = (
       <>
         {board.source === "snapshot" && <p className={styles.note}>Showing a saved copy; live scores are unavailable.</p>}
-        {board.available ? <BoardRows label="Global ranking" board={board} onOpen={openPlayer} period={period} /> : <p className={styles.note}>{unavailableText(board.reason)}</p>}
+        {board.available ? <BoardRows label="Global ranking" board={board} onOpen={openPlayer} period={period} metric={metric} /> : <p className={styles.note}>{unavailableText(board.reason, metric)}</p>}
       </>
     );
   }
@@ -320,7 +345,7 @@ export default function LeaderboardScreen() {
       localBody = (
         <>
           {board.source === "snapshot" && <p className={styles.note}>Showing a saved copy; live scores are unavailable.</p>}
-          <BoardRows label="Local ranking" board={board} onOpen={openPlayer} period={period} />
+          <BoardRows label="Local ranking" board={board} onOpen={openPlayer} period={period} metric={metric} />
         </>
       );
     } else if (board.reason === "no_country") {
@@ -331,7 +356,7 @@ export default function LeaderboardScreen() {
         </p>
       );
     } else {
-      localBody = <p className={styles.note}>{unavailableText(board.reason)}</p>;
+      localBody = <p className={styles.note}>{unavailableText(board.reason, metric)}</p>;
     }
   }
   const showPicker = picker.countries.length > 0 || country !== null;
@@ -343,17 +368,8 @@ export default function LeaderboardScreen() {
         <h1 className={styles.h1}>Leaderboard</h1>
       </header>
       <div className={styles.controls}>
+        <Segmented label="Rank by" value={metric} options={METRICS} onChange={setMetric} />
         <Segmented label="Time range" value={period} options={PERIODS} onChange={setPeriod} />
-        <div className={styles.field}>
-          <label htmlFor={ids.stage}>Stage</label>
-          <select id={ids.stage} value={slug ?? ""} onChange={(e) => setSlug(e.target.value || null)}>
-            {tabs.map((t) => (
-              <option key={t.slug ?? "all"} value={t.slug ?? ""}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       <section className={styles.standing} aria-labelledby={ids.standing}>
@@ -385,7 +401,7 @@ export default function LeaderboardScreen() {
             Global
           </h2>
           <p className={styles.caption}>
-            {periodLabel} · {stageLabel}
+            {periodLabel} · {metricLabel}
           </p>
           {globalBody}
         </section>
@@ -401,7 +417,7 @@ export default function LeaderboardScreen() {
             )}
           </h2>
           <p className={styles.caption}>
-            {periodLabel} · {stageLabel}
+            {periodLabel} · {metricLabel}
           </p>
           {pickFirst && localBody}
           {showPicker && countrySelect}

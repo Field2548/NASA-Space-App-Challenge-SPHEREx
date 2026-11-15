@@ -32,7 +32,7 @@ vi.mock("@/lib/server/db", async (original) => ({
 
 import { GET } from "@/app/api/leaderboard/route";
 import { BOT_NAME } from "@/lib/server/bot";
-import { rememberCountry } from "@/lib/server/leaderboard";
+import { rankByMovers, rememberCountry } from "@/lib/server/leaderboard";
 import { resetRateLimit } from "@/lib/server/rateLimit";
 import { encodeUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
 
@@ -43,6 +43,8 @@ const row = (rank: number, name: string, score: number, finds: number | null, is
   ({ rank, display_name: name, score, accuracy, ...(finds === null ? {} : { finds }), is_me });
 
 const V2 = [row(1, "nova", 1850, 14), row(2, "kt", 350, 6, true)];
+const mrow = (rank: number, name: string, movers: number, score: number, is_me = false) => ({ ...row(rank, name, score, 9, is_me), movers });
+const MOVERS = [mrow(1, "nova", 5, 900), mrow(2, "kt", 2, 350, true)];
 const COUNTRIES = [
   { code: "US", players: 2 },
   { code: "TH", players: 4 },
@@ -56,6 +58,7 @@ beforeEach(() => {
     leaderboard_v2: ok(V2),
     leaderboard_countries: ok(COUNTRIES),
     leaderboard: ok([row(1, "nova", 1850, null), row(2, "kt", 350, null, true)]),
+    leaderboard_movers: ok(MOVERS),
     set_my_country: ok(null),
   };
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -357,5 +360,102 @@ describe("what a response may contain", () => {
       expect(text, q).not.toMatch(/user_id|@|email/i);
       expect(res.headers.get("cache-control"), q).toContain("no-store");
     }
+  });
+});
+
+describe("metric=movers", () => {
+  const bots = (b: { rows: { is_bot: boolean }[] }) => b.rows.filter((r) => r.is_bot);
+
+  it("defaults to the points board, and rejects an unknown metric", async () => {
+    await GET(get("/api/leaderboard"));
+    expect(rpcNames()).toContain("leaderboard_v2");
+    expect(rpcNames()).not.toContain("leaderboard_movers");
+    for (const q of ["metric=stage", "metric=POINTS", "metric=1"]) expect((await GET(get(`/api/leaderboard?${q}`))).status, q).toBe(400);
+    // An empty value counts as missing, like the other parameters.
+    expect((await GET(get("/api/leaderboard?metric="))).status).toBe(200);
+  });
+
+  it("explicit points is the same as no metric", async () => {
+    const body = await (await GET(get("/api/leaderboard?metric=points"))).json();
+    expect(body).toMatchObject({ metric: "points" });
+    expect(rpcNames()).toContain("leaderboard_v2");
+  });
+
+  it("calls leaderboard_movers and returns movers and points on every row", async () => {
+    const body = await (await GET(get("/api/leaderboard?metric=movers&period=week"))).json();
+    expect(state.calls[0]).toMatchObject({ name: "leaderboard_movers", args: { p_slug: null, p_country: null, p_limit: 50 } });
+    expect(Math.abs(Date.now() - Date.parse(state.calls[0].args.p_since as string) - 7 * 86_400_000)).toBeLessThan(5000);
+    expect(body).toMatchObject({ metric: "movers", period: "week", available: true, source: "db" });
+    expect(body.rows).toEqual([
+      { rank: 1, name: "nova", score: 900, accuracy: 0.5, finds: 9, movers: 5, is_bot: false, is_me: false },
+      { rank: 2, name: "kt", score: 350, accuracy: 0.5, finds: 9, movers: 2, is_bot: false, is_me: true },
+    ]);
+    expect(body.me).toMatchObject({ rank: 2, name: "kt", movers: 2, score: 350 });
+  });
+
+  it("puts the bot by its movers on the all-time global board; a human with the same count stays above it", async () => {
+    const body = await (await GET(get("/api/leaderboard?metric=movers"))).json();
+    // The bot reaches 3 known objects (see the saved snapshot): between 5 and 2 movers.
+    expect(body.rows.map((r: { name: string }) => r.name)).toEqual(["nova", BOT_NAME, "kt"]);
+    expect(bots(body)[0]).toMatchObject({ movers: 3, score: 1750, finds: null });
+    expect(body.rows.map((r: { rank: number }) => r.rank)).toEqual([1, 2, 3]);
+    expect(body.me).toMatchObject({ name: "kt", rank: 3, movers: 2, score: 350 });
+    state.replies.leaderboard_movers = ok([mrow(1, "nova", 5, 900), mrow(2, "kt", 3, 350, true)]);
+    const tie = await (await GET(get("/api/leaderboard?metric=movers"))).json();
+    expect(tie.rows.map((r: { name: string }) => r.name)).toEqual(["nova", "kt", BOT_NAME]);
+  });
+
+  it("has no bot row on weekly and local boards", async () => {
+    for (const q of ["period=week", "region=local&country=TH"]) {
+      expect(bots(await (await GET(get(`/api/leaderboard?metric=movers&${q}`))).json()), q).toHaveLength(0);
+    }
+  });
+
+  it("still takes a stage (scope=spot&slug=) and passes it on", async () => {
+    await GET(get("/api/leaderboard?metric=movers&scope=spot&slug=eris", { cookie: `${UNLOCK_COOKIE}=${encodeUnlocked(["eris"])}` }));
+    expect(state.calls[0]).toMatchObject({ name: "leaderboard_movers", args: { p_slug: "eris" } });
+  });
+
+  it("serves the saved snapshot with the bot's movers when the function is not installed (never the points function)", async () => {
+    delete state.replies.leaderboard_movers;
+    const body = await (await GET(get("/api/leaderboard?metric=movers"))).json();
+    expect(body).toMatchObject({ metric: "movers", source: "snapshot", available: true });
+    expect(body.rows).toHaveLength(1);
+    expect(body.rows[0]).toMatchObject({ name: BOT_NAME, is_bot: true, movers: 3 });
+    expect(rpcNames()).not.toContain("leaderboard");
+  });
+
+  it("answers not_installed on weekly and local boards when the function is missing", async () => {
+    delete state.replies.leaderboard_movers;
+    const body = await (await GET(get("/api/leaderboard?metric=movers&period=week"))).json();
+    expect(body).toMatchObject({ available: false, reason: "not_installed", rows: [] });
+  });
+
+  describe("without a database", () => {
+    beforeEach(() => {
+      state.configured = false;
+    });
+
+    it("derives the all-time global board from the snapshot", async () => {
+      const body = await (await GET(get("/api/leaderboard?metric=movers"))).json();
+      expect(body).toMatchObject({ metric: "movers", source: "snapshot", available: true });
+      expect(body.rows[0]).toMatchObject({ is_bot: true, movers: 3, rank: 1 });
+    });
+
+    it("answers no_database for weekly and local boards", async () => {
+      const body = await (await GET(get("/api/leaderboard?metric=movers&period=week"))).json();
+      expect(body).toMatchObject({ available: false, reason: "no_database", rows: [] });
+    });
+  });
+});
+
+describe("rankByMovers (a saved copy)", () => {
+  const r = (name: string, movers: number | null | undefined, score: number) => ({ name, movers, score, rank: 99 });
+  it("orders by movers, then points, drops rows with no movers and renumbers", () => {
+    const out = rankByMovers([r("a", 2, 50), r("b", 5, 10), r("c", 2, 80), r("d", 0, 999), r("e", undefined, 5)]);
+    expect(out.map((x) => `${x.rank}:${x.name}`)).toEqual(["1:b", "2:c", "3:a"]);
+  });
+  it("is empty for no rows", () => {
+    expect(rankByMovers([])).toEqual([]);
   });
 });
