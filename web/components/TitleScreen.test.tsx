@@ -56,6 +56,17 @@ describe("TitleScreen", () => {
     expect(sky.querySelectorAll("text").length).toBeGreaterThan(100);
   });
 
+  it("twinkles the bright stars as HTML glyphs, never as SVG text, so a twinkle never repaints the sky", () => {
+    render(<TitleScreen />);
+    const bright = screen.getAllByTestId("bright-star");
+    expect(bright.length).toBeGreaterThan(30);
+    for (const s of bright) {
+      expect(s.tagName).toBe("SPAN");
+      expect(s.closest("svg")).toBeNull();
+      expect(s.textContent).toBe("*");
+    }
+  });
+
   it("keeps ASCII shooting stars behind the menu", () => {
     render(<TitleScreen />);
     const shooting = screen.getAllByTestId("shooting-star");
