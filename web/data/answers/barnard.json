@@ -1,0 +1,704 @@
+{
+ "slug": "barnard",
+ "nothing_moves": false,
+ "noise_bar_sigma": null,
+ "t_ref_mjd": 61096.227478,
+ "objects": [
+  {
+   "id": "barnard",
+   "name": "Barnard's Star (GJ 699)",
+   "kind": "star",
+   "role": "mover",
+   "source": "SIMBAD NAME Barnard's star + proper motion + parallax",
+   "positions": [
+    {
+     "frame": 1,
+     "x": 59.11,
+     "y": 59.82,
+     "in_grid": true,
+     "snr": 25214.9,
+     "change_snr": 48517.0,
+     "measured_x": 58.94,
+     "measured_y": 59.75,
+     "offset_px": 0.18
+    },
+    {
+     "frame": 2,
+     "x": 59.11,
+     "y": 59.79,
+     "in_grid": true,
+     "snr": 27301.5,
+     "change_snr": 69234.8,
+     "measured_x": 58.81,
+     "measured_y": 59.84,
+     "offset_px": 0.31
+    },
+    {
+     "frame": 3,
+     "x": 59.01,
+     "y": 58.92,
+     "in_grid": true,
+     "snr": 19014.3,
+     "change_snr": 37850.4,
+     "measured_x": 59.19,
+     "measured_y": 59.01,
+     "offset_px": 0.19
+    },
+    {
+     "frame": 4,
+     "x": 59.23,
+     "y": 58.15,
+     "in_grid": true,
+     "snr": 32650.8,
+     "change_snr": 79466.7,
+     "measured_x": 59.21,
+     "measured_y": 58.16,
+     "offset_px": 0.02
+    },
+    {
+     "frame": 5,
+     "x": 59.24,
+     "y": 58.12,
+     "in_grid": true,
+     "snr": 16209.0,
+     "change_snr": 41764.9,
+     "measured_x": 59.29,
+     "measured_y": 58.14,
+     "offset_px": 0.05
+    }
+   ],
+   "vx_px_per_day": 0.00033,
+   "vy_px_per_day": -0.00462,
+   "total_motion_px": 1.7,
+   "brightness": [
+    {
+     "frame": 1,
+     "n_exposures": 8,
+     "n_detected": 8,
+     "flux_ratio_vs_earlier_frame": {},
+     "exposures": [
+      {
+       "file": "2025W34_2B_0030_1_D6.fits",
+       "wavelength_um": 4.5804,
+       "flux_mjy": 3794.838,
+       "err_mjy": 2.35,
+       "flags_within_3px": {
+        "OVERFLOW": 0,
+        "NONLINEAR": 0,
+        "BLOOM": 10,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_1_D3.fits",
+       "wavelength_um": 1.8302,
+       "flux_mjy": 6413.701,
+       "err_mjy": 9.473,
+       "flags_within_3px": {
+        "OVERFLOW": 6,
+        "NONLINEAR": 0,
+        "BLOOM": 27,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_2_D6.fits",
+       "wavelength_um": 4.6137,
+       "flux_mjy": 3728.934,
+       "err_mjy": 1.893,
+       "flags_within_3px": {
+        "OVERFLOW": 2,
+        "NONLINEAR": 0,
+        "BLOOM": 13,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_2_D3.fits",
+       "wavelength_um": 1.8728,
+       "flux_mjy": 8258.346,
+       "err_mjy": 5.351,
+       "flags_within_3px": {
+        "OVERFLOW": 6,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_3_D3.fits",
+       "wavelength_um": 1.9167,
+       "flux_mjy": 1526.899,
+       "err_mjy": 4.142,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 26,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_3_D6.fits",
+       "wavelength_um": 4.6474,
+       "flux_mjy": 3657.693,
+       "err_mjy": 1.874,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 10,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_4_D3.fits",
+       "wavelength_um": 1.9607,
+       "flux_mjy": 2142.147,
+       "err_mjy": 6.208,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W34_2B_0030_4_D6.fits",
+       "wavelength_um": 4.6812,
+       "flux_mjy": 3905.019,
+       "err_mjy": 3.282,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 12,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      }
+     ]
+    },
+    {
+     "frame": 2,
+     "n_exposures": 8,
+     "n_detected": 8,
+     "flux_ratio_vs_earlier_frame": {},
+     "exposures": [
+      {
+       "file": "2025W35_2A_0221_1_D5.fits",
+       "wavelength_um": 4.131,
+       "flux_mjy": 4624.027,
+       "err_mjy": 2.818,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 18,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_1_D2.fits",
+       "wavelength_um": 1.3605,
+       "flux_mjy": 3055.092,
+       "err_mjy": 2.667,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 23,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_2_D5.fits",
+       "wavelength_um": 4.1668,
+       "flux_mjy": 4972.589,
+       "err_mjy": 2.842,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 18,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_2_D2.fits",
+       "wavelength_um": 1.3927,
+       "flux_mjy": 5159.285,
+       "err_mjy": 3.684,
+       "flags_within_3px": {
+        "OVERFLOW": 5,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_3_D2.fits",
+       "wavelength_um": 1.4264,
+       "flux_mjy": 5577.704,
+       "err_mjy": 4.533,
+       "flags_within_3px": {
+        "OVERFLOW": 5,
+        "NONLINEAR": 0,
+        "BLOOM": 27,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_3_D5.fits",
+       "wavelength_um": 4.2028,
+       "flux_mjy": 4677.803,
+       "err_mjy": 2.604,
+       "flags_within_3px": {
+        "OVERFLOW": 1,
+        "NONLINEAR": 0,
+        "BLOOM": 18,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_4_D2.fits",
+       "wavelength_um": 1.4606,
+       "flux_mjy": 5289.42,
+       "err_mjy": 4.327,
+       "flags_within_3px": {
+        "OVERFLOW": 5,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2025W35_2A_0221_4_D5.fits",
+       "wavelength_um": 4.239,
+       "flux_mjy": 4530.39,
+       "err_mjy": 2.625,
+       "flags_within_3px": {
+        "OVERFLOW": 1,
+        "NONLINEAR": 0,
+        "BLOOM": 17,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      }
+     ]
+    },
+    {
+     "frame": 3,
+     "n_exposures": 8,
+     "n_detected": 8,
+     "flux_ratio_vs_earlier_frame": {},
+     "exposures": [
+      {
+       "file": "2026W11_1A_0511_1_D4.fits",
+       "wavelength_um": 2.6366,
+       "flux_mjy": 5881.859,
+       "err_mjy": 11.355,
+       "flags_within_3px": {
+        "OVERFLOW": 7,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_1_D1.fits",
+       "wavelength_um": 0.8042,
+       "flux_mjy": 3942.236,
+       "err_mjy": 2.131,
+       "flags_within_3px": {
+        "OVERFLOW": 2,
+        "NONLINEAR": 0,
+        "BLOOM": 27,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_2_D4.fits",
+       "wavelength_um": 2.7084,
+       "flux_mjy": 5223.048,
+       "err_mjy": 9.921,
+       "flags_within_3px": {
+        "OVERFLOW": 6,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_2_D1.fits",
+       "wavelength_um": 0.8232,
+       "flux_mjy": 2456.858,
+       "err_mjy": 3.568,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_3_D4.fits",
+       "wavelength_um": 2.7815,
+       "flux_mjy": 4478.95,
+       "err_mjy": 10.102,
+       "flags_within_3px": {
+        "OVERFLOW": 6,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_3_D1.fits",
+       "wavelength_um": 0.8429,
+       "flux_mjy": 3042.99,
+       "err_mjy": 3.425,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_4_D1.fits",
+       "wavelength_um": 0.8627,
+       "flux_mjy": 3795.486,
+       "err_mjy": 3.16,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 32,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W11_1A_0511_4_D4.fits",
+       "wavelength_um": 2.8575,
+       "flux_mjy": 4424.885,
+       "err_mjy": 10.881,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      }
+     ]
+    },
+    {
+     "frame": 4,
+     "n_exposures": 8,
+     "n_detected": 8,
+     "flux_ratio_vs_earlier_frame": {
+      "1": {
+       "n_pairs": 18,
+       "flux_ratio": 1.091,
+       "scatter": 0.061
+      }
+     },
+     "exposures": [
+      {
+       "file": "2026W34_1A_0007_1_D6.fits",
+       "wavelength_um": 4.4655,
+       "flux_mjy": 4305.557,
+       "err_mjy": 2.473,
+       "flags_within_3px": {
+        "OVERFLOW": 5,
+        "NONLINEAR": 0,
+        "BLOOM": 11,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_1_D3.fits",
+       "wavelength_um": 1.6882,
+       "flux_mjy": 11607.719,
+       "err_mjy": 7.981,
+       "flags_within_3px": {
+        "OVERFLOW": 8,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 1,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_2_D6.fits",
+       "wavelength_um": 4.4977,
+       "flux_mjy": 4083.228,
+       "err_mjy": 2.536,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 14,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_2_D3.fits",
+       "wavelength_um": 1.7274,
+       "flux_mjy": 8452.592,
+       "err_mjy": 7.031,
+       "flags_within_3px": {
+        "OVERFLOW": 6,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_3_D3.fits",
+       "wavelength_um": 1.7671,
+       "flux_mjy": 9708.286,
+       "err_mjy": 7.565,
+       "flags_within_3px": {
+        "OVERFLOW": 7,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_3_D6.fits",
+       "wavelength_um": 4.5303,
+       "flux_mjy": 4063.683,
+       "err_mjy": 2.087,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 12,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_4_D6.fits",
+       "wavelength_um": 4.5633,
+       "flux_mjy": 3993.485,
+       "err_mjy": 2.2,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 11,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W34_1A_0007_4_D3.fits",
+       "wavelength_um": 1.8086,
+       "flux_mjy": 7606.475,
+       "err_mjy": 7.272,
+       "flags_within_3px": {
+        "OVERFLOW": 5,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      }
+     ]
+    },
+    {
+     "frame": 5,
+     "n_exposures": 8,
+     "n_detected": 8,
+     "flux_ratio_vs_earlier_frame": {
+      "3": {
+       "n_pairs": 11,
+       "flux_ratio": 1.328,
+       "scatter": 0.22
+      }
+     },
+     "exposures": [
+      {
+       "file": "2026W35_1A_0079_1_D4.fits",
+       "wavelength_um": 2.818,
+       "flux_mjy": 5994.731,
+       "err_mjy": 7.458,
+       "flags_within_3px": {
+        "OVERFLOW": 7,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_1_D1.fits",
+       "wavelength_um": 0.8524,
+       "flux_mjy": 5039.605,
+       "err_mjy": 3.319,
+       "flags_within_3px": {
+        "OVERFLOW": 2,
+        "NONLINEAR": 0,
+        "BLOOM": 27,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_2_D1.fits",
+       "wavelength_um": 0.8727,
+       "flux_mjy": 4492.239,
+       "err_mjy": 1.851,
+       "flags_within_3px": {
+        "OVERFLOW": 2,
+        "NONLINEAR": 0,
+        "BLOOM": 25,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_2_D4.fits",
+       "wavelength_um": 2.8952,
+       "flux_mjy": 5422.688,
+       "err_mjy": 10.25,
+       "flags_within_3px": {
+        "OVERFLOW": 6,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_3_D4.fits",
+       "wavelength_um": 2.974,
+       "flux_mjy": 3986.093,
+       "err_mjy": 9.192,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_3_D1.fits",
+       "wavelength_um": 0.8934,
+       "flux_mjy": 3901.348,
+       "err_mjy": 5.036,
+       "flags_within_3px": {
+        "OVERFLOW": 3,
+        "NONLINEAR": 0,
+        "BLOOM": 29,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_4_D1.fits",
+       "wavelength_um": 0.9145,
+       "flux_mjy": 7211.359,
+       "err_mjy": 3.998,
+       "flags_within_3px": {
+        "OVERFLOW": 5,
+        "NONLINEAR": 0,
+        "BLOOM": 28,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      },
+      {
+       "file": "2026W35_1A_0079_4_D4.fits",
+       "wavelength_um": 3.056,
+       "flux_mjy": 3617.642,
+       "err_mjy": 9.426,
+       "flags_within_3px": {
+        "OVERFLOW": 4,
+        "NONLINEAR": 0,
+        "BLOOM": 30,
+        "PERSIST": 0,
+        "HALO": 0,
+        "GHOST": 0
+       }
+      }
+     ]
+    }
+   ],
+   "saturation": {
+    "exposures_checked": 40,
+    "exposures_with_overflow_or_nonlinear_flag_within_3px": 39,
+    "exposures_with_any_listed_flag_within_3px": 40,
+    "max_peak_mjy_sr": 2664.2
+   }
+  }
+ ],
+ "bot": {
+  "source": "shift_stack.py",
+  "candidates": []
+ },
+ "reveal": {
+  "title": "Test your tool on Barnard's Star",
+  "kind": "star",
+  "difficulty": "tool"
+ }
+}

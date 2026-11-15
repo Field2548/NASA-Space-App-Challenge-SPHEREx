@@ -66,7 +66,7 @@ const FIRST_TILES = 12;
 /** Hide the loading bar after this long even if tiles are still coming. */
 const TILE_WAIT_MS = 12000;
 
-const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard", "expert", "boss", "control"];
+const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard", "expert", "boss", "tool", "control"];
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;

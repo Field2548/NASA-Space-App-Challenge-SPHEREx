@@ -193,7 +193,7 @@ export default function StagesScreen() {
   );
 }
 
-const PIPS: Record<FieldSummary["difficulty"], number> = { easy: 1, medium: 2, hard: 3, expert: 4, boss: 4, control: 0 };
+const PIPS: Record<FieldSummary["difficulty"], number> = { easy: 1, medium: 2, hard: 3, expert: 4, boss: 4, tool: 2, control: 0 };
 const BURST_BITS = Array.from({ length: 10 }, (_, i) => i);
 
 type CardProps = {

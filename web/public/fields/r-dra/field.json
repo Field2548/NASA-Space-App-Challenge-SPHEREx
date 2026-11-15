@@ -1,0 +1,128 @@
+{
+ "slug": "r-dra",
+ "title": "Test your tool on R Draconis",
+ "kind": "spot",
+ "difficulty": "tool",
+ "ra": 248.1672,
+ "dec": 66.755,
+ "fov_deg": 0.1,
+ "pixel_arcsec": 6.15,
+ "size": [
+  59,
+  59
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   248.1672,
+   66.755
+  ],
+  "crpix": [
+   30.0,
+   30.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60811.958068,
+   "utc": "2025-05-16T22:59:37",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60873.446013,
+   "utc": "2025-07-17T10:42:15",
+   "hours_since_prev": 1475.71,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 60965.616759,
+   "utc": "2025-10-17T14:48:08",
+   "hours_since_prev": 2212.1,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61039.154302,
+   "utc": "2025-12-30T03:42:11",
+   "hours_since_prev": 1764.9,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61152.333295,
+   "utc": "2026-04-22T07:59:56",
+   "hours_since_prev": 2716.3,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 6,
+   "mjd": 61234.071128,
+   "utc": "2026-07-13T01:42:25",
+   "hours_since_prev": 1961.71,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.1226,
+  "offset": -1.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp",
+  "thumbs/6.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 3887.891
+ },
+ "psf_fwhm_px": 1.663,
+ "has": {
+  "exposures": true,
+  "spectrum": false
+ }
+}

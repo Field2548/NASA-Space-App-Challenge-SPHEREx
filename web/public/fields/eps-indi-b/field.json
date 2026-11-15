@@ -1,0 +1,116 @@
+{
+ "slug": "eps-indi-b",
+ "title": "Test your tool on Epsilon Indi B",
+ "kind": "spot",
+ "difficulty": "tool",
+ "ra": 331.0964,
+ "dec": -56.8006,
+ "fov_deg": 0.2,
+ "pixel_arcsec": 6.15,
+ "size": [
+  119,
+  119
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   331.0964,
+   -56.8006
+  ],
+  "crpix": [
+   60.0,
+   60.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60792.706756,
+   "utc": "2025-04-27T16:57:43",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60832.723111,
+   "utc": "2025-06-06T17:21:16",
+   "hours_since_prev": 960.39,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 60947.304185,
+   "utc": "2025-09-29T07:18:01",
+   "hours_since_prev": 2749.95,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61150.952067,
+   "utc": "2026-04-20T22:50:58",
+   "hours_since_prev": 4887.55,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61309.369512,
+   "utc": "2026-09-26T08:52:05",
+   "hours_since_prev": 3802.02,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0123,
+  "offset": -3.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 248.279
+ },
+ "psf_fwhm_px": 1.654,
+ "has": {
+  "exposures": true,
+  "spectrum": false
+ }
+}

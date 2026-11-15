@@ -11,7 +11,7 @@ Conventions used by every type:
 | --- | --- | --- | --- |
 | `RGB` | `[r, g, b]`, 0 to 255 each | palettes | imaging, UI |
 | `Vision` | `normal`, `protan`, `deutan`, `tritan`, `mono` | VisionPicker | palettes, spectra |
-| `Difficulty` | `easy`, `medium`, `hard`, `boss`, `expert`, `control` | field.json | scoring, UI |
+| `Difficulty` | `easy`, `medium`, `hard`, `boss`, `expert`, `tool`, `control` | field.json | scoring, UI |
 | `FieldKind` | `spot` (every public ready spot, issue #10), `fixture`; `asteroid`, `dwarf-planet`, `control`, `star` only in answer-key `reveal`; plus browser-only `quicklook` | field.json | UI |
 | `FrameMeta` | one burst: index `i`, `mjd`, `utc`, `hours_since_prev`, `n_bands`, `detectors` | field.json `frames[]` | timeline, framePicker, marks |
 | `FieldWcs` | gnomonic TAN, `crval`, `crpix` (1-based, bottom-up, exactly FITS; top-down reference pixel is `(crpix[0]-1, H-crpix[1])`), `cdelt` deg/px | field.json `wcs` | wcs.ts |

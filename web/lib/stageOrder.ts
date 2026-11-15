@@ -8,6 +8,7 @@ export const GROUPS: { difficulty: FieldSummary["difficulty"]; label: string }[]
   { difficulty: "hard", label: "Hard" },
   { difficulty: "expert", label: "Expert" }, // not in the current index; kept so no stage is dropped
   { difficulty: "boss", label: "Boss" },
+  { difficulty: "tool", label: "Tool tests" },
   { difficulty: "control", label: "Control" }, // legacy
 ];
 

@@ -12,7 +12,7 @@ import type { FieldSummary } from "@/lib/types";
 import BackLink from "./BackLink";
 import styles from "./LeaderboardScreen.module.css";
 
-const ORDER: FieldSummary["difficulty"][] = ["easy", "medium", "hard", "expert", "boss", "control"];
+const ORDER: FieldSummary["difficulty"][] = ["easy", "medium", "hard", "expert", "boss", "tool", "control"];
 
 type Tab = { slug: string | null; label: string };
 type View = { slug: string | null; board: Board } | { slug: string | null; error: true };

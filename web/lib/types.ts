@@ -5,7 +5,7 @@ export type RGB = [number, number, number]; // 0..255
 
 export type Vision = "normal" | "protan" | "deutan" | "tritan" | "mono";
 
-export type Difficulty = "easy" | "medium" | "hard" | "boss" | "expert" | "control"; // "control": legacy, public files no longer use it (issue #10)
+export type Difficulty = "easy" | "medium" | "hard" | "boss" | "expert" | "tool" | "control"; // "control": legacy, public files no longer use it (issue #10)
 
 // field.json kinds are DATA's (field-schema.md section 2); "quicklook" is browser-only.
 export type FieldKind = "asteroid" | "dwarf-planet" | "control" | "star" | "fixture" | "quicklook" | "spot";
