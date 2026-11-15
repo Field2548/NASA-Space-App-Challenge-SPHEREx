@@ -377,7 +377,14 @@ function cachedHeaders(url: string, fetch: FetchLike | undefined, signal: AbortS
       return r.hdus;
     });
     headerCache.set(url, p);
-    p.catch(() => headerCache.delete(url)); // never cache a failure or a cancel
+    // Never cache a failure or a cancel; drop it as soon as its run is cancelled, so a run started
+    // in the same tick reads afresh (and a late rejection never removes that run's newer entry).
+    const mine = p;
+    const drop = () => {
+      if (headerCache.get(url) === mine) headerCache.delete(url);
+    };
+    p.catch(drop);
+    signal.addEventListener("abort", drop, { once: true });
   }
   return p;
 }
@@ -407,12 +414,14 @@ function cachedRows(
   });
   rowCache.set(key, { promise, bytes });
   rowCacheBytes += bytes;
-  promise.catch(() => {
+  const drop = () => {
     if (rowCache.get(key)?.promise === promise) {
       rowCache.delete(key);
       rowCacheBytes -= bytes;
     }
-  });
+  };
+  promise.catch(drop);
+  signal.addEventListener("abort", drop, { once: true }); // see cachedHeaders
   // Evict the oldest reads beyond the limit (Map keeps insertion order).
   for (const [k, v] of rowCache) {
     if (rowCacheBytes <= CACHE_LIMIT_BYTES || k === key) break;

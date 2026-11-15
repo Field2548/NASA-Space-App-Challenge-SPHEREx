@@ -340,6 +340,25 @@ describe("runQuickLook on synthetic exposures", () => {
     expect(stats.calls).toBeLessThanOrEqual(4);
   });
 
+  it("a run started right after cancelling another over the same files is not cancelled too", async () => {
+    // The worker aborts the old run and starts the new one in the same tick (settings changed).
+    // The new run must not pick up the old run's in-flight (soon aborted) cached reads.
+    const { plan, files } = syntheticPlan();
+    const stats = { inFlight: 0, maxInFlight: 0, bytes: 0, calls: 0 };
+    const ac = new AbortController();
+    const first = runQuickLook(plan, () => {}, ac.signal, { fetch: serve(files, stats, 20) });
+    first.catch(() => {});
+    await new Promise((r) => setTimeout(r, 5)); // first run's header reads are in flight
+    ac.abort();
+    const second = await runQuickLook(plan, () => {}, new AbortController().signal, { fetch: serve(files, stats) });
+    expect(second.frames.length).toBe(2);
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    // The first run's late rejections must not evict the second run's cache entries.
+    const before = stats.calls;
+    await runQuickLook(plan, () => {}, new AbortController().signal, { fetch: serve(files, stats) });
+    expect(stats.calls).toBe(before);
+  });
+
   it("skips an unreadable exposure and fails only when nothing is left", async () => {
     const { plan, files } = syntheticPlan();
     const broken = new Map(files);
