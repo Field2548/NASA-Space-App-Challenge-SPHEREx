@@ -36,10 +36,21 @@ export const DEFAULT_NAXIS = 2040;
 
 /** One exposure in the quick-look list. Extends the shared ExposureMeta (types.ts). */
 export interface QuickLookExposure extends ExposureMeta {
-  /** URL to Range-read: the S3 object from `cloud_access`, else IRSA's `access_url`. */
-  url: string;
-  /** "s3": public bucket, browsers may read it (CORS allows GET + Range). "irsa": no CORS, needs a proxy. */
+  /**
+   * URL the browser Range-reads: the public S3 object built from SIA `cloud_access` (CORS allows a
+   * cross-origin GET with Range there). Null when IRSA gave no S3 copy: IRSA's own server sends no
+   * CORS headers, so such an exposure is not readable in the browser and the planner skips it.
+   */
+  url: string | null;
+  /** IRSA's `access_url` for the same file: provenance, and readable server-side (or via a proxy). */
+  access_url: string;
+  /** "s3" when `url` is set, "irsa" when only `access_url` exists. */
   source: "s3" | "irsa";
+  /**
+   * Approximate file size in bytes from SIA `access_estsize` (kB of 1000 bytes, rounded up; checked
+   * 65071 kB for a 65,070,720-byte file). A hint only: the FITS reader never needs the file size.
+   */
+  est_size_bytes: number | null;
   /** IRSA collection, e.g. "spherex_dr1". */
   collection: string;
   /** End of the exposure (SIA t_max), MJD. `mjd` is the start (t_min), as in motion_frames. */
@@ -240,10 +251,10 @@ export function planQuickLook(list: QuickLookExposure[], o: PlanOptions): QuickL
   const notes: string[] = [];
   const dets = new Set(o.detectors);
   const usable = list.filter(
-    (e) => (dets.size === 0 || dets.has(e.detector)) && (o.includeIrsa || e.source === "s3") && e.covers_field !== false,
+    (e) => (dets.size === 0 || dets.has(e.detector)) && (o.includeIrsa || e.url !== null) && e.covers_field !== false,
   );
   const partial = list.filter(
-    (e) => (dets.size === 0 || dets.has(e.detector)) && (o.includeIrsa || e.source === "s3") && e.covers_field === false,
+    (e) => (dets.size === 0 || dets.has(e.detector)) && (o.includeIrsa || e.url !== null) && e.covers_field === false,
   );
   let bursts = groupBursts(usable).filter((b) => b.length >= 3);
   if (bursts.length < Math.min(2, o.frames)) {
@@ -338,6 +349,11 @@ export interface RunOptions {
   fetch?: FetchLike;
   /** Parallel exposure downloads (default and maximum 4). */
   concurrency?: number;
+  /**
+   * Turn an exposure's URL (from the list route: S3 when present, else IRSA access_url) into the URL
+   * actually Range-read, e.g. a proxy route. Default: read the URL as given.
+   */
+  rewriteUrl?: (url: string) => string;
 }
 
 // ---- in-memory cache of headers and rows (survives between runs in the same worker) ----
@@ -599,7 +615,9 @@ export async function runQuickLook(
 
   const work = async (k: number) => {
     const res = results[k];
-    const url = res.meta.url;
+    // Exposures without an S3 copy only reach this point with includeIrsa, i.e. behind a proxy.
+    const base = res.meta.url ?? res.meta.access_url;
+    const url = o.rewriteUrl ? o.rewriteUrl(base) : base;
     try {
       const hdus = await cachedHeaders(url, o.fetch, signal, onBytes);
       const img = findHdu(hdus, "IMAGE");
@@ -737,7 +755,11 @@ export function transferablesOf(field: QuickLookField): ArrayBuffer[] {
 // ------------------------------------------------------------------------------------------------
 
 export type QuickLookWorkerRequest =
-  | { type: "start"; id: string; plan: QuickLookPlan }
+  /**
+   * proxyPrefix: when set, every exposure URL is read as proxyPrefix + encodeURIComponent(url)
+   * (functions cannot cross postMessage, so this is the worker's form of RunOptions.rewriteUrl).
+   */
+  | { type: "start"; id: string; plan: QuickLookPlan; proxyPrefix?: string }
   | { type: "cancel"; id: string };
 
 export type QuickLookWorkerResponse =
