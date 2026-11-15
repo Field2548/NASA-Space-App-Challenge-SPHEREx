@@ -42,6 +42,17 @@ body {
   min-height: 100%;
 }
 
+/* Column layout so the site footer sits at the bottom of the window on short pages (Settings). */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+body > * {
+  flex-shrink: 0;
+}
+
 body {
   color: var(--text);
   background-color: var(--bg-0);

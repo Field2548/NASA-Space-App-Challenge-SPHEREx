@@ -3,6 +3,7 @@ import { JetBrains_Mono, Orbitron } from "next/font/google";
 import type { CSSProperties } from "react";
 import AccountControl from "@/components/AccountControl";
 import MusicPlayer from "@/components/MusicPlayer";
+import UiSounds from "@/components/UiSounds";
 import NavTracker from "@/components/NavTracker";
 import SiteFooter from "@/components/SiteFooter";
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AccountControl />
         {children}
         <MusicPlayer />
+        <UiSounds />
         <SiteFooter />
       </body>
     </html>
