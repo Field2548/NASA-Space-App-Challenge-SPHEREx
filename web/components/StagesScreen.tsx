@@ -138,7 +138,6 @@ export default function StagesScreen() {
               <li
                 className={`panel ${styles.card}`}
                 data-testid="training-card"
-                data-part="STG-00"
                 data-status={trained ? "solved" : "new"}
               >
                 <div className={styles.head}>
@@ -238,7 +237,6 @@ function StageCard({ n, stage, next, burst, open, tabStop, onToggle, onFocusTogg
     <li
       className={`panel ${styles.card}`}
       data-testid={`stage-${spot.slug}`}
-      data-part={`STG-${String(n).padStart(2, "0")}`}
       data-open={open ? "true" : "false"}
       data-status={status}
       onClick={onCardClick}

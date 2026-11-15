@@ -374,7 +374,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     <div className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}>
       <aside className={styles.left}>
         {canInspect && (
-          <section className="panel" data-part="PNL-01 // INSPECT">
+          <section className="panel" data-part="Inspect">
             <button
               type="button"
               aria-pressed={mode === "inspect"}
@@ -391,7 +391,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("color-by-time") && (
-          <section className="panel" data-part="PNL-02 // IMAGE TOOLS">
+          <section className="panel" data-part="Image tools">
             <button
               type="button"
               aria-pressed={overlay === "colorByTime"}
@@ -410,7 +410,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("wavelength") && field.has?.exposures === true && (
-          <section className="panel" data-part="PNL-03 // WAVELENGTH">
+          <section className="panel" data-part="Wavelength">
             <WavelengthSwitch field={field} value={wavelength} onChange={setWavelength} fewerThanThree={wl.fewerThanThree} />
             {wavelength !== "all" && !wl.frames && (
               <p className={styles.small} role="status" data-testid="wavelength-status">
@@ -420,7 +420,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {showOverlays && (
-          <section className="panel" data-part="PNL-04 // OVERLAYS">
+          <section className="panel" data-part="Overlays">
             <div data-slot="overlays">
               <button
                 type="button"
@@ -445,12 +445,12 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("brightness") && (
-          <section className="panel" data-part="PNL-05 // MORPHOLOGY">
+          <section className="panel" data-part="Morphology">
             <MorphologyControl value={morph} onChange={setMorph} />
           </section>
         )}
         {tools.has("brightness") && (
-          <section className="panel" data-part="PNL-06 // BRIGHTNESS">
+          <section className="panel" data-part="Brightness">
             <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
             <ToneCurveEditor value={curve} onChange={setCurve} />
           </section>
@@ -543,13 +543,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
       </main>
 
       {tools.has("mark") && (
-        <aside className={styles.right} aria-label="Scoreboard panel">
+        <aside className={styles.right} aria-label="Answer">
           <button type="button" className={styles.collapse} aria-expanded={scoreOpen} onClick={() => setScoreOpen((o) => !o)}>
             {scoreOpen ? "click to minimize" : "▸"}
           </button>
           {scoreOpen && (
             <>
-              <section className="panel" data-part="PNL-07 // ANSWER">
+              <section className="panel" data-part="Answer">
                 <p className={styles.small}>
                   {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
                 </p>
