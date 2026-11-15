@@ -1,5 +1,8 @@
 .account {
-  position: fixed;
+  /* Absolute, not fixed: it sits in the top-right corner of the page and scrolls away with the page
+     header, so it never floats over content on a scrolled page. (<body> is not positioned, so this is
+     relative to the first screen.) Full-height screens do not scroll, so it stays visible there. */
+  position: absolute;
   top: 8px;
   right: var(--space-3);
   z-index: 30;
