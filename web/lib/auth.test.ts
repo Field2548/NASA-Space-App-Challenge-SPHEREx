@@ -127,23 +127,37 @@ describe("guest replay store", () => {
     expect(store._data.has(GUEST_REPLAY_KEY)).toBe(true);
   });
 
-  it("replaces an identical body instead of storing it twice", () => {
+  it("does not store an identical body twice", () => {
     saveGuestSubmission(req(1));
     saveGuestSubmission(req(2));
     saveGuestSubmission(req(1));
-    expect(loadGuestSubmissions()).toEqual([req(2), req(1)]);
+    expect(loadGuestSubmissions()).toEqual([req(1), req(2)]);
   });
 
-  it("keeps ONE entry per spot, the newest, even when the bodies differ", () => {
-    const marks = (x: number) => [{ frame: 1, x, y: 5 }, { frame: 3, x: x + 2, y: 5 }];
-    saveGuestSubmission({ spot: "eros", answer: "nothing" });
-    saveGuestSubmission({ spot: "hektor", answer: "nothing" });
-    saveGuestSubmission({ spot: "eros", answer: "track", marks: marks(10) });
-    saveGuestSubmission({ spot: "eros", answer: "track", marks: marks(20) });
-    expect(loadGuestSubmissions()).toEqual([
-      { spot: "hektor", answer: "nothing" },
-      { spot: "eros", answer: "track", marks: marks(20) },
-    ]);
+  const marks = (x: number) => [{ frame: 1, x, y: 5 }, { frame: 3, x: x + 2, y: 5 }];
+
+  it("keeps a right answer and a later wrong one on the same spot, in order, so both count", () => {
+    const right: CheckRequest = { spot: "eros", answer: "track", marks: marks(10) };
+    const wrong: CheckRequest = { spot: "eros", answer: "nothing" };
+    saveGuestSubmission(right);
+    saveGuestSubmission(wrong);
+    expect(loadGuestSubmissions()).toEqual([right, wrong]);
+  });
+
+  it("on one spot keeps the FIRST request ever stored plus the newest 4 (6 stored: 1, 3, 4, 5, 6)", () => {
+    const all = [1, 2, 3, 4, 5, 6].map((n) => ({ spot: "eros", answer: "track" as const, marks: marks(n * 10) }));
+    for (const r of all) saveGuestSubmission(r);
+    expect(loadGuestSubmissions()).toEqual([all[0], all[2], all[3], all[4], all[5]]);
+  });
+
+  it("groups the list by spot, keeping each spot's requests in time order", () => {
+    const hektor: CheckRequest = { spot: "hektor", answer: "nothing" };
+    const eros1: CheckRequest = { spot: "eros", answer: "track", marks: marks(10) };
+    const eros2: CheckRequest = { spot: "eros", answer: "nothing" };
+    saveGuestSubmission(hektor);
+    saveGuestSubmission(eros1);
+    saveGuestSubmission(eros2);
+    expect(loadGuestSubmissions()).toEqual([eros1, eros2, hektor]);
   });
 
   it("silently ignores an invalid entry and keeps what was stored", () => {
@@ -173,12 +187,13 @@ describe("guest replay store", () => {
     expect(loadGuestSubmissions()).toHaveLength(3);
   });
 
-  it("keeps only the newest 20", () => {
+  it("keeps at most 20 spots: the 5 oldest spots are dropped whole", () => {
     for (let i = 1; i <= 25; i++) saveGuestSubmission(req(i));
     const kept = loadGuestSubmissions();
     expect(kept).toHaveLength(20);
-    expect(kept[0]).toEqual(req(6));
-    expect(kept[19]).toEqual(req(25));
+    const spots = kept.map((r) => r.spot);
+    for (let i = 1; i <= 5; i++) expect(spots).not.toContain(`spot-${i}`);
+    for (let i = 6; i <= 25; i++) expect(spots).toContain(`spot-${i}`);
   });
 
   it("keeps track requests with their marks", () => {
@@ -280,6 +295,51 @@ describe("moveGuestProgress", () => {
       error: "Could not move guest progress (HTTP 503). It stays in this browser.",
     });
     expect(loadGuestSubmissions()).toEqual([req(1)]);
+  });
+
+  const trackReq = (spot: string, n: number): CheckRequest => ({
+    spot,
+    answer: "track",
+    marks: [{ frame: 1, x: n, y: 5 }, { frame: 3, x: n + 2, y: 5 }],
+  });
+
+  /** 9 spots with 5 different requests each: 45 stored entries. */
+  function saveFortyFive() {
+    for (let s = 0; s < 9; s++) for (let k = 0; k < 5; k++) saveGuestSubmission(trackReq(`spot-${s}`, s * 10 + k + 1));
+    expect(loadGuestSubmissions()).toHaveLength(45);
+  }
+
+  it("sends 45 stored requests as 3 calls of 20, 20 and 5, and clears them on 200", async () => {
+    saveFortyFive();
+    const f = fakeFetch(200);
+    await expect(moveGuestProgress(f, {})).resolves.toEqual({ moved: 45 });
+    expect(f).toHaveBeenCalledTimes(3);
+    const sizes = f.mock.calls.map(([, init]) => (JSON.parse(String(init?.body)) as { replay: unknown[] }).replay.length);
+    expect(sizes).toEqual([20, 20, 5]);
+    expect(loadGuestSubmissions()).toEqual([]);
+  });
+
+  it("a 503 on the second call keeps chunks 2 and 3, and sends nothing after the failure", async () => {
+    saveFortyFive();
+    const before = loadGuestSubmissions();
+    const answers = [200, 503];
+    const f = vi.fn<typeof fetch>(async () => new Response(null, { status: answers.shift() ?? 200 }));
+    const result = await moveGuestProgress(f, {});
+    expect(result).toEqual({ error: "Could not move guest progress (HTTP 503). It stays in this browser." });
+    expect(f).toHaveBeenCalledTimes(2);
+    const second = (JSON.parse(String(f.mock.calls[1][1]?.body)) as { replay: CheckRequest[] }).replay;
+    expect(second).toEqual(before.slice(20, 40));
+    expect(loadGuestSubmissions()).toEqual(before.slice(20));
+  });
+
+  it("a 400 on the first call discards only that chunk and stops", async () => {
+    saveFortyFive();
+    const before = loadGuestSubmissions();
+    const f = fakeFetch(400);
+    const result = await moveGuestProgress(f, {});
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(result).toHaveProperty("error");
+    expect(loadGuestSubmissions()).toEqual(before.slice(20));
   });
 
   it("keeps the store and returns an error when the network fails", async () => {

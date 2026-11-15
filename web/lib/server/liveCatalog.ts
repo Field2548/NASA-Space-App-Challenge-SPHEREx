@@ -244,9 +244,14 @@ const cache = new Map<string, CacheEntry>();
 /** Lookups on their way, by cache key: a second caller for the same key waits for the first. */
 const inFlight = new Map<string, Promise<Found>>();
 
-/** Positions rounded to 1 arcsec (1/3600 deg). */
+/**
+ * Positions rounded to 1 arcsec (1/3600 deg). RA is wrapped into [0, 360) after rounding, so
+ * 359.99999 and 0.00001 (within 1 arcsec of each other across the 0 degree line) share a key.
+ */
 function cacheKey(ra: number, dec: number): string {
-  return `${Math.round(ra * 3600)}:${Math.round(dec * 3600)}`;
+  const full = 360 * 3600;
+  const raArcsec = ((Math.round(ra * 3600) % full) + full) % full;
+  return `${raArcsec}:${Math.round(dec * 3600)}`;
 }
 
 function cacheGet(key: string, now: number): Found | null {

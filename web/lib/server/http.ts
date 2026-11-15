@@ -50,7 +50,7 @@ export function errorResponse(
   headers?: Record<string, string>,
 ): NextResponse {
   return NextResponse.json(
-    { error: { code, message, ...(details ? { details } : {}) } },
+    { error: { code, message, details: details ?? {} } },
     { status: STATUS[code], headers },
   );
 }
@@ -90,21 +90,22 @@ export function queryObject(request: Request): Record<string, string> {
 
 /**
  * Best guess at the caller's address, for the light rate limit only.
- * Order: `x-vercel-forwarded-for` (set by Vercel's edge from the real connection; a client cannot
- * choose it), then `x-real-ip`, then the LAST entry of `x-forwarded-for`. Each proxy appends the
- * address it saw to the end of that header, so the last entry is the one added by the nearest
- * proxy; the first entry is whatever the client wrote, which anyone can change to dodge the limit.
- * Without any of them (local development): "local".
+ * Order: `x-vercel-forwarded-for` (first entry; Vercel's edge sets it from the real connection, so a
+ * client cannot choose it), then the LAST entry of `x-forwarded-for`, then `x-real-ip`. Each proxy
+ * appends the address it saw to the end of `x-forwarded-for`, so the last entry is the one added by
+ * the nearest proxy; the first entry is whatever the client wrote. `x-real-ip` comes after it
+ * because, off Vercel, a client can set that header to anything. Without any of them (local
+ * development): "local".
  */
 export function clientIp(request: Request): string {
   const first = (v: string | null) => (v ?? "").split(",")[0].trim();
   const vercel = first(request.headers.get("x-vercel-forwarded-for"));
   if (vercel) return vercel;
-  const real = (request.headers.get("x-real-ip") ?? "").trim();
-  if (real) return real;
   const fwd = (request.headers.get("x-forwarded-for") ?? "").split(",");
   const last = fwd[fwd.length - 1].trim();
-  return last || "local";
+  if (last) return last;
+  const real = (request.headers.get("x-real-ip") ?? "").trim();
+  return real || "local";
 }
 
 /** Next.js's own control-flow error while prerendering (cacheComponents): it must reach Next. */

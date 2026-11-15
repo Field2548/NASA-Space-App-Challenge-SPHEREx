@@ -12,6 +12,7 @@ import {
 import { authHeader, getSupabaseBrowser } from "@/lib/supabase";
 
 type Mode = "login" | "signup";
+type ErrorField = "email" | "password" | "name" | null;
 
 export interface AuthDialogProps {
   open: boolean;
@@ -69,6 +70,8 @@ export function AuthDialog({ open, onClose, onSignedIn, initialMode }: AuthDialo
     if (!dialog) return;
     if (open && !dialog.open) {
       dialog.showModal();
+      // showModal focuses the first control (Close); the email field is where typing starts.
+      dialog.querySelector<HTMLInputElement>('input[name="email"]')?.focus();
     } else if (!open && dialog.open) {
       closingFromProp.current = true;
       dialog.close();
@@ -173,7 +176,9 @@ function AuthForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorText] = useState<string | null>(null);
+  // Which field the error belongs to; null means a general error that is not tied to one input.
+  const [errorField, setErrorField] = useState<ErrorField>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -185,10 +190,15 @@ function AuthForm({
   const errorId = `${ids}-error`;
   const isSignup = mode === "signup";
 
-  function switchMode(next: Mode) {
+  function setError(message: string | null, field: ErrorField = null) {
+    setErrorText(message);
+    setErrorField(message ? field : null);
+  }
+
+  function switchMode(next: Mode, options?: { keepNotice?: boolean }) {
     setMode(next);
     setError(null);
-    setNotice(null);
+    if (!options?.keepNotice) setNotice(null);
   }
 
   /** Guest progress moves into the account, then the parent hears about the sign-in. */
@@ -213,17 +223,22 @@ function AuthForm({
 
     const emailProblem = validateEmail(address);
     if (emailProblem) {
-      setError(emailProblem);
+      setError(emailProblem, "email");
       return;
     }
     if (isSignup) {
-      const nameProblem = validateDisplayName(name) ?? validatePassword(password);
+      const nameProblem = validateDisplayName(name);
       if (nameProblem) {
-        setError(nameProblem);
+        setError(nameProblem, "name");
+        return;
+      }
+      const passwordProblem = validatePassword(password);
+      if (passwordProblem) {
+        setError(passwordProblem, "password");
         return;
       }
     } else if (password === "") {
-      setError("Enter your password.");
+      setError("Enter your password.", "password");
       return;
     }
 
@@ -246,7 +261,7 @@ function AuthForm({
         return;
       }
       if (free !== true) {
-        setError("That name is taken.");
+        setError("That name is taken.", "name");
         return;
       }
 
@@ -260,8 +275,8 @@ function AuthForm({
         return;
       }
       if (!data.session) {
+        switchMode("login", { keepNotice: true });
         setNotice("Check your email to confirm your account, then log in.");
-        switchMode("login");
         return;
       }
       await finishSignIn(name);
@@ -297,8 +312,8 @@ function AuthForm({
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={describedBy}
+            aria-invalid={errorField === "email" ? true : undefined}
+            aria-describedby={errorField === "email" ? describedBy : undefined}
           />
         </div>
 
@@ -311,8 +326,8 @@ function AuthForm({
             autoComplete={isSignup ? "new-password" : "current-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={describedBy}
+            aria-invalid={errorField === "password" ? true : undefined}
+            aria-describedby={errorField === "password" ? describedBy : undefined}
           />
           {isSignup ? (
             <p className="auth-muted" style={{ margin: "var(--space-1) 0 0" }}>
@@ -331,8 +346,8 @@ function AuthForm({
               autoComplete="nickname"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={[nameHintId, describedBy].filter(Boolean).join(" ")}
+              aria-invalid={errorField === "name" ? true : undefined}
+              aria-describedby={[nameHintId, errorField === "name" ? describedBy : undefined].filter(Boolean).join(" ")}
             />
             <p id={nameHintId} className="auth-muted" style={{ margin: "var(--space-1) 0 0" }}>
               3 to 20 characters: letters, digits, space, _ . or -. Shown on the scoreboard.

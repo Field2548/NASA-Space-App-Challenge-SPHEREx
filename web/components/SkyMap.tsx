@@ -27,6 +27,7 @@ import {
   HIPS_ID,
   HIPS_NAME,
   loadAladin,
+  releaseAladin,
   type AladinCatalog,
   type AladinInstance,
   type AladinOverlay,
@@ -81,6 +82,14 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
   const aladinRef = useRef<AladinInstance | null>(null);
   const libRef = useRef<AladinStatic | null>(null);
   const objectClickRef = useRef(false);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Latest callbacks for Aladin's listeners, which are registered once.
   const cbRef = useRef({ onPlay, onPointer, onClickSky });
@@ -121,11 +130,15 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     if (!el) return;
     const ctl = new AbortController();
     let cancelled = false;
+    let raf = 0;
     const fail = (why: string) => {
       if (cancelled) return;
       cancelled = true;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       aladinRef.current = null;
-      el.replaceChildren();
+      // Aladin cannot be destroyed; free its WebGL contexts so the hidden map stops drawing.
+      releaseAladin(el);
       setFailReason(why);
       setMapState("failed");
     };
@@ -185,7 +198,6 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         a.gotoRaDec(GALACTIC_CENTER[0], GALACTIC_CENTER[1]);
         a.setFoV(360);
 
-        let raf = 0;
         let pending: { ra: number; dec: number } | null = null;
         a.on("mouseMove", (e: { x: number; y: number }) => {
           let p: { ra: number; dec: number } | null = null;
@@ -199,6 +211,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           if (!raf) {
             raf = requestAnimationFrame(() => {
               raf = 0;
+              if (cancelled) return;
               if (statusRef.current) {
                 statusRef.current.textContent = pending
                   ? `RA ${formatRA(pending.ra)}  Dec ${formatDec(pending.dec)}`
@@ -209,6 +222,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           }
         });
         a.on("click", (e: { ra: number; dec: number; isDragging?: boolean }) => {
+          if (cancelled) return;
           if (objectClickRef.current) {
             objectClickRef.current = false;
             return;
@@ -218,7 +232,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           if (Number.isFinite(e.ra) && Number.isFinite(e.dec)) cbRef.current.onClickSky?.({ ra: e.ra, dec: e.dec });
         });
         a.on("zoomChanged", (f: number) => {
-          if (Number.isFinite(f)) setFov(f);
+          if (!cancelled && Number.isFinite(f)) setFov(f);
         });
 
         aladinRef.current = a;
@@ -233,8 +247,12 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     return () => {
       cancelled = true;
       ctl.abort();
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      clickTimer.current = null;
       aladinRef.current = null;
-      el.replaceChildren();
+      releaseAladin(el);
     };
   }, [attempt]);
 
@@ -259,8 +277,13 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         labelColor: color,
         labelFont,
         onClick: (src: AladinSource<unknown>) => {
+          if (!mountedRef.current) return;
           objectClickRef.current = true;
-          setTimeout(() => (objectClickRef.current = false), 0);
+          if (clickTimer.current) clearTimeout(clickTimer.current);
+          clickTimer.current = setTimeout(() => {
+            objectClickRef.current = false;
+            clickTimer.current = null;
+          }, 0);
           const slug = (src.data as { slug?: string } | undefined)?.slug;
           const hit = spotsRef.current.find((s) => s.slug === slug);
           if (hit) setSelected(hit);
@@ -346,16 +369,16 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     };
   }, [mapState, overlay]);
 
-  // Focus Play when a card opens; Esc closes it.
+  // Focus Play when a card opens and give focus back to whatever opened it when it closes.
+  const cardOpen = selected !== null;
   useEffect(() => {
-    if (!selected) return;
+    if (!cardOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     playRef.current?.focus({ preventScroll: true });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelected(null);
+    return () => {
+      if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected]);
+  }, [cardOpen]);
 
   const choose = (s: FieldSummary) => {
     setSelected(s);
@@ -384,13 +407,12 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       }}
     >
       {/* Aladin draws into this div. It stays mounted so a retry can reuse it. */}
-      <div
-        ref={mapRef}
-        onPointerLeave={leave}
+      <section
         aria-label="Sky map. Use the ready spots list to reach spots with the keyboard."
-        role="application"
         style={{ position: "absolute", inset: 0, visibility: failed ? "hidden" : "visible" }}
-      />
+      >
+        <div ref={mapRef} onPointerLeave={leave} style={{ position: "absolute", inset: 0 }} />
+      </section>
 
       {mapState === "loading" && (
         <div
@@ -490,6 +512,12 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       {selected && (
         <section
           aria-labelledby={cardTitleId}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setSelected(null);
+            }
+          }}
           className="panel"
           data-part="SPT-01 // READY SPOT"
           style={{ position: "absolute", right: 16, top: 72, width: 240, padding: "var(--space-3)" }}

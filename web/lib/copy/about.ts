@@ -18,6 +18,8 @@ export const ABOUT_SECTIONS: AboutSection[] = [
     paragraphs: [
       "The pictures come from SPHEREx, a NASA mission. We downloaded them from NASA's IRSA archive (irsa.ipac.caltech.edu).",
       "The positions of the known asteroids and dwarf planets come from JPL Horizons, the NASA JPL ephemeris service. We checked our detections against these predicted positions.",
+      "This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration. This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology.",
+      "The code is free software under the GNU General Public License, version 3 (GPL-3.0). The full licence is on the Licence page (/licence).",
     ],
   },
   {

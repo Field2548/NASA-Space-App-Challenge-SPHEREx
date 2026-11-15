@@ -8,3 +8,6 @@ __pycache__/
 *.part
 data/**/cutouts/
 data/**/images/
+
+# Supabase CLI working files (may hold connection details)
+supabase/.temp/

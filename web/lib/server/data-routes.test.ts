@@ -7,7 +7,8 @@ import { GET as density } from "@/app/api/density/route";
 import { GET as keepalive } from "@/app/api/keepalive/route";
 import { GET as leaderboard } from "@/app/api/leaderboard/route";
 import { GET as listRequests, POST as postRequest } from "@/app/api/request-spot/route";
-import { BOT_NAME, botScore, mergeBot } from "@/lib/server/bot";
+import { loadAnswerKey } from "@/lib/scoring";
+import { BOT_NAME, botScore, botScoreForSpot, mergeBot } from "@/lib/server/bot";
 import { resetRateLimit } from "@/lib/server/rateLimit";
 
 const KEYS = [
@@ -242,6 +243,21 @@ describe("botScore against the real answer keys", () => {
     expect(bot.above_bar).toBe(6);
     expect(bot.matched).toBe(3);
     expect(bot.accuracy).toBe(0.5);
+  });
+  it("counts a known object once when two candidates land on it", async () => {
+    const key = await loadAnswerKey("eris");
+    const field = await import("@/lib/scoring").then((m) => m.loadFieldForScoring("eris"));
+    expect(key && field).toBeTruthy();
+    const k = key!;
+    const first = k.bot.candidates.find((c) => c.rank === 1)!;
+    const twin = { ...first, rank: 99 };
+    const doubled = { ...k, bot: { ...k.bot, candidates: [...k.bot.candidates, twin] } };
+    const once = botScoreForSpot(k, field!);
+    const twice = botScoreForSpot(doubled, field!);
+    expect(twice.above_bar).toBe(once.above_bar + 1);
+    expect(twice.matched).toBe(once.matched);
+    expect(twice.score).toBe(once.score);
+    expect(twice.matches).toHaveLength(1);
   });
   it("can be limited to some spots, and has null accuracy with no candidates", async () => {
     const one = await botScore(["eris"]);

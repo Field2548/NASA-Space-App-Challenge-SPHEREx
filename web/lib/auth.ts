@@ -9,7 +9,12 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 
 export const GUEST_REPLAY_KEY = "onion-sky:guest-replay";
-const MAX_GUEST_SUBMISSIONS = 20;
+/** Stored requests per spot: the first one ever stored, plus the newest 4. */
+const MAX_PER_SPOT = 5;
+/** Spots kept; the spot whose newest request is oldest is dropped whole. */
+const MAX_SPOTS = 20;
+/** Requests per POST /api/complete (the server accepts 1 to 20, api.md section 4). */
+const REPLAY_CHUNK = 20;
 const DEFAULT_ERROR = "Could not sign in. Please try again.";
 
 /**
@@ -96,24 +101,61 @@ function readList(store: Storage | null): CheckRequest[] {
 }
 
 /**
- * Keeps a guest's check request. An invalid one is ignored. The store holds ONE entry per spot,
- * the newest (a later answer replaces the earlier one), and at most 20 spots (the newest 20).
+ * Keeps a guest's check request. An invalid one is ignored. The store keeps, per spot, up to 5
+ * requests in the order they were given: the FIRST one ever stored for the spot (it may be the
+ * correct answer that earns the points) and the newest 4. An identical body already stored is not
+ * stored twice. At most 20 spots are kept; the spot whose newest request is oldest is dropped.
+ * The server re-scores every entry on replay, so each one counts, not only the newest.
  */
 export function saveGuestSubmission(req: CheckRequest): void {
   try {
     if (!isCheckRequest(req)) return;
     const store = storage();
     if (!store) return;
-    const kept = readList(store).filter((item) => item.spot !== req.spot);
-    kept.push(req);
-    store.setItem(GUEST_REPLAY_KEY, JSON.stringify(kept.slice(-MAX_GUEST_SUBMISSIONS)));
+    const all = readList(store);
+    const body = JSON.stringify(req);
+    if (all.some((item) => JSON.stringify(item) === body)) return;
+    all.push(req);
+
+    const ofSpot = all.filter((item) => item.spot === req.spot);
+    if (ofSpot.length > MAX_PER_SPOT) all.splice(all.indexOf(ofSpot[1]), 1);
+
+    const newest = new Map<string, number>();
+    all.forEach((item, i) => newest.set(item.spot, i));
+    if (newest.size > MAX_SPOTS) {
+      let stalest = "";
+      let stalestAt = Infinity;
+      for (const [spot, i] of newest) {
+        if (i < stalestAt) {
+          stalest = spot;
+          stalestAt = i;
+        }
+      }
+      store.setItem(GUEST_REPLAY_KEY, JSON.stringify(all.filter((item) => item.spot !== stalest)));
+      return;
+    }
+    store.setItem(GUEST_REPLAY_KEY, JSON.stringify(all));
   } catch {
     // Blocked or full storage: guest play goes on, the progress just is not kept.
   }
 }
 
+/** Every stored request, ordered by spot, then by the time it was stored. */
 export function loadGuestSubmissions(): CheckRequest[] {
-  return readList(storage());
+  // Array.prototype.sort is stable, so equal spots keep their time order.
+  return readList(storage()).sort((a, b) => (a.spot < b.spot ? -1 : a.spot > b.spot ? 1 : 0));
+}
+
+/** Removes exactly these requests from the store, leaving the others in their stored order. */
+function forgetSent(sent: CheckRequest[]): void {
+  try {
+    const store = storage();
+    if (!store) return;
+    const gone = new Set(sent.map((item) => JSON.stringify(item)));
+    store.setItem(GUEST_REPLAY_KEY, JSON.stringify(readList(store).filter((item) => !gone.has(JSON.stringify(item)))));
+  } catch {
+    // Nothing to forget if storage is blocked.
+  }
 }
 
 export function clearGuestSubmissions(): void {
@@ -125,37 +167,43 @@ export function clearGuestSubmissions(): void {
 }
 
 /**
- * Sends the guest's saved check requests to POST /api/complete. The store is cleared on HTTP 200
- * and on 400 (the server will never accept this replay, so keeping it would fail forever). It is
- * kept on 401, 429, 503, any other status and a network error, so the player can try again. A 404
- * (route not built yet) keeps the store and reports nothing moved.
+ * Sends the guest's saved check requests to POST /api/complete, in chunks of 20 (one call each),
+ * in the order of loadGuestSubmissions. A chunk is removed from the store only when the server
+ * accepted it (200) or rejected it for good (400). Sending stops at the first other answer, so
+ * that chunk and the rest stay for the next try: 401, 429, 503, any other status, or a network
+ * error. A 404 (route not built yet) also stops, reporting only what was already accepted.
  */
 export async function moveGuestProgress(
   fetchImpl: typeof fetch = fetch,
   headers: Record<string, string>,
 ): Promise<{ moved: number } | { error: string }> {
   const replay = loadGuestSubmissions();
-  if (replay.length === 0) return { moved: 0 };
+  let moved = 0;
 
-  let res: Response;
-  try {
-    res = await fetchImpl("/api/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ replay }),
-    });
-  } catch {
-    return { error: "Could not reach the server to move guest progress. It stays in this browser." };
-  }
+  for (let start = 0; start < replay.length; start += REPLAY_CHUNK) {
+    const chunk = replay.slice(start, start + REPLAY_CHUNK);
+    let res: Response;
+    try {
+      res = await fetchImpl("/api/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ replay: chunk }),
+      });
+    } catch {
+      return { error: "Could not reach the server to move guest progress. It stays in this browser." };
+    }
 
-  if (res.status === 404) return { moved: 0 };
-  if (res.status === 200) {
-    clearGuestSubmissions();
-    return { moved: replay.length };
+    if (res.status === 200) {
+      forgetSent(chunk);
+      moved += chunk.length;
+      continue;
+    }
+    if (res.status === 404) return { moved };
+    if (res.status === 400) {
+      forgetSent(chunk);
+      return { error: "Part of the saved guest progress was not accepted by the server, so it was discarded." };
+    }
+    return { error: `Could not move guest progress (HTTP ${res.status}). It stays in this browser.` };
   }
-  if (res.status === 400) {
-    clearGuestSubmissions();
-    return { error: "The saved guest progress was not accepted by the server, so it was discarded." };
-  }
-  return { error: `Could not move guest progress (HTTP ${res.status}). It stays in this browser.` };
+  return { moved };
 }
