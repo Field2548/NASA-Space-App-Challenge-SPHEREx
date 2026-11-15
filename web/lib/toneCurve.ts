@@ -1,77 +1,59 @@
 // Tone curve: output brightness as a function of the brightness the viewer already shows
-// (0..1 after the asinh stretch). Five control points at fixed inputs, only their heights
-// move, kept non-decreasing; between them a monotone cubic (Fritsch-Carlson). The default is
-// the identity, which leaves the picture untouched (applyCurve returns the same array).
+// (0..1 after the asinh stretch). Two stages:
+// 1. a base stretch picked on a 3-stop slider: Linear, Log or asinh (asinh = no change);
+// 2. a quadratic Bezier from (0,0) to (1,1) with one handle on the anti-diagonal x + y = 1.
+//    The single parameter `bend` in -1..1 places the handle at ((1 - bend)/2, (1 + bend)/2):
+//    0 is the straight line (no change), > 0 lifts faint levels, < 0 darkens them.
+//    A handle inside the unit square keeps the curve non-decreasing.
+// The default (asinh, bend 0) is the identity: applyCurve returns the same array.
 
-export const CURVE_X = [0, 0.25, 0.5, 0.75, 1] as const;
-export type Curve = number[];
-export type CurvePreset = "linear" | "asinh" | "log";
+export const CURVE_PRESETS = ["linear", "log", "asinh"] as const;
+export type CurvePreset = (typeof CURVE_PRESETS)[number];
+export interface Curve {
+  preset: CurvePreset;
+  bend: number;
+}
 
-export const DEFAULT_CURVE: Curve = [0, 0.25, 0.5, 0.75, 1];
+export const DEFAULT_CURVE: Curve = { preset: "asinh", bend: 0 };
 
-export const isDefaultCurve = (c: Curve) => c.every((y, i) => Math.abs(y - DEFAULT_CURVE[i]) < 1e-9);
-
+const EPS = 1e-9;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+export const clampBend = (b: number) => Math.min(1, Math.max(-1, Number.isFinite(b) ? b : 0));
 
-/** Preset heights. "asinh" is today's look (identity); the others are relative to it. */
-export function presetCurve(name: CurvePreset, a = 5): Curve {
-  const f: Record<CurvePreset, (y: number) => number> = {
-    asinh: (y) => y,
-    // undo the asinh: brightness proportional to the signal
-    linear: (y) => Math.sinh(y * Math.asinh(a)) / a,
-    log: (y) => Math.log1p(9 * y) / Math.log(10),
-  };
-  return CURVE_X.map((x) => f[name](x));
+export const isDefaultCurve = (c: Curve) => c.preset === "asinh" && Math.abs(c.bend) < EPS;
+
+const A = 5;
+const PRESET_FN: Record<CurvePreset, (y: number) => number> = {
+  asinh: (y) => y,
+  // undo the asinh: brightness proportional to the signal
+  linear: (y) => Math.sinh(y * Math.asinh(A)) / A,
+  log: (y) => Math.log1p(9 * y) / Math.log(10),
+};
+
+/** A preset with a straight Bezier (the slider's stops). */
+export function presetCurve(name: CurvePreset): Curve {
+  return { preset: name, bend: 0 };
 }
 
-/** Move point i to height y, kept between its neighbours so the curve stays non-decreasing. */
-export function movePoint(c: Curve, i: number, y: number): Curve {
-  const lo = i > 0 ? c[i - 1] : 0;
-  const hi = i < c.length - 1 ? c[i + 1] : 1;
-  const out = [...c];
-  out[i] = Math.min(hi, Math.max(lo, clamp01(y)));
-  return out;
+/** Bezier handle position for a bend value. */
+export function handleOf(bend: number): { x: number; y: number } {
+  const b = clampBend(bend);
+  return { x: (1 - b) / 2, y: (1 + b) / 2 };
 }
 
-/** Monotone cubic Hermite tangents (Fritsch-Carlson). */
-function tangents(y: Curve): number[] {
-  const n = y.length;
-  const h = (i: number) => CURVE_X[i + 1] - CURVE_X[i];
-  const d = y.slice(0, -1).map((v, i) => (y[i + 1] - v) / h(i));
-  const m = new Array<number>(n);
-  m[0] = d[0];
-  m[n - 1] = d[n - 2];
-  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
-  for (let i = 0; i < n - 1; i++) {
-    if (d[i] === 0) {
-      m[i] = 0;
-      m[i + 1] = 0;
-      continue;
-    }
-    const al = m[i] / d[i];
-    const be = m[i + 1] / d[i];
-    const s = al * al + be * be;
-    if (s > 9) {
-      const t = 3 / Math.sqrt(s);
-      m[i] = t * al * d[i];
-      m[i + 1] = t * be * d[i];
-    }
-  }
-  return m;
+/** Height of the Bezier at input x (solves x(t) = x for t, then returns y(t)). */
+export function bezierAt(bend: number, x: number): number {
+  const s = clamp01(x);
+  const { x: px, y: py } = handleOf(bend);
+  const a = 1 - 2 * px; // x(t) = a t^2 + 2 px t
+  const t = Math.abs(a) < EPS ? s : (-px + Math.sqrt(Math.max(0, px * px + a * s))) / a;
+  const u = clamp01(t);
+  return clamp01(2 * u * (1 - u) * py + u * u);
 }
 
-/** Curve height at input x in 0..1. */
+/** Curve height at input x in 0..1: base stretch, then the Bezier. */
 export function curveAt(c: Curve, x: number): number {
-  const t = clamp01(x);
-  let i = 0;
-  while (i < CURVE_X.length - 2 && t > CURVE_X[i + 1]) i++;
-  const m = tangents(c);
-  const h = CURVE_X[i + 1] - CURVE_X[i];
-  const s = (t - CURVE_X[i]) / h;
-  const s2 = s * s;
-  const s3 = s2 * s;
-  const v = (2 * s3 - 3 * s2 + 1) * c[i] + (s3 - 2 * s2 + s) * h * m[i] + (-2 * s3 + 3 * s2) * c[i + 1] + (s3 - s2) * h * m[i + 1];
-  return clamp01(v);
+  return bezierAt(c.bend, clamp01(PRESET_FN[c.preset](clamp01(x))));
 }
 
 const LUT_SIZE = 1024;

@@ -1,20 +1,16 @@
 "use client";
-// Light intensity curve editor (PNL-06): input brightness (what the picture shows now) on the
-// horizontal axis, output brightness on the vertical. Five points move up and down (drag or
-// arrow keys, Shift for big steps); presets Linear, Log, asinh (the default look and the reset).
+// Light intensity curve editor (PNL-06). A 3-stop slider picks the base stretch (Linear, Log,
+// asinh; asinh is the default look and the reset). Below it a one-handle Bezier bends the result:
+// the handle slides along the anti-diagonal (drag, or arrow keys with Shift for big steps).
 //
 // Props: { value: Curve; onChange(c: Curve): void }
 
 import { type KeyboardEvent, type PointerEvent, useRef } from "react";
-import { applyCurve, CURVE_X, type Curve, curveAt, DEFAULT_CURVE, movePoint, type CurvePreset, presetCurve } from "@/lib/toneCurve";
+import { applyCurve, bezierAt, clampBend, CURVE_PRESETS, type Curve, type CurvePreset, handleOf, isDefaultCurve, presetCurve } from "@/lib/toneCurve";
 import HelpImage from "./HelpImage";
 import InfoPopover from "./InfoPopover";
 
-const PRESETS: { key: CurvePreset; label: string }[] = [
-  { key: "linear", label: "Linear" },
-  { key: "log", label: "Log" },
-  { key: "asinh", label: "asinh" },
-];
+const PRESET_LABEL: Record<CurvePreset, string> = { linear: "Linear", log: "Log", asinh: "asinh" };
 const SIZE = 140;
 const PAD = 8;
 const sx = (x: number) => PAD + x * (SIZE - 2 * PAD);
@@ -37,26 +33,29 @@ export interface ToneCurveEditorProps {
 
 export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const drag = useRef<number | null>(null);
+  const dragging = useRef(false);
+  const setBend = (b: number) => onChange({ ...value, bend: clampBend(b) });
 
-  const path = Array.from({ length: 41 }, (_, i) => `${i ? "L" : "M"}${sx(i / 40).toFixed(1)} ${sy(curveAt(value, i / 40)).toFixed(1)}`).join("");
+  const path = Array.from({ length: 41 }, (_, i) => `${i ? "L" : "M"}${sx(i / 40).toFixed(1)} ${sy(bezierAt(value.bend, i / 40)).toFixed(1)}`).join("");
+  const h = handleOf(value.bend);
 
-  const onKey = (i: number) => (e: KeyboardEvent<SVGCircleElement>) => {
-    const step = e.shiftKey ? 0.1 : 0.02;
+  const onKey = (e: KeyboardEvent<SVGCircleElement>) => {
+    const step = e.shiftKey ? 0.2 : 0.05;
     const dir = e.key === "ArrowUp" || e.key === "ArrowRight" ? 1 : e.key === "ArrowDown" || e.key === "ArrowLeft" ? -1 : 0;
     if (!dir) return;
     e.preventDefault();
-    onChange(movePoint(value, i, value[i] + dir * step));
+    setBend(Math.round((value.bend + dir * step) * 100) / 100);
   };
   const dragTo = (e: PointerEvent<SVGElement>) => {
-    const i = drag.current;
     const r = svgRef.current?.getBoundingClientRect();
-    if (i === null || !r || !r.height) return;
+    if (!dragging.current || !r || !r.width || !r.height) return;
+    const x = ((e.clientX - r.left) / r.width * SIZE - PAD) / (SIZE - 2 * PAD);
     const y = 1 - ((e.clientY - r.top) / r.height * SIZE - PAD) / (SIZE - 2 * PAD);
-    onChange(movePoint(value, i, y));
+    setBend(y - x); // projection onto the anti-diagonal
   };
 
-  const demo = value.every((y, i) => Math.abs(y - DEFAULT_CURVE[i]) < 1e-9) ? presetCurve("log") : value;
+  const presetIdx = CURVE_PRESETS.indexOf(value.preset);
+  const demo = isDefaultCurve(value) ? { preset: "asinh" as const, bend: 0.5 } : value;
   const sc = rampScene();
 
   return (
@@ -65,14 +64,13 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         Light curve{" "}
         <InfoPopover label="Light curve" title="Light curve: how bright each level is drawn">
           <p>
-            The picture is first stretched so faint things show (the asinh look). This curve then decides how bright each level is
-            drawn: the left-right position is the brightness the picture has now, the height is the brightness it gets. Raise the
-            middle of the curve to brighten faint things, lower it to darken them. Everything stays in order, brighter never turns
-            darker than dimmer.
+            The picture is first stretched so faint things show. The slider picks that stretch: asinh is the default look and the
+            reset, Linear is brightness proportional to the signal, Log lifts the faint end.
           </p>
           <p>
-            Drag a dot up or down, or focus it and press the arrow keys (Shift for bigger steps). Presets: asinh is the default
-            look and the reset, Linear is brightness proportional to the signal, Log lifts the faint end.
+            The curve then bends the result: left-right is the brightness the picture has now, the height is the brightness it gets.
+            Drag the dot up-left to brighten faint things, down-right to darken them, or focus it and press the arrow keys (Shift for
+            bigger steps). Everything stays in order, brighter never turns darker than dimmer.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
             <HelpImage data={sc.data} w={sc.w} h={sc.h} label="Before: a plain ramp from dark to bright with a faint blob" caption="Before" />
@@ -80,6 +78,30 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
           </div>
         </InfoPopover>
       </div>
+      <label style={{ display: "grid", gap: 2 }}>
+        <span>Stretch: {PRESET_LABEL[value.preset]}</span>
+        <input
+          type="range"
+          min={0}
+          max={CURVE_PRESETS.length - 1}
+          step={1}
+          list="tone-presets"
+          value={presetIdx}
+          aria-label="Stretch"
+          aria-valuetext={PRESET_LABEL[value.preset]}
+          onChange={(e) => onChange({ ...value, preset: CURVE_PRESETS[Number(e.target.value)] ?? "asinh" })}
+        />
+        <datalist id="tone-presets">
+          {CURVE_PRESETS.map((p, i) => (
+            <option key={p} value={i} label={PRESET_LABEL[p]} />
+          ))}
+        </datalist>
+        <span style={{ display: "flex", justifyContent: "space-between", opacity: 0.8 }} aria-hidden="true">
+          {CURVE_PRESETS.map((p) => (
+            <span key={p}>{PRESET_LABEL[p]}</span>
+          ))}
+        </span>
+      </label>
       <svg
         ref={svgRef}
         width={SIZE}
@@ -87,42 +109,39 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         style={{ touchAction: "none", border: "1px solid #666" }}
         onPointerMove={dragTo}
-        onPointerUp={() => (drag.current = null)}
-        onPointerLeave={() => (drag.current = null)}
+        onPointerUp={() => (dragging.current = false)}
+        onPointerLeave={() => (dragging.current = false)}
       >
         <path d={`M${sx(0)} ${sy(0)}L${sx(1)} ${sy(1)}`} stroke="#666" strokeDasharray="3 3" fill="none" />
+        <path d={`M${sx(0)} ${sy(1)}L${sx(1)} ${sy(0)}`} stroke="#444" strokeDasharray="1 3" fill="none" />
+        <path d={`M${sx(0)} ${sy(0)}L${sx(h.x)} ${sy(h.y)}L${sx(1)} ${sy(1)}`} stroke="#888" strokeWidth={1} fill="none" />
         <path d={path} stroke="var(--cyan, #0ff)" strokeWidth={2} fill="none" />
-        {CURVE_X.map((x, i) => (
-          <circle
-            key={i}
-            role="slider"
-            tabIndex={0}
-            aria-label={`Curve point ${i + 1} of ${CURVE_X.length}, input ${Math.round(x * 100)} percent`}
-            aria-orientation="vertical"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(value[i] * 100)}
-            cx={sx(x)}
-            cy={sy(value[i])}
-            r={6}
-            fill="var(--bg, #000)"
-            stroke="var(--cyan, #0ff)"
-            strokeWidth={2}
-            style={{ cursor: "ns-resize" }}
-            onKeyDown={onKey(i)}
-            onPointerDown={(e) => {
-              drag.current = i;
-              e.currentTarget.setPointerCapture?.(e.pointerId);
-            }}
-          />
-        ))}
+        <circle
+          role="slider"
+          tabIndex={0}
+          aria-label="Curve bend"
+          aria-valuemin={-100}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(value.bend * 100)}
+          aria-valuetext={value.bend > 0 ? `brighter faint end, ${Math.round(value.bend * 100)}` : value.bend < 0 ? `darker faint end, ${Math.round(-value.bend * 100)}` : "straight"}
+          cx={sx(h.x)}
+          cy={sy(h.y)}
+          r={6}
+          fill="var(--bg, #000)"
+          stroke="var(--cyan, #0ff)"
+          strokeWidth={2}
+          style={{ cursor: "move" }}
+          onKeyDown={onKey}
+          onPointerDown={(e) => {
+            dragging.current = true;
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+          }}
+        />
       </svg>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {PRESETS.map((p) => (
-          <button key={p.key} type="button" onClick={() => onChange(presetCurve(p.key))}>
-            {p.label}
-          </button>
-        ))}
+      <div>
+        <button type="button" onClick={() => onChange(presetCurve(value.preset))} disabled={Math.abs(value.bend) < 1e-9}>
+          Straighten
+        </button>
       </div>
     </div>
   );
