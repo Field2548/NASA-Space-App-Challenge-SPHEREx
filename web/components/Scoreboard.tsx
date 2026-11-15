@@ -80,20 +80,9 @@ export function Scoreboard({ slug = null, refreshKey = 0, className }: Scoreboar
   });
 
   return (
-    <div
-      className={className}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: 240,
-        maxWidth: "100%",
-        flexShrink: 0,
-      }}
-    >
-      <div style={{ padding: "var(--space-2)", fontSize: 12 }}>Scoreboard</div>
-
+    <section className={className ? `panel ${className}` : "panel"} data-part="PNL-08 // SCOREBOARD" style={{ minWidth: 0 }}>
       {
-        <div id={panelId} className="panel" style={{ flex: 1, minWidth: 0 }}>
+        <div id={panelId} style={{ minWidth: 0 }}>
           <div role="group" aria-label="Scope" style={{ display: "flex", gap: "var(--space-1)" }}>
             <button
               type="button"
@@ -205,6 +194,6 @@ export function Scoreboard({ slug = null, refreshKey = 0, className }: Scoreboar
           )}
         </div>
       }
-    </div>
+    </section>
   );
 }
