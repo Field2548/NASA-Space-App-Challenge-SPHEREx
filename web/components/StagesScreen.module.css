@@ -15,6 +15,11 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* BackLink keeps a bottom margin for pages where it sits above content; in this bar it must centre. */
+.top > a {
+  margin-bottom: 0;
+}
+
 .title {
   margin: 0;
   font-size: 16px;
