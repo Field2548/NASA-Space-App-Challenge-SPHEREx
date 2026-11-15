@@ -42,6 +42,8 @@ function fakeStore(o: { solved?: boolean } = {}) {
     saveSolve: async (r) => (solves.push(r), true),
     saveReport: async (r) => (reports.push(r), true),
     near: async () => [],
+    tileDensity: async () => [],
+    tilePatches: async () => [],
   };
   return { store, solves, reports };
 }

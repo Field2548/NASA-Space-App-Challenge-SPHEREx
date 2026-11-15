@@ -30,6 +30,17 @@ export interface PatchStore {
   saveReport(row: ReportRow): Promise<boolean>;
   /** Patches whose centre lies within `r` degrees of (ra, dec). */
   near(ra: number, dec: number, r: number): Promise<PatchSummary[] | null>;
+  /** Cells at `order` inside a tile: [ipix, patches solved, patches reported]. Null when the query fails. */
+  tileDensity(order: number, tileOrder: number, tile: number): Promise<[number, number, number][] | null>;
+  /** Up to `limit` patches inside a tile with what was done to each. Null when the query fails. */
+  tilePatches(tileOrder: number, tile: number, limit: number): Promise<TilePatch[] | null>;
+}
+
+/** One patch in a tile: no user, no names. */
+export interface TilePatch {
+  id: string;
+  solved: boolean;
+  reported: boolean;
 }
 
 const D2R = Math.PI / 180;
@@ -123,6 +134,35 @@ export function supabaseStore(sb: SupabaseClient): PatchStore {
         ]);
         if (s.error || rep.error) return null;
         return summarise(s.data ?? [], rep.data ?? [], ra, dec, r);
+      } catch {
+        return null;
+      }
+    },
+    async tileDensity(order, tileOrder, tile) {
+      try {
+        const { data, error } = await sb
+          .rpc("patch_density", { p_order: order, p_tile_order: tileOrder, p_tile: tile })
+          .abortSignal(AbortSignal.timeout(5000));
+        if (error || !Array.isArray(data)) return null;
+        return (data as { ipix: number | string; solves: number | string; reports: number | string }[])
+          .map((r) => [Number(r.ipix), Number(r.solves), Number(r.reports)] as [number, number, number])
+          .filter(([i, s, r]) => Number.isFinite(i) && s + r > 0)
+          .sort((a, b) => a[0] - b[0]);
+      } catch {
+        return null;
+      }
+    },
+    async tilePatches(tileOrder, tile, limit) {
+      try {
+        const { data, error } = await sb
+          .rpc("patch_footprints", { p_tile_order: tileOrder, p_tile: tile, p_limit: limit })
+          .abortSignal(AbortSignal.timeout(5000));
+        if (error || !Array.isArray(data)) return null;
+        return (data as { patch_id: string; has_solve: boolean; has_report: boolean }[]).map((r) => ({
+          id: r.patch_id,
+          solved: Boolean(r.has_solve),
+          reported: Boolean(r.has_report),
+        }));
       } catch {
         return null;
       }
