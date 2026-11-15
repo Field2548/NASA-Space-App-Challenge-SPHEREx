@@ -105,6 +105,20 @@ describe("findHipsUrl, shared check and local fallback", () => {
     await expect(m.findHipsUrl()).resolves.toBe(local);
   });
 
+  it("falls back to IRSA's SPHEREx DR1 HiPS when every CDS mirror is down, before the coarse copy", async () => {
+    const local = `${window.location.origin}/hips/spherex-color`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("MocServer")) return new Response("[]");
+        return url.startsWith("https://irsa.ipac.caltech.edu/") || url.startsWith(local) ? new Response(PROPS) : new Response("down", { status: 404 });
+      }),
+    );
+    const m = await fresh();
+    await expect(m.findHipsUrl()).resolves.toBe(m.IRSA_HIPS);
+    expect(m.IRSA_HIPS).toBe("https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube");
+  });
+
   it("does not keep a failed check, so a retry looks again", async () => {
     let up = false;
     vi.stubGlobal(

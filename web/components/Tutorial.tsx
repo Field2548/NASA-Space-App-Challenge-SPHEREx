@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { EROS_OVERLAY, REVEAL_INSPECT_ON, TUTORIAL, type TutorialLevel } from "@/lib/copy/tutorial";
+import { EROS_OVERLAY, REVEAL_INSPECT_ON, TUTORIAL, TUTORIAL_MISS, type TutorialLevel } from "@/lib/copy/tutorial";
 import { GUEST_KEY, type GuestData, loadGuest, saveGuest } from "@/lib/guest";
 import { usePrefersReducedMotion } from "@/lib/useBlink";
 import CoachMark from "./CoachMark";
@@ -105,6 +105,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
   // Inspect state as PlayScreen last reported it, so the reveal step never asks to open an
   // Inspect that is already on (clicking it would turn it off and stall the step).
   const [inspectOn, setInspectOn] = useState(false);
+  const [missed, setMissed] = useState(false);
   const tools = useMemo(() => toolsAt(pos, levels), [pos, levels]);
 
   const go = useCallback(
@@ -130,6 +131,9 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
   const onEvent = useCallback(
     (name: PlayEvent | "intro-seen", detail: PlayEventDetail) => {
       if (detail.inspectOn !== undefined) setInspectOn(detail.inspectOn);
+      // A submit that missed Eros says so until the next mark (or a step change).
+      if (name === "submitted") setMissed(detail.unlocked === false);
+      else if (name === "mark-placed") setMissed(false);
       const p = posRef.current;
       if (!p) return;
       const next = nextPos(p, name, detail, levels);
@@ -148,6 +152,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
   let text = inspectAlreadyOn ? REVEAL_INSPECT_ON : (step?.text ?? "");
   if (step?.doneWhen === "play-pressed" && reducedMotion) text = `${text} ${REDUCED_MOTION_NOTE}`;
   if (step?.doneWhen === "mark-placed") text = `${text} ${EROS_HINT}`;
+  if (missed && step) text = `${TUTORIAL_MISS} ${text}`;
 
   return (
     <div className={styles.root}>

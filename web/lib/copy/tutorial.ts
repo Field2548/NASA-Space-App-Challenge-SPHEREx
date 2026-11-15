@@ -20,6 +20,10 @@ export type TutorialLevel = {
 export const REVEAL_INSPECT_ON =
   "The dot is (433) Eros. Inspect is already on: click the dot to see its name, its place on the sky, how bright it is, and when the picture was taken.";
 
+/** Coach text after a tutorial submit that did not land on Eros (the checker's round verdict is not shown here). */
+export const TUTORIAL_MISS =
+  "Not on the dot yet. A mark must sit within 2 pixels of it. Click Clear marks, then mark the jumping dot again in frames 1 to 3, or use Skip step.";
+
 /** JPL positions of (433) Eros on the tutorial field, copied from web/data/catalog/eros.json
  * (pixel grid, frames 1-based = FrameMeta.i of public/fields/eros). It is drawn when the
  * tutorial's Known asteroids toggle is on; the tutorial may name Eros, a round never does. */

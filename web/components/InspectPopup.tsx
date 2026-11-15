@@ -7,7 +7,7 @@ import { pixelToSky } from "@/lib/wcs";
 import { distanceLines, galactic, placePopup, safeHttpsUrl, type InfoExplore, type SourceStatus } from "@/lib/inspectPopup";
 import type { Field } from "@/lib/types";
 
-const LOCKED_TEXT = "[LOCKED] Names and distances unlock after you submit.";
+const LOCKED_TEXT = "[LOCKED] Names and distances unlock after a correct answer on this spot.";
 const CAVEAT_TEXT = "Age and exact chemical amounts can't be measured from this data.";
 const SOURCE_NAME = { simbad: "SIMBAD", gaia: "Gaia", jpl: "JPL Horizons" } as const;
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { REVEAL_INSPECT_ON, TUTORIAL } from "@/lib/copy/tutorial";
+import { REVEAL_INSPECT_ON, TUTORIAL, TUTORIAL_MISS } from "@/lib/copy/tutorial";
 import { defaultGuest, GUEST_KEY, loadGuest, resetGuest } from "@/lib/guest";
 import { placeCard } from "./CoachMark";
 import { makeField, mockCanvas } from "./testFixtures";
@@ -168,6 +168,33 @@ describe("Tutorial", () => {
     expect([has(/Inspect off/), has("Known asteroids")]).toEqual([true, false]);
     fireEvent.click(screen.getByRole("button", { name: "Skip step" }));
     expect(has("Known asteroids")).toBe(true);
+  });
+
+  it("a submit that misses the dot says so in the coach and how to retry; marking again clears it", async () => {
+    const field = makeField({ slug: "eros" }, 5, 6, 4);
+    const bytes = new Uint16Array(5 * 6 * 4).fill(1000).buffer;
+    const miss = { verdict: { kind: "candidate", points: 0, message: "Unconfirmed candidate." }, first_finder: false, already_found: false, persisted: false, unlocked: false, practice: false };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.startsWith("/api/check")
+          ? new Response(JSON.stringify(miss), { status: 200 })
+          : url.endsWith("field.json")
+            ? new Response(JSON.stringify(field), { status: 200 })
+            : new Response(bytes, { status: 200 }),
+      ),
+    );
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 1, step: 0, done: [0] } }));
+    render(<Tutorial />);
+    const canvas = await screen.findByTestId("field-canvas");
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    expect(coach().textContent).toContain(TUTORIAL[1].steps[2].text);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await vi.waitFor(() => expect(coach().textContent).toContain(TUTORIAL_MISS));
+    fireEvent.click(canvas, { clientX: 15, clientY: 15 });
+    expect(coach().textContent).not.toContain(TUTORIAL_MISS);
   });
 
   it("the reveal step never stalls when Inspect is already on", async () => {
