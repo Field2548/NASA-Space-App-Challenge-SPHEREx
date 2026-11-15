@@ -39,6 +39,7 @@ import {
   type AladinStatic,
 } from "./skymap/aladin";
 import { difficultyStyle, flyFovForSpot, heatColor, heatGradientCss } from "./skymap/geometry";
+import { createCommunityLayer, type CommunityLayer } from "./skymap/communityLayer";
 import { startHipsPrefetch, type HipsPrefetch } from "./skymap/hipsPrefetch";
 import { difficultyColor, reticleCanvas, SpotGlyph } from "./skymap/markers";
 import { loadSpotsOnce } from "./skymap/spots";
@@ -57,6 +58,12 @@ export interface SkyMapProps {
   patches?: SkyPatch[] | null;
   /** The patch the player picked: an amber square. */
   picked?: { corners: [number, number][] } | null;
+  /**
+   * All players' patches, anonymous, streamed by level of detail (skymap/communityLayer.ts): glowing
+   * density from afar, footprints up close, your own in a second colour. While on, the solved-patch
+   * outlines from `patches` are not drawn, as the community layer shows the same patches.
+   */
+  community?: boolean;
   /** View centre (ICRS) and field of view, after the view settles. */
   onView?: (v: { ra: number; dec: number; fov: number }) => void;
   /** A parent that owns the spot card (/stages): a marker click calls this and the map's own list and card stay off. */
@@ -122,6 +129,7 @@ export function SkyMap({
   showSpots = true,
   patches,
   picked,
+  community = false,
   onView,
   onSpot,
   spotMarks,
@@ -134,6 +142,7 @@ export function SkyMap({
   const libRef = useRef<AladinStatic | null>(null);
   const prefetchRef = useRef<HipsPrefetch | null>(null);
   const objectClickRef = useRef(false);
+  const communityRef = useRef<CommunityLayer | null>(null);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -308,8 +317,11 @@ export function SkyMap({
             if (cancelled) return;
             try {
               const [ra, dec] = a.getRaDec();
-              const f = a.getFov()[0];
-              if ([ra, dec, f].every(Number.isFinite)) cbRef.current.onView?.({ ra, dec, fov: f });
+              const [f, fY] = a.getFov();
+              if ([ra, dec, f].every(Number.isFinite)) {
+                cbRef.current.onView?.({ ra, dec, fov: f });
+                communityRef.current?.update({ ra, dec, fov: f, fovY: Number.isFinite(fY) ? fY : f });
+              }
             } catch {
               /* view not ready */
             }
@@ -442,6 +454,38 @@ export function SkyMap({
     flyTo(tRa, tDec, tFov && tFov > 0 ? tFov : DEFAULT_FLY_FOV);
   }, [mapState, tRa, tDec, tFov, flyTo]);
 
+  // Community patches: glowing density from afar, footprints up close.
+  useEffect(() => {
+    const a = aladinRef.current;
+    const lib = libRef.current;
+    if (mapState !== "ready" || !a || !lib || !community) return;
+    const layer = createCommunityLayer({
+      lib,
+      aladin: a,
+      onObjectClick: () => {
+        objectClickRef.current = true;
+        if (clickTimer.current) clearTimeout(clickTimer.current);
+        clickTimer.current = setTimeout(() => {
+          objectClickRef.current = false;
+          clickTimer.current = null;
+        }, 0);
+      },
+      onFly: (ra, dec, f) => flyTo(ra, dec, f),
+    });
+    communityRef.current = layer;
+    try {
+      const [ra, dec] = a.getRaDec();
+      const [f, fY] = a.getFov();
+      if ([ra, dec, f].every(Number.isFinite)) layer.update({ ra, dec, fov: f, fovY: Number.isFinite(fY) ? fY : f });
+    } catch {
+      /* view not ready: the first settled view starts it */
+    }
+    return () => {
+      layer.destroy();
+      if (communityRef.current === layer) communityRef.current = null;
+    };
+  }, [mapState, community, flyTo]);
+
   // Density overlay: HEALPix cells as filled polygons on a heat scale.
   useEffect(() => {
     const a = aladinRef.current;
@@ -481,7 +525,7 @@ export function SkyMap({
   }, [mapState, overlay]);
 
   // Solved patches (green outline, cyan known objects, amber reports) once zoomed in close.
-  const patchesShown = fov <= PATCH_SHOW_FOV;
+  const patchesShown = fov <= PATCH_SHOW_FOV && !community;
   useEffect(() => {
     const a = aladinRef.current;
     const lib = libRef.current;
