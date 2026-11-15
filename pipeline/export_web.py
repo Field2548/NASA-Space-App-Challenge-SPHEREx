@@ -14,6 +14,7 @@ import numpy as np
 
 PIXEL_ARCSEC = 6.15          # same value as spectral_bands.PIXEL_SCALE
 NODATA = 65535               # u16 value for "no data" (NaN)
+ASINH_HALF = 32767           # exposures.u16 asinh encoding: value 32767 is 0 MJy/sr
 BLACK_SIGMA, SOFT_SIGMA = -1.0, 2.0   # the shared stretch of motion_frames.make_stretch
 
 
@@ -403,18 +404,26 @@ def wavelength_map(path, in_wcs, wcs, shape, cells=8):
 
 
 def quantize_plane(plane, noise):
-    """One exposure plane -> (u16 array, scale, offset, clipped). Linear, as the contract says.
-    The step never exceeds noise / 2 (so rounding adds under 2% to the noise); if the range is
-    too wide for that, the brightest pixels are clipped to 65534 and 'clipped' is True."""
-    lo, hi = float(np.nanmin(plane)), float(np.nanmax(plane))
-    offset = float(np.floor(lo * 1e4) / 1e4)
-    scale = max((hi - offset) / (NODATA - 1), 1e-9)
-    clipped = scale > noise / 2
-    if clipped:
-        scale = noise / 2
-    scale = float(f"{scale:.6g}") if clipped else float(np.ceil(scale * 1e7) / 1e7)
-    q = np.clip(np.rint((plane - offset) / scale), 0, NODATA - 1)
-    return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), scale, offset, bool(clipped)
+    """One exposure plane -> (u16 array, soft, step, clipped). asinh encoding, field-schema.md
+    section 7: value = round(asinh(x / soft) / step) + 32767, so MJy/sr = soft * sinh((value -
+    32767) * step). soft is the plane's noise (as written to the JSON); step puts the brightest
+    pixel at the end of the range, so nothing is clipped (clipped is always False)."""
+    soft = float(f"{noise:.5g}")
+    top = float(np.nanmax(np.abs(plane)))
+    step = max(float(np.ceil(np.arcsinh(top / soft) / ASINH_HALF * 1e9) / 1e9), 1e-9)
+    q = np.clip(np.rint(np.arcsinh(plane / soft) / step) + ASINH_HALF, 0, NODATA - 1)
+    return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), soft, step, False
+
+
+def decode_exposure(q, e):
+    """One plane of exposures.u16 -> MJy/sr with NaN, for its exposures.json row: asinh (soft,
+    step) or the older linear (scale, offset)."""
+    q = np.asarray(q)
+    if "scale" in e:
+        v = q * e["scale"] + e["offset"]
+    else:
+        v = e["soft"] * np.sinh((q.astype("f8") - ASINH_HALF) * e["step"])
+    return np.where(q == NODATA, np.nan, v)
 
 
 def grid_for_shape(ra, dec, shape):
@@ -464,20 +473,20 @@ def export_exposures(folder, sky, out_dir, wcs=None):
             noise = float(noise_of(plane))
             obs_id, det = name[:-5].rsplit("_D", 1)
             date_obs = str(fits.getheader(path, "IMAGE")["DATE-OBS"])
-            q, scale, offset, clipped = quantize_plane(plane[::-1], noise)   # rows top-down
+            q, soft, step, clipped = quantize_plane(plane[::-1], noise)   # rows top-down
             grid, bandwidth = wavelength_map(path, in_wcs, wcs, (h, w))
             mjd = float(Time(date_obs).mjd)
             items.append({"k": len(items), "frame": m["i"], "mjd": round(mjd, 6),
                           "utc": date_obs[:19], "detector": int(det), "obs_id": obs_id,
                           "file": name, "source": urls.get((obs_id, int(det))),
-                          "scale": scale, "offset": offset, "noise": float(f"{noise:.5g}"),
+                          "soft": soft, "step": step, "noise": float(f"{noise:.5g}"),
                           "clipped": clipped, "bandwidth_um": bandwidth, "wavelength_um": grid})
             planes.append(q)
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "exposures.u16"), "wb") as f:
         f.write(np.array(planes, dtype="<u2").tobytes())
     info = {"file": "exposures.u16", "size": [w, h], "count": len(items), "units": "MJy/sr",
-            "nodata": NODATA, "wavelength_grid": 8, "exposures": items}
+            "encoding": "asinh", "nodata": NODATA, "wavelength_grid": 8, "exposures": items}
     with open(os.path.join(out_dir, "exposures.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(info, f, separators=(",", ":"))
         f.write("\n")
@@ -490,8 +499,7 @@ def read_exposures(spot_dir):
         info = json.load(f)
     w, h = info["size"]
     q = np.fromfile(os.path.join(spot_dir, info["file"]), dtype="<u2").reshape(info["count"], h, w)
-    planes = np.array([np.where(q[e["k"]] == NODATA, np.nan, q[e["k"]] * e["scale"] + e["offset"])
-                       for e in info["exposures"]])
+    planes = np.array([decode_exposure(q[e["k"]], e) for e in info["exposures"]])
     return planes, info
 
 

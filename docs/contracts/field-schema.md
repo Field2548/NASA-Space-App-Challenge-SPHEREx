@@ -126,17 +126,18 @@ Never import this from client code and never copy it under `public/`.
 
 ## 7. `exposures.u16` + `exposures.json` (phase 2, optional)
 
-`exposures.u16`: `K x H x W` little-endian Uint16, rows top-down, `65535` = no data. Each exposure has its **own** `scale` and `offset`; values are surface brightness in MJy/sr after zodiacal-light and background subtraction: `MJy/sr = value * scale + offset`. Written only for `precision: "float"` spots whose cutouts were available (`has.exposures`). About 1 MB for a 119 px spot.
+`exposures.u16`: `K x H x W` little-endian Uint16, rows top-down, `65535` = no data. Values are surface brightness in MJy/sr after zodiacal-light and background subtraction, stored with an asinh stretch so that faint sky and very bright sources (Eros reaches 320 MJy/sr, 25000 times the noise) share one plane without clipping. Each exposure has its **own** `soft` and `step`: `MJy/sr = soft * sinh((value - 32767) * step)`. The encoder is `value = round(asinh(x / soft) / step) + 32767`, with `soft` = the plane's `noise` and `step = asinh(max|x| / soft) / 32767`, so the brightest pixel maps to the end of the range. Near the sky the rounding step is about `noise * step`, a few ten-thousandths of the noise; at the brightest pixel the relative error is about `step` (0.03 percent). Written only for `precision: "float"` spots whose cutouts were available (`has.exposures`). About 1 MB for a 119 px spot.
 
 ```json
 {
-  "file": "exposures.u16", "size": [119, 119], "count": 34, "units": "MJy/sr", "nodata": 65535,
+  "file": "exposures.u16", "size": [119, 119], "count": 34, "units": "MJy/sr",
+  "encoding": "asinh", "nodata": 65535,
   "wavelength_grid": 8,
   "exposures": [
     { "k": 0, "frame": 1, "mjd": 60865.750596, "utc": "2025-07-09T18:00:51", "detector": 3,
       "obs_id": "2025W28_1B_0502_1", "file": "2025W28_1B_0502_1_D3.fits",
       "source": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/...",
-      "scale": 0.0006442, "offset": -0.3108, "noise": 0.012676, "clipped": false,
+      "soft": 0.012676, "step": 0.000331, "noise": 0.012676, "clipped": false,
       "bandwidth_um": 0.0537,
       "wavelength_um": [[null, null, null, 2.1357, 2.1328, 2.1299, 2.127, 2.1241]] } ]
 }
@@ -145,15 +146,16 @@ Never import this from client code and never copy it under `public/`.
 - `k` is the plane index in `exposures.u16`. `frame` is the frame number (from 1) this exposure belongs to. Exposures are listed frame by frame; a frame has `n_bands` of them.
 - `mjd` / `utc` is the start of the exposure (`DATE-OBS`). `source` is the full IRSA image the cutout came from (provenance), or `null`.
 - `noise` is the sigma-clipped standard deviation of the plane, in MJy/sr.
-- `scale` is at most `noise / 2`. If the plane's range is too wide for that, the brightest pixels are clipped to `65534` and `clipped` is `true` (their real value is higher).
-- `wavelength_um` is an 8 x 8 grid (8 rows top-down, each 8 columns): the wavelength seen at the centre of each of 8 x 8 equal cells of the spot. Cell `(cx, cy)` is centred on pixel `((cx + 0.5) * W / 8 - 0.5, (cy + 0.5) * H / 8 - 0.5)`. Interpolate bilinearly. `null` = the exposure does not cover that cell. `bandwidth_um` is the band width at the centre of the spot (`null` if not covered).
+- `soft` equals `noise`. Nothing is clipped, so `clipped` is always `false` (kept in the file for older readers).
+- Older files (no top-level `encoding`) use a linear `scale` and `offset` per exposure instead: `MJy/sr = value * scale + offset`. Readers accept both forms: linear when `scale` is present, asinh otherwise.
+- `wavelength_um` is an 8 x 8 grid (8 rows top-down, each 8 columns): the wavelength seen at the centre of each of 8 x 8 equal cells of the spot. Cell `(cx, cy)` is centred on pixel `((cx + 0.5) * W / 8 - 0.5, (cy + 0.5) * H / 8 - 0.5)`. Interpolate bilinearly; at the edges (outside the outermost cell centres) clamp to the nearest cell centre, never extrapolate. `null` = the exposure does not cover that cell. `bandwidth_um` is the band width at the centre of the spot (`null` if not covered).
 
 **Rebuilding a frame from exposures** (what the wavelength switch does; reference code is `rebuild_frame` in `pipeline/export_web.py`, the same maths as `build_frame` in `motion_frames.py`):
 
-1. Pick the exposures of one frame that pass the filter (detector or wavelength).
+1. Pick the exposures of one frame that pass the filter (detector or wavelength). A frame with no exposure passing the filter is skipped (no frame is built for it).
 2. Turn each plane into noise units: `plane / noise`.
-3. Per pixel: with 3 or more planes, a 3-sigma-clipped mean (centre = median, spread = 1.4826 x median absolute deviation, repeat until nothing more is clipped); with 1 or 2 planes, the plain mean ignoring NaN (show the "fewer than 3" notice: cosmic rays are not removed).
-4. Divide the result by its own noise (sigma-clipped standard deviation, 2.5 sigma, 5 rounds).
+3. Per pixel: with 3 or more planes (all selected planes count, also those that are NaN at this pixel), a 3-sigma-clipped mean: centre = median, sigma = 1.4826 x median absolute deviation; a value is clipped only when it is more than 3 sigma from the median, and never when that sigma is 0; at most 5 rounds (astropy's default), not "until nothing more is clipped". With 1 or 2 planes, the plain mean ignoring NaN (show the "fewer than 3" notice: cosmic rays are not removed).
+4. Divide the result by its own noise: the standard deviation (population, divisor N) of the finite pixels after sigma clipping at 2.5 sigma around the median, 5 rounds.
 5. Blank every pixel that is NaN in any of the frames shown, then use one shared stretch.
 
 Noise guard: a plane whose given noise is not a finite positive number is skipped (not used, not counted in `planesUsed`), and if the rebuilt frame's own noise is not a finite positive number the frame is returned undivided, so a constant plane never gives Infinity or NaN-filled output.
