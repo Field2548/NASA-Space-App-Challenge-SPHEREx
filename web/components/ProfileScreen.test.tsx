@@ -102,42 +102,41 @@ describe("ProfileScreen", () => {
   async function openForm(display: string | null, finds?: FindRow[] | null) {
     vi.spyOn(supa, "getSupabaseBrowser").mockReturnValue(fakeClient({ id: "u1" }, display, finds));
     render(<ProfileScreen />);
-    return (await screen.findByLabelText("Display name")) as HTMLInputElement;
+    await screen.findByText("Stages solved");
   }
-  const save = (input: HTMLInputElement, value: string) => {
-    fireEvent.change(input, { target: { value } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  };
 
-  it("saves a new display name and updates the session metadata", async () => {
-    const input = await openForm("vega");
-    await waitFor(() => expect(input.value).toBe("vega"));
-    save(input, "  Nova  ");
-    await screen.findByText("Saved.");
-    expect(update).toHaveBeenCalledWith({ display_name: "Nova" });
-    expect(updateUser).toHaveBeenCalledWith({ data: { display_name: "Nova" } });
+  it("offers no rename for a user who already has a profile", async () => {
+    await openForm("vega");
+    expect(screen.queryByLabelText("Display name")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(screen.queryByText("Pick a display name so you appear on the scoreboard.")).toBeNull();
+    expect(update).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("says when the name is taken", async () => {
-    update.mockResolvedValue({ error: { code: "23505" } });
-    save(await openForm("vega"), "Nova");
-    expect(await screen.findByText("That name is taken. Pick another.")).toBeTruthy();
-    expect(updateUser).not.toHaveBeenCalled();
-  });
-
-  it("rejects an invalid name without calling the database", async () => {
-    save(await openForm("vega"), "x");
-    expect(await screen.findByText("Use at least 3 characters.")).toBeTruthy();
+  it("asks a user without a profile row to pick a name once, inserts it, then hides the form", async () => {
+    await openForm(null);
+    expect(await screen.findByText("Pick a display name so you appear on the scoreboard.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "  Nova  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByLabelText("Display name")).toBeNull());
+    expect(insert).toHaveBeenCalledWith({ id: "u1", display_name: "Nova" });
+    expect(updateUser).toHaveBeenCalledWith({ data: { display_name: "Nova" } });
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("asks a user without a profile row to pick a name, and inserts it", async () => {
-    const input = await openForm(null);
-    expect(await screen.findByText("Pick a display name so you appear on the scoreboard.")).toBeTruthy();
-    save(input, "Nova");
-    await screen.findByText("Saved.");
-    expect(insert).toHaveBeenCalledWith({ id: "u1", display_name: "Nova" });
+  it("says when the one-time name is taken and rejects an invalid one", async () => {
+    await openForm(null);
+    const input = await screen.findByLabelText("Display name");
+    fireEvent.change(input, { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Use at least 3 characters.")).toBeTruthy();
+    expect(insert).not.toHaveBeenCalled();
+    insert.mockResolvedValue({ error: { code: "23505" } });
+    fireEvent.change(input, { target: { value: "Nova" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("That name is taken. Pick another.")).toBeTruthy();
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("counts distinct solved stages from the database for a logged-in user", async () => {

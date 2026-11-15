@@ -197,16 +197,15 @@ begin
   perform set_config('request.jwt.claim.sub', '0000000a-0000-4000-8000-00000000000a', true);
   perform set_config('request.jwt.claims', '{"sub": "0000000a-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
 
+  -- The name is chosen once at sign-up: no update of display_name, valid or not (migration display_name_once).
   begin
-    update public.profiles set display_name = 'Shift-and-stack bot';
-    raise exception 'FAIL: a player took the bot''s name';
-  exception when check_violation then null;
+    update public.profiles set display_name = 'probe_a_renamed';
+    raise exception 'FAIL: a player renamed themselves';
+  exception when insufficient_privilege then null;
   end;
-  begin
-    update public.profiles set display_name = ' padded ';
-    raise exception 'FAIL: a name with spaces at the ends was accepted';
-  exception when check_violation then null;
-  end;
+  if (select display_name from public.profiles where id = '0000000a-0000-4000-8000-00000000000a') <> 'probe_a' then
+    raise exception 'FAIL: user A cannot read their own display name';
+  end if;
   begin
     update public.profiles set id = '0000000b-0000-4000-8000-00000000000b';
     raise exception 'FAIL: a player changed their profile id';
@@ -222,7 +221,7 @@ begin
     raise exception 'FAIL: display_name_available accepts a reserved, short or taken name';
   end if;
   reset role;
-  raise notice 'ok: display names are checked, and a player can only edit their own';
+  raise notice 'ok: a player can read but never change their display name';
 end $$;
 
 -- ---------------------------------------------------------------- repeats, row cap, request queue
