@@ -78,6 +78,6 @@ def test_movers_move_by_the_catalog_proper_motion(slug, lo, hi):
     assert lo < obj["total_motion_px"] < hi
 
 
-@pytest.mark.parametrize("slug", ["rw-aur", "r-dra"])
+@pytest.mark.parametrize("slug", ["rw-aur", "r-dra", "taurus-ice"])
 def test_variables_do_not_move(slug):
     assert _answer(slug)["objects"][0]["total_motion_px"] < 0.05

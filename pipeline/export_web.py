@@ -634,7 +634,8 @@ def parse_args():
     p.add_argument("--fov", type=float, default=0.2, help="field of view in degrees (default 0.2)")
     p.add_argument("--track", help="JPL Horizons small-body id of the known object")
     p.add_argument("--stars", action="store_true",
-                   help="export the tool-test star spots (STAR_SPOTS in star_targets.py)")
+                   help="export the tool-test star spots (STAR_SPOTS in star_targets.py; with "
+                        "--slug only that one; uses data/bands_<slug> for the spectrum tiles)")
     p.add_argument("--star", help="reserved")
     p.add_argument("--noise-bar", type=float, help="the bot search's noise bar (sigma)")
     p.add_argument("--nothing-moves", action="store_true", help="control spot")
@@ -652,7 +653,7 @@ def main():
         from star_targets import STAR_SPOTS
         jobs = [{"slug": s["slug"], "folder": os.path.join(ROOT, s["folder"]), "title": s["title"],
                  "kind": "star", "difficulty": "tool", "fov": s["fov"], "star": s["star"],
-                 "noise_bar": None} for s in STAR_SPOTS]
+                 "noise_bar": None} for s in STAR_SPOTS if not a.slug or s["slug"] == a.slug]
     elif a.all:
         jobs = [dict(s, folder=os.path.join(ROOT, s["folder"])) for s in SPOTS]
     elif a.folder and a.slug and a.title and a.difficulty:
@@ -662,7 +663,7 @@ def main():
     else:
         raise SystemExit("give FOLDER --slug --title --difficulty, or --all")
     for j in jobs:
-        bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all else None)
+        bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all or a.stars else None)
         f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out, bands=bands,
                          track=j.get("track"), star=j.get("star"), kind=j["kind"], fov=j["fov"],
                          noise_bar=j.get("noise_bar"), nothing_moves=j.get("nothing_moves", False))

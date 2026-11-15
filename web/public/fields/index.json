@@ -98,5 +98,15 @@
   "difficulty": "tool",
   "kind": "spot",
   "thumbnail": "r-dra/thumbs/1.webp"
+ },
+ {
+  "slug": "taurus-ice",
+  "title": "Taurus dark cloud: ice in starlight",
+  "ra": 69.9119,
+  "dec": 26.1907,
+  "fov_deg": 0.2,
+  "difficulty": "tool",
+  "kind": "spot",
+  "thumbnail": "taurus-ice/thumbs/1.webp"
  }
 ]

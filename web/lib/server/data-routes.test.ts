@@ -244,9 +244,9 @@ describe("botScore against the real answer keys", () => {
     const bot = await botScore();
     const per = Object.fromEntries(bot.spots.map((s) => [s.slug, s]));
     expect(Object.keys(per).sort()).toEqual([
-      "barnard", "cygnus", "eps-indi-b", "eris", "eros", "hektor", "makemake", "r-dra", "rw-aur", "wise0855",
+      "barnard", "cygnus", "eps-indi-b", "eris", "eros", "hektor", "makemake", "r-dra", "rw-aur", "taurus-ice", "wise0855",
     ]);
-    for (const slug of ["barnard", "eps-indi-b", "wise0855", "rw-aur", "r-dra"]) {
+    for (const slug of ["barnard", "eps-indi-b", "wise0855", "rw-aur", "r-dra", "taurus-ice"]) {
       expect(per[slug]).toMatchObject({ score: 0, above_bar: 0, matched: 0 });
     }
     expect(per.eris).toMatchObject({ score: 1000, above_bar: 2, matched: 1 });
