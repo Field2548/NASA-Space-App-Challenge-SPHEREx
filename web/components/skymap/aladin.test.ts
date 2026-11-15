@@ -70,3 +70,53 @@ describe("findHipsUrl", () => {
     expect(await findHipsUrl()).toBe("https://other.example/hips");
   });
 });
+
+describe("findHipsUrl, shared check and local fallback", () => {
+  const PROPS = "hips_order = 7\nhips_tile_format = png\n";
+  async function fresh() {
+    vi.resetModules();
+    return import("./aladin");
+  }
+
+  it("answers from a known mirror without waiting for the MocServer, and checks once per page", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("MocServer")) return new Promise<Response>(() => {}); // never answers
+      if (url.startsWith("https://alasky.cds")) return Promise.resolve(new Response(PROPS));
+      return Promise.resolve(new Response("down", { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const m = await fresh();
+    await expect(m.findHipsUrl()).resolves.toBe("https://alasky.cds.unistra.fr/SPHEREx/color");
+    const calls = fetchMock.mock.calls.length;
+    await expect(m.findHipsUrl(new AbortController().signal)).resolves.toBe("https://alasky.cds.unistra.fr/SPHEREx/color");
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
+
+  it("falls back to the site's own coarse copy when every CDS mirror is down", async () => {
+    const local = `${window.location.origin}/hips/spherex-color`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("MocServer")) return new Response("[]");
+        return url.startsWith(local) ? new Response(PROPS) : new Response("down", { status: 404 });
+      }),
+    );
+    const m = await fresh();
+    await expect(m.findHipsUrl()).resolves.toBe(local);
+  });
+
+  it("does not keep a failed check, so a retry looks again", async () => {
+    let up = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("MocServer")) return new Response("[]");
+        return up && url.startsWith("https://alasky") ? new Response(PROPS) : new Response("down", { status: 404 });
+      }),
+    );
+    const m = await fresh();
+    await expect(m.findHipsUrl()).resolves.toBeNull();
+    up = true;
+    await expect(m.findHipsUrl()).resolves.toMatch(/^https:\/\/alasky/);
+  });
+});

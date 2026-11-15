@@ -24,11 +24,12 @@ describe("PlayRoute", () => {
     render(<PlayRoute spot="fixture" params={{ spot: "fixture", frames: "1-3", spacing: "real", vision: "mono" }} />);
     expect(screen.props?.initialView).toEqual({ frames: [1, 3], realSpacing: true, vision: "mono" });
   });
-  it("writes changes back with router.replace and keeps other params", () => {
+  it("writes changes to the address without a router navigation (which remounts the game and drops marks)", () => {
     window.history.replaceState(null, "", "/play?spot=fixture&ra=10");
     render(<PlayRoute spot="fixture" params={{ spot: "fixture", ra: "10" }} />);
     screen.props?.onViewChange({ frames: [1, 3], realSpacing: false, vision: "tritan" });
-    expect(nav.replace).toHaveBeenCalledWith("/play?spot=fixture&ra=10&frames=1-3&vision=tritan", { scroll: false });
+    expect(window.location.pathname + window.location.search).toBe("/play?spot=fixture&ra=10&frames=1-3&vision=tritan");
+    expect(nav.replace).not.toHaveBeenCalled();
   });
   it("does not replace when the URL already matches", () => {
     window.history.replaceState(null, "", "/play?spot=fixture&vision=mono");

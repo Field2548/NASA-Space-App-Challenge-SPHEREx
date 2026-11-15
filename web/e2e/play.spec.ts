@@ -12,6 +12,20 @@ test("/play?spot=eros loads a canvas and a click places a mark", async ({ page }
   await expect(page.locator('svg [data-frame="1"]')).toHaveCount(1);
 });
 
+test("/play?spot=eros Inspect popup closes with its Close button", async ({ page }) => {
+  await page.goto("/play?spot=eros");
+  const canvas = page.getByTestId("field-canvas");
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press("i");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("canvas has no box");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const title = page.getByRole("heading", { name: /^INSPECT \/\/ px/ });
+  await expect(title).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(title).toHaveCount(0);
+});
+
 test("/play?spot=eros marks by keyboard", async ({ page }) => {
   await page.goto("/play?spot=eros");
   await expect(page.getByTestId("field-canvas")).toBeVisible();

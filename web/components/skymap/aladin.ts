@@ -163,19 +163,57 @@ async function probeMirror(url: string, signal?: AbortSignal): Promise<string> {
  * The MocServer lookup runs at the same time as the probes of the known mirrors, so a dead CDS
  * costs one timeout, not several in a row.
  */
-export async function findHipsUrl(signal?: AbortSignal): Promise<string | null> {
-  const known = KNOWN_MIRRORS.map((url) => probeMirror(url, signal));
-  const extra = mirrorsFromMocServer(signal).then((urls) => {
+async function probeMirrors(): Promise<string | null> {
+  const known = KNOWN_MIRRORS.map((url) => probeMirror(url));
+  const extra = mirrorsFromMocServer().then((urls) => {
     const fresh = urls.filter((u) => !KNOWN_MIRRORS.includes(u));
     if (!fresh.length) throw new Error("no extra mirrors");
-    return Promise.any(fresh.map((url) => probeMirror(url, signal)));
+    return Promise.any(fresh.map((url) => probeMirror(url)));
   });
+  // The site's own coarse copy (pipeline/mirror_hips.py), probed at the same time; used only when
+  // every CDS mirror fails, so a dead CDS still costs one timeout.
+  const local =
+    typeof window === "undefined"
+      ? Promise.resolve(null)
+      : probeMirror(`${window.location.origin}${LOCAL_HIPS}`).catch(() => null);
   try {
     return await Promise.any([...known, extra]);
   } catch {
-    if (signal?.aborted) throw new DOMException("aborted", "AbortError");
-    return null;
+    return await local;
   }
+}
+
+/** Where pipeline/mirror_hips.py puts the coarse copy (web/public/hips/spherex-color). */
+export const LOCAL_HIPS = "/hips/spherex-color";
+
+let mirror: Promise<string | null> | null = null;
+
+/**
+ * The working mirror, looked up once per page load and shared (the title screen starts it early,
+ * see preloadSky). A null result is not kept, so "Try the map again" looks again.
+ */
+export function findHipsUrl(signal?: AbortSignal): Promise<string | null> {
+  if (!mirror) {
+    const p = probeMirrors();
+    mirror = p;
+    void p.then((url) => {
+      if (url === null && mirror === p) mirror = null;
+    });
+  }
+  const shared = mirror;
+  if (!signal) return shared;
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(new DOMException("aborted", "AbortError"));
+    if (signal.aborted) return abort();
+    signal.addEventListener("abort", abort, { once: true });
+    shared.then(resolve, reject);
+  });
+}
+
+/** Start the sky map's slow parts (Aladin Lite + WASM, the CDS mirror check) before /map opens. */
+export function preloadSky(): void {
+  loadAladin().catch(() => {});
+  void findHipsUrl();
 }
 
 /**

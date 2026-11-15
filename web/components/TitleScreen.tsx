@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
 import LoginButton from "./LoginButton";
+import SkyPreload from "./SkyPreload";
 import styles from "./TitleScreen.module.css";
 
 type Cell = { ch: string; tw: 0 | 1 | 2 | 3 };
@@ -69,6 +70,7 @@ export default function TitleScreen() {
           </Link>
           <LoginButton className={styles.button} />
         </nav>
+        <SkyPreload />
       </div>
     </main>
   );

@@ -101,6 +101,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
   const [spotsFailed, setSpotsFailed] = useState(false);
   const [mapState, setMapState] = useState<MapState>("loading");
   const [failReason, setFailReason] = useState("");
+  const [programReady, setProgramReady] = useState(false); // Aladin Lite loaded; still waiting on CDS
   const [attempt, setAttempt] = useState(0);
   const [selected, setSelected] = useState<FieldSummary | null>(null);
   const [fov, setFov] = useState(360);
@@ -146,7 +147,9 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       let lib: AladinStatic;
       let url: string | null;
       try {
-        [lib, url] = await Promise.all([loadAladin(), findHipsUrl(ctl.signal)]);
+        const libP = loadAladin();
+        void libP.then(() => !cancelled && setProgramReady(true), () => {});
+        [lib, url] = await Promise.all([libP, findHipsUrl(ctl.signal)]);
       } catch (e) {
         if (ctl.signal.aborted) return;
         const msg = String(e);
@@ -416,7 +419,11 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           role="status"
           style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--text-dim)" }}
         >
-          <span>[####------] loading the SPHEREx sky</span>
+          <span>
+            {programReady
+              ? "[########--] waiting for CDS (Strasbourg), the source of the SPHEREx sky picture…"
+              : "[###-------] loading the sky map program…"}
+          </span>
         </div>
       )}
 
