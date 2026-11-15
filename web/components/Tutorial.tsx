@@ -186,6 +186,9 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
               Skip step
             </button>
           )}
+          <Link href="/map" className={styles.link}>
+            Skip to sky map
+          </Link>
           <Link href="/" className={styles.link}>
             Leave
           </Link>

@@ -110,7 +110,7 @@ async function mirrorsFromMocServer(signal?: AbortSignal): Promise<string[]> {
   for (const base of MOCSERVERS) {
     try {
       const res = await fetch(`${base}?ID=${encodeURIComponent(HIPS_ID)}&fmt=json&get=record`, {
-        signal: withTimeout(signal, 4000),
+        signal: withTimeout(signal, 2000),
       });
       if (!res.ok) continue;
       const rows = (await res.json()) as Record<string, unknown>[];
@@ -132,20 +132,61 @@ async function mirrorsFromMocServer(signal?: AbortSignal): Promise<string[]> {
  * Returns null if none does. Done before Aladin starts because when the base layer fails, Aladin
  * falls back to its default DSS survey (not allowed here, BP section 7) and can retry forever.
  */
-export async function findHipsUrl(signal?: AbortSignal): Promise<string | null> {
-  const fromRecord = await mirrorsFromMocServer(signal);
-  const candidates = [...new Set([...fromRecord, ...KNOWN_MIRRORS])];
-  const probes = candidates.map(async (url) => {
-    const res = await fetch(`${url}/properties`, { signal: withTimeout(signal, 6000) });
+async function probeMirrors(): Promise<string | null> {
+  const probe = async (url: string) => {
+    const res = await fetch(`${url}/properties`, { signal: AbortSignal.timeout(PROBE_MS) });
     const text = res.ok ? await res.text() : "";
     // CDS answers its "Page unavailable" HTML with a 404; a real properties file has hips_ keys.
     if (!res.ok || !/hips_(tile_format|order)/.test(text)) throw new Error(`${url}: HTTP ${res.status}`);
     return url;
+  };
+  // The known mirrors are probed at once; the MocServer record only adds mirrors not known here.
+  const extra = mirrorsFromMocServer().then((urls) => {
+    const fresh = urls.filter((u) => !KNOWN_MIRRORS.includes(u));
+    return fresh.length ? Promise.any(fresh.map(probe)) : Promise.reject(new Error("no extra mirror"));
   });
   try {
-    return await Promise.any(probes);
+    return await Promise.any([...KNOWN_MIRRORS.map(probe), extra]);
   } catch {
-    if (signal?.aborted) throw new DOMException("aborted", "AbortError");
-    return null;
+    // CDS is down: the site's own copy of orders 0-3 (pipeline/mirror_hips.py), if it has one.
+    try {
+      return await probe(`${window.location.origin}${LOCAL_HIPS}`);
+    } catch {
+      return null;
+    }
   }
+}
+
+/** Where pipeline/mirror_hips.py puts the coarse copy (web/public/hips/spherex-color). */
+export const LOCAL_HIPS = "/hips/spherex-color";
+
+const PROBE_MS = 5000;
+let mirror: Promise<string | null> | null = null;
+
+/**
+ * The working mirror, looked up once per page load and shared (the title screen starts it early,
+ * see preloadSky). A null result is not kept, so "Try the map again" looks again.
+ */
+export function findHipsUrl(signal?: AbortSignal): Promise<string | null> {
+  if (!mirror) {
+    const p = probeMirrors();
+    mirror = p;
+    void p.then((url) => {
+      if (url === null && mirror === p) mirror = null;
+    });
+  }
+  const shared = mirror;
+  if (!signal) return shared;
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(new DOMException("aborted", "AbortError"));
+    if (signal.aborted) return abort();
+    signal.addEventListener("abort", abort, { once: true });
+    shared.then(resolve, reject);
+  });
+}
+
+/** Start the sky map's slow parts (Aladin Lite + WASM, the CDS mirror check) before /map opens. */
+export function preloadSky(): void {
+  loadAladin().catch(() => {});
+  void findHipsUrl();
 }

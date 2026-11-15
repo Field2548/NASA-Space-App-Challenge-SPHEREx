@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import type { FieldSummary } from "@/lib/types";
 import { CoordinateBox } from "./CoordinateBox";
 import styles from "./MapScreen.module.css";
+import QuickLook from "./QuickLook";
 import { SkyMap } from "./SkyMap";
 import { flyFovForSpot, spotCovering } from "./skymap/geometry";
 import { loadSpotsOnce } from "./skymap/spots";
@@ -19,6 +20,7 @@ export default function MapScreen() {
   const router = useRouter();
   const [spots, setSpots] = useState<FieldSummary[] | undefined>(undefined);
   const [target, setTarget] = useState<{ ra: number; dec: number; fov?: number } | null>(null);
+  const [quick, setQuick] = useState<{ ra: number; dec: number } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -48,7 +50,9 @@ export default function MapScreen() {
               setTarget({ ra, dec, fov: s ? flyFovForSpot(s) : 1 });
             }}
             onPlay={play}
+            onQuickLook={(p) => setQuick(p)}
           />
+          {quick && <QuickLook ra={quick.ra} dec={quick.dec} onClose={() => setQuick(null)} />}
         </div>
       </main>
     </div>
