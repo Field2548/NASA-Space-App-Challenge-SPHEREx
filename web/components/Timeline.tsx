@@ -1,28 +1,31 @@
 "use client";
-// Timeline v1 (BP 8.8): Track 1 frame clips with thumbnails and time-coloured borders, date/time
-// and "+gap" labels, a playhead with scrubbing, optional ONION range track, Track 2 "My marks".
-// Keyboard: focus the frames track, then Left/Right step, Home/End jump, Space plays or pauses.
+// Timeline (BP 8.8): one toolbar (Previous / Play / Next, the current frame, Frames shown, Speed), the frame
+// clips with thumbnails, time-coloured borders and "marked" badges, and one labelled range lane per job under
+// the clips: "Blink" (the frames the blink plays) and, while Color by time is on, "Color" (the frames mixed
+// into the colour picture). Each lane is a two-thumb range aligned to the clips.
+// Keyboard: focus the frames track, then Left/Right step (wrapping round the ends), Home/End jump, Space
+// plays or pauses. A range thumb moves with Left/Right/Home/End.
 //
 // Props:
 //   field: Field; frames: Float32Array[] (decoded S/N)
 //   index: number; onIndexChange(i: number): void      array index (0-based)
-//   marks?: Mark[]                                      shown on Track 2
+//   marks?: Mark[]                                      shown as badges on the clips
 //   colors?: RGB[]                                      time colours (default timeColors(n, vision))
 //   vision?: Vision                                     colour-vision mode for the default colours
 //   brightness?: number                                 black point for the fallback thumbnails (S/N)
 //   playing?: boolean; onTogglePlay?(): void            blink control (from useBlink)
-//   reducedMotion?: boolean                             shows that auto-play is off
-//   controlsSlot?: ReactNode                            "Frames & spacing" controls at the left
-//   loopMode?: "loop" | "pingpong"; onLoopModeChange?(m)  Loop / Ping-pong toggle shown when the callback is
-//                                                          given (PlayScreen passes the same mode to useBlink)
+//   reducedMotion?: boolean                             auto-play is off; Play is disabled and says why
+//   controlsSlot?: ReactNode                            extra controls at the end of the toolbar
 //   onionRange?: [a, b]; onOnionRangeChange?(r)         inclusive array indices for Color by time (2..7 frames);
-//                                                          the ONION track shows when onionRange is given;
 //                                                          FieldViewer overlayFrames = onionRangeFrames(range)
+//   onionActive?: boolean                               show the Color lane (default true when onionRange is given)
 //   loopRange?: [a, b]; onLoopRangeChange?(r)           inclusive array indices the blink plays (default all);
-//                                                          two edge handles on the thumbnail strip show when the
-//                                                          callback is given; clips outside the loop are dimmed
-//   fps?: number; onFpsChange?(f)                       blink speed, one of BLINK_SPEEDS; the slider shows
+//                                                          the Blink lane shows when the callback is given;
+//                                                          clips outside the range are dimmed
+//   fps?: number; onFpsChange?(f)                       blink speed, one of BLINK_SPEEDS; the Speed control shows
 //                                                          when the callback is given
+//   frameMax?: number; onFrameCountChange?(c)           "Frames" stepper (2..frameMax) shown when the callback is
+//                                                          given; the parent hands in only the chosen frames
 //
 // Thumbnails: field.thumbs (one 48x48 WebP per frame, via loadThumbs) when there are as many as
 // frames; otherwise, while loading, and on error, the frame-derived canvas at `brightness`.
@@ -31,7 +34,7 @@ import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useId
 import { loadThumbs } from "@/lib/fields";
 import { makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB, Vision } from "@/lib/types";
-import { BLINK_SPEEDS, type BlinkMode } from "@/lib/useBlink";
+import { BLINK_SPEEDS, wrapIndex } from "@/lib/useBlink";
 import { timeColors } from "@/lib/palettes";
 import { formatGap, rgbCss, stretchPoints } from "./FieldViewer";
 import styles from "./Timeline.module.css";
@@ -40,7 +43,7 @@ export const CLIP_W = 112;
 export const CLIP_GAP = 8;
 export const ONION_MAX = 7;
 const STEP = CLIP_W + CLIP_GAP;
-const HANDLE_W = 10;
+const HANDLE_W = 24; // range thumb width: a 24px hit target at least
 
 export interface TimelineProps {
   field: Field;
@@ -55,23 +58,24 @@ export interface TimelineProps {
   onTogglePlay?(): void;
   reducedMotion?: boolean;
   controlsSlot?: ReactNode;
-  loopMode?: BlinkMode;
-  onLoopModeChange?(m: BlinkMode): void;
   onionRange?: [number, number];
   onOnionRangeChange?(r: [number, number]): void;
+  onionActive?: boolean;
   loopRange?: [number, number];
   onLoopRangeChange?(r: [number, number]): void;
   fps?: number;
   onFpsChange?(f: number): void;
+  frameMax?: number;
+  onFrameCountChange?(c: number): void;
   /** Draw thumbnails from `frames` (a rebuilt wavelength band) instead of the all-band field.thumbs. */
   thumbsFromFrames?: boolean;
 }
 
-/** New index for a key press, or null if the key is not ours. */
+/** New index for a key press, or null if the key is not ours. Left/Right wrap round the ends. */
 export function keyToIndex(key: string, i: number, n: number): number | null {
   if (n === 0) return null;
-  if (key === "ArrowRight") return Math.min(n - 1, i + 1);
-  if (key === "ArrowLeft") return Math.max(0, i - 1);
+  if (key === "ArrowRight") return wrapIndex(i, 1, n);
+  if (key === "ArrowLeft") return wrapIndex(i, -1, n);
   if (key === "Home") return 0;
   if (key === "End") return n - 1;
   return null;
@@ -114,6 +118,11 @@ function shortUtc(utc: string): string {
   return utc.slice(5, 16).replace("T", " ");
 }
 
+/** "frames 2–4", or "frame 3" for one frame. */
+function spanText(r: [number, number]): string {
+  return r[0] === r[1] ? `frame ${r[0] + 1}` : `frames ${r[0] + 1}–${r[1] + 1}`;
+}
+
 export function Thumb({ gray, w, h, bitmap }: { gray: Float32Array | null; w: number; h: number; bitmap?: ImageBitmap }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const cw = bitmap ? bitmap.width : w;
@@ -131,9 +140,96 @@ export function Thumb({ gray, w, h, bitmap }: { gray: Float32Array | null; w: nu
   return <canvas ref={ref} width={cw} height={ch} className={styles.thumb} aria-hidden="true" data-thumb={bitmap ? "webp" : "frame"} />;
 }
 
+interface LaneProps {
+  name: string;
+  hint: string;
+  range: [number, number];
+  n: number;
+  left: number[];
+  total: number;
+  minSpan: number;
+  maxSpan: number;
+  tone: "blink" | "color";
+  onChange(r: [number, number]): void;
+  startName: string;
+  endName: string;
+}
+
+/** A labelled two-thumb range under the clips. Thumbs snap to clip boundaries and never cross. */
+function RangeLane({ name, hint, range, n, left, total, minSpan, maxSpan, tone, onChange, startName, endName }: LaneProps) {
+  const [a, b] = range;
+  const move = (which: 0 | 1, k: number) => {
+    const next: [number, number] =
+      which === 0
+        ? [Math.min(b - (minSpan - 1), Math.max(Math.max(0, b - (maxSpan - 1)), k)), b]
+        : [a, Math.max(a + (minSpan - 1), Math.min(Math.min(n - 1, a + (maxSpan - 1)), k))];
+    if (next[0] !== a || next[1] !== b) onChange(next);
+  };
+  const onKey = (which: 0 | 1) => (e: KeyboardEvent<HTMLDivElement>) => {
+    const cur = range[which];
+    let next: number | null = null;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") next = cur - 1;
+    else if (e.key === "ArrowRight" || e.key === "ArrowUp") next = cur + 1;
+    else if (e.key === "Home") next = which === 0 ? 0 : a + (minSpan - 1);
+    else if (e.key === "End") next = which === 0 ? b - (minSpan - 1) : n - 1;
+    if (next === null) return;
+    e.preventDefault();
+    move(which, next);
+  };
+  const drag = (which: 0 | 1) => ({
+    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      e.currentTarget.dataset.drag = "1";
+    },
+    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+      const row = e.currentTarget.closest<HTMLElement>("[data-sync]");
+      if (e.currentTarget.dataset.drag !== "1" || !row) return;
+      move(which, nearestClip(e.clientX - row.getBoundingClientRect().left + row.scrollLeft - 2, left));
+    },
+    onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
+      delete e.currentTarget.dataset.drag;
+    },
+    onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
+      delete e.currentTarget.dataset.drag;
+    },
+  });
+  return (
+    <>
+      <div className={styles.laneLabel} title={hint}>
+        <span className={styles.laneName}>{name}</span>
+        <span className={styles.laneValue}>{spanText(range)}</span>
+      </div>
+      <div className={styles.laneRow} data-sync="" data-tone={tone} role="group" aria-label={`${name} ${spanText(range)}`} title={hint}>
+        <div className={styles.lane} style={{ width: total }}>
+          <div className={styles.rail} />
+          <div className={styles.span} style={{ left: left[a], width: left[b] + CLIP_W - left[a] }} />
+          {([0, 1] as const).map((which) => (
+            <div
+              key={which}
+              role="slider"
+              tabIndex={0}
+              aria-label={which === 0 ? startName : endName}
+              aria-orientation="horizontal"
+              aria-valuemin={1}
+              aria-valuemax={n}
+              aria-valuenow={range[which] + 1}
+              aria-valuetext={`${which === 0 ? "starts" : "ends"} at frame ${range[which] + 1} of ${n}`}
+              title={hint}
+              className={styles.thumbHandle}
+              style={{ left: which === 0 ? left[a] : left[b] + CLIP_W - HANDLE_W }}
+              onKeyDown={onKey(which)}
+              {...drag(which)}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Timeline(props: TimelineProps) {
   const { field, frames, index, onIndexChange, marks = [], playing = false, onTogglePlay, reducedMotion = false, controlsSlot } = props;
-  const { loopMode, onLoopModeChange, onOnionRangeChange, onLoopRangeChange, onFpsChange } = props;
+  const { onOnionRangeChange, onLoopRangeChange, onFpsChange, onFrameCountChange } = props;
   const [W, H] = field.size;
   const n = frames.length;
   const vision = props.vision ?? "normal";
@@ -167,50 +263,15 @@ export default function Timeline(props: TimelineProps) {
   const uid = useId();
   const clipId = (k: number) => `${uid}-clip-${k}`;
   const scrubbing = useRef(false);
+  const tracksRef = useRef<HTMLDivElement>(null);
 
   const left = useMemo(() => Array.from({ length: n }, (_, k) => k * STEP), [n]);
   const total = n > 0 ? left[n - 1] + CLIP_W + 4 : 0;
   const margin = (k: number) => (k === 0 ? 0 : left[k] - left[k - 1] - CLIP_W);
-  const onion = props.onionRange ? clampOnion(props.onionRange, n) : null;
-  const speedAt = (BLINK_SPEEDS as readonly number[]).indexOf(props.fps ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1]);
+  const onion = props.onionRange && props.onionActive !== false ? clampOnion(props.onionRange, n) : null;
+  const fps = props.fps ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1];
   const loop: [number, number] | null = n > 0 ? [Math.min(n - 1, Math.max(0, props.loopRange?.[0] ?? 0)), Math.min(n - 1, Math.max(0, props.loopRange?.[1] ?? n - 1))] : null;
-  // A handle stops at the other one, so at least one frame stays in the loop.
-  const moveLoop = (which: 0 | 1, k: number) => {
-    if (!loop || !onLoopRangeChange) return;
-    const v = which === 0 ? Math.min(loop[1], Math.max(0, k)) : Math.max(loop[0], Math.min(n - 1, k));
-    if (v === loop[which]) return;
-    onLoopRangeChange(which === 0 ? [v, loop[1]] : [loop[0], v]);
-  };
-  const clipsRow = useRef<HTMLDivElement>(null);
-  const onLoopKey = (which: 0 | 1) => (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!loop) return;
-    const cur = loop[which];
-    const next = e.key === "ArrowLeft" ? cur - 1 : e.key === "ArrowRight" ? cur + 1 : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : null;
-    if (next === null) return;
-    e.preventDefault();
-    e.stopPropagation(); // the strip's own arrow keys step the frame
-    moveLoop(which, next);
-  };
-  const loopDrag = (which: 0 | 1) => ({
-    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
-      e.stopPropagation(); // the handle drags the loop edge; it does not scrub the playhead
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      e.currentTarget.dataset.drag = "1";
-    },
-    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
-      const row = clipsRow.current;
-      if (e.currentTarget.dataset.drag !== "1" || !row) return;
-      moveLoop(which, nearestClip(e.clientX - row.getBoundingClientRect().left + row.scrollLeft - 2, left));
-    },
-    onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
-      delete e.currentTarget.dataset.drag;
-    },
-    onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
-      delete e.currentTarget.dataset.drag;
-    },
-  });
-  const onionRow = useRef<HTMLDivElement>(null);
-  const markRow = useRef<HTMLDivElement>(null);
+  const frameMax = Math.max(n, props.frameMax ?? n);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === " " && onTogglePlay) {
@@ -245,105 +306,90 @@ export default function Timeline(props: TimelineProps) {
     scrubbing.current = false;
   };
 
-  const moveOnion = (which: 0 | 1, k: number) => {
-    if (!onion || !onOnionRangeChange || n < 2) return;
-    let [a, b] = onion;
-    if (which === 0) a = Math.max(b - (ONION_MAX - 1), Math.min(b - 1, Math.max(0, k)));
-    else b = Math.min(a + (ONION_MAX - 1), Math.max(a + 1, Math.min(n - 1, k)));
-    if (a !== onion[0] || b !== onion[1]) onOnionRangeChange([a, b]);
-  };
-  const onHandleKey = (which: 0 | 1) => (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!onion) return;
-    const cur = onion[which];
-    let next: number | null = null;
-    if (e.key === "ArrowLeft") next = cur - 1;
-    else if (e.key === "ArrowRight") next = cur + 1;
-    else if (e.key === "Home") next = which === 0 ? 0 : onion[0] + 1;
-    else if (e.key === "End") next = which === 0 ? onion[1] - 1 : n - 1;
-    if (next === null) return;
-    e.preventDefault();
-    moveOnion(which, next);
-  };
-  const handleDrag = (which: 0 | 1) => ({
-    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      e.currentTarget.dataset.drag = "1";
-    },
-    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
-      const row = onionRow.current;
-      if (e.currentTarget.dataset.drag !== "1" || !row) return;
-      moveOnion(which, nearestClip(e.clientX - row.getBoundingClientRect().left + row.scrollLeft - 2, left));
-    },
-    onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
-      delete e.currentTarget.dataset.drag;
-    },
-    onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
-      delete e.currentTarget.dataset.drag;
-    },
-  });
-
   const marked = new Set(marks.map((m) => m.frame));
   const playheadLeft = (left[index] ?? 0) + CLIP_W / 2;
+  const cur = field.frames[index];
+  const canStep = n > 1;
+  const step = (d: number) => onIndexChange(wrapIndex(index, d, n));
+  const playTitle = reducedMotion
+    ? "Auto-play is off because your device asks for reduced motion. Step through the frames with the arrow buttons."
+    : n < 2
+      ? "Needs at least two frames."
+      : undefined;
 
   return (
     <section className={styles.root} aria-label="Timeline">
-      <div className={styles.controls}>
-        <div className={styles.buttons}>
-          <button type="button" aria-label="Previous frame" onClick={() => onIndexChange(Math.max(0, index - 1))} disabled={index <= 0}>
+      <div className={styles.bar}>
+        <div className={styles.transport} role="group" aria-label="Frame controls">
+          <button type="button" className={styles.step} aria-label="Previous frame" title="Previous frame (←)" onClick={() => step(-1)} disabled={!canStep}>
             ◀
           </button>
           {onTogglePlay && (
-            <button type="button" aria-label={playing ? "Pause blink" : "Play blink"} aria-pressed={playing} onClick={onTogglePlay} disabled={reducedMotion || n < 2} data-tutorial-target="play-button">
+            <button
+              type="button"
+              className={styles.play}
+              aria-label={playing ? "Pause blink" : "Play blink"}
+              aria-pressed={playing}
+              title={playTitle}
+              onClick={onTogglePlay}
+              disabled={reducedMotion || n < 2}
+              data-tutorial-target="play-button"
+            >
               {playing ? "Pause" : "Blink"}
             </button>
           )}
-          <button type="button" aria-label="Next frame" onClick={() => onIndexChange(Math.min(n - 1, index + 1))} disabled={index >= n - 1}>
+          <button type="button" className={styles.step} aria-label="Next frame" title="Next frame (→)" onClick={() => step(1)} disabled={!canStep}>
             ▶
           </button>
-          {onLoopModeChange && (
-            <button
-              type="button"
-              aria-label={`Blink order: ${loopMode === "pingpong" ? "ping-pong" : "loop"}. Switch`}
-              onClick={() => onLoopModeChange(loopMode === "pingpong" ? "loop" : "pingpong")}
-            >
-              {loopMode === "pingpong" ? "Ping-pong" : "Loop"}
-            </button>
+          {cur && (
+            <p className={styles.readout}>
+              <b>
+                Frame {index + 1} / {n}
+              </b>
+              <span>{shortUtc(cur.utc)} UTC</span>
+            </p>
           )}
         </div>
-        {onFpsChange && (
-          <label className={styles.check}>
-            Speed
-            <input
-              type="range"
-              min={0}
-              max={BLINK_SPEEDS.length - 1}
-              step={1}
-              value={Math.max(0, speedAt)}
-              aria-label="Blink speed"
-              aria-valuetext={`${BLINK_SPEEDS[Math.max(0, speedAt)]} ${BLINK_SPEEDS[Math.max(0, speedAt)] === 1 ? "frame" : "frames"} per second`}
-              onChange={(e) => onFpsChange(BLINK_SPEEDS[Number(e.target.value)] ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1])}
-            />
-            {BLINK_SPEEDS[Math.max(0, speedAt)]} fps
-          </label>
-        )}
-        {onLoopRangeChange && loop && n > 1 && (
-          <div className={styles.check} role="group" aria-label="Loop range">
-            <span>Loop frames {loop[0] + 1} to {loop[1] + 1}</span>
-          </div>
-        )}
-        <p className={styles.note}>{reducedMotion ? "Auto-play off (reduced motion). Step with ← →." : "Max 3 frames/s. Step with ← →."}</p>
-        {controlsSlot ?? (
-          <div className={styles.slot} data-slot="frames-and-spacing">
-            FRAMES &amp; SPACING
-          </div>
-        )}
+        <div className={styles.options}>
+          {onFrameCountChange && n >= 1 && frameMax > 2 && (
+            <div className={styles.field} role="group" aria-label="Frames shown" title="How many of this spot's frames to use, spread evenly across the time span. Marks on hidden frames are kept.">
+              <span className={styles.fieldName}>Frames</span>
+              <div className={styles.stepper}>
+                <button type="button" aria-label="Show fewer frames" onClick={() => onFrameCountChange(Math.max(2, n - 1))} disabled={n <= 2}>
+                  −
+                </button>
+                <output aria-live="polite">
+                  {n} of {frameMax}
+                </output>
+                <button type="button" aria-label="Show more frames" onClick={() => onFrameCountChange(Math.min(frameMax, n + 1))} disabled={n >= frameMax}>
+                  +
+                </button>
+              </div>
+            </div>
+          )}
+          {onFpsChange && (
+            <div className={styles.field} role="group" aria-label="Blink speed" title="How fast the blink steps through the frames (3 a second at most).">
+              <span className={styles.fieldName}>Speed</span>
+              <div className={styles.segments}>
+                {BLINK_SPEEDS.map((f) => (
+                  <button key={f} type="button" aria-pressed={fps === f} aria-label={`${f} ${f === 1 ? "frame" : "frames"} per second`} onClick={() => onFpsChange(f)}>
+                    {f}/s
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {controlsSlot}
+        </div>
       </div>
 
-      <div className={styles.tracks}>
-        <div className={styles.trackLabel}>FRAMES</div>
+      <div className={styles.tracks} ref={tracksRef}>
+        <div className={styles.laneLabel}>
+          <span className={styles.laneName}>Frames</span>
+          <span className={styles.laneValue}>{n} shown</span>
+        </div>
         <div
           className={styles.clips}
-          ref={clipsRow}
           role="listbox"
           aria-label="Frames"
           data-tutorial-target="frame-picker"
@@ -357,8 +403,9 @@ export default function Timeline(props: TimelineProps) {
           onPointerCancel={endScrub}
           onScroll={(e) => {
             const x = e.currentTarget.scrollLeft;
-            if (onionRow.current) onionRow.current.scrollLeft = x;
-            if (markRow.current) markRow.current.scrollLeft = x;
+            tracksRef.current?.querySelectorAll<HTMLElement>("[data-sync]").forEach((el) => {
+              el.scrollLeft = x;
+            });
           }}
         >
           {field.frames.slice(0, n).map((f, k) => (
@@ -367,13 +414,18 @@ export default function Timeline(props: TimelineProps) {
               id={clipId(k)}
               role="option"
               aria-selected={k === index}
-              aria-label={`Frame ${k + 1} of ${n}, ${f.utc}, ${formatGap(f.hours_since_prev, k === 0)}`}
+              aria-label={`Frame ${k + 1} of ${n}, ${f.utc}, ${formatGap(f.hours_since_prev, k === 0)}${marked.has(f.i) ? ", marked" : ""}`}
               className={`${styles.clip} ${k === index ? styles.current : ""} ${onion && k >= onion[0] && k <= onion[1] ? styles.inOnion : ""}`}
-              data-dimmed={loop && (k < loop[0] || k > loop[1]) ? "true" : undefined}
+              data-dimmed={loop && onLoopRangeChange && (k < loop[0] || k > loop[1]) ? "true" : undefined}
               style={{ width: CLIP_W, marginLeft: margin(k), borderColor: colors[k] ? rgbCss(colors[k]) : undefined }}
             >
               <div className={`science-viewport ${styles.thumbBox}`}>
                 <Thumb gray={grays ? grays[k] : null} w={W} h={H} bitmap={useWebp && thumbs ? thumbs[k] : undefined} />
+                {marked.has(f.i) && (
+                  <span className={styles.markBadge} aria-hidden="true">
+                    marked
+                  </span>
+                )}
               </div>
               <div className={styles.clipText}>
                 <span>
@@ -384,70 +436,40 @@ export default function Timeline(props: TimelineProps) {
             </div>
           ))}
           {n > 0 && <div className={styles.playhead} style={{ left: playheadLeft }} aria-hidden="true" />}
-          {onLoopRangeChange && loop && n > 1 && (
-            <>
-              <div className={styles.loopBracket} style={{ left: left[loop[0]] + 2, width: left[loop[1]] + CLIP_W - left[loop[0]] }} aria-hidden="true" />
-              {([0, 1] as const).map((which) => (
-                <div
-                  key={which}
-                  role="slider"
-                  tabIndex={0}
-                  aria-label={which === 0 ? "Loop start" : "Loop end"}
-                  aria-orientation="horizontal"
-                  aria-valuemin={1}
-                  aria-valuemax={n}
-                  aria-valuenow={loop[which] + 1}
-                  aria-valuetext={`frame ${loop[which] + 1} of ${n}`}
-                  className={styles.loopHandle}
-                  style={{ left: which === 0 ? left[loop[0]] + 2 : left[loop[1]] + 2 + CLIP_W - HANDLE_W }}
-                  onKeyDown={onLoopKey(which)}
-                  {...loopDrag(which)}
-                />
-              ))}
-            </>
-          )}
         </div>
 
-        {onion && (
-          <>
-            <div className={styles.trackLabel}>ONION</div>
-            <div className={styles.onionRow} ref={onionRow}>
-              <div className={styles.onionLane} style={{ width: total }}>
-                <div className={styles.onionBar} style={{ left: left[onion[0]], width: left[onion[1]] + CLIP_W - left[onion[0]] }} />
-                {([0, 1] as const).map((which) => (
-                  <div
-                    key={which}
-                    role="slider"
-                    tabIndex={0}
-                    aria-label={which === 0 ? "Onion range start" : "Onion range end"}
-                    aria-orientation="horizontal"
-                    aria-valuemin={1}
-                    aria-valuemax={n}
-                    aria-valuenow={onion[which] + 1}
-                    aria-valuetext={`frame ${onion[which] + 1} of ${n}`}
-                    className={styles.handle}
-                    style={{ left: which === 0 ? left[onion[0]] : left[onion[1]] + CLIP_W - HANDLE_W }}
-                    onKeyDown={onHandleKey(which)}
-                    {...handleDrag(which)}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
+        {onLoopRangeChange && loop && n > 1 && (
+          <RangeLane
+            name="Blink"
+            hint="Drag the ends to choose which frames the blink plays. Frames outside it are dimmed."
+            range={loop}
+            n={n}
+            left={left}
+            total={total}
+            minSpan={1}
+            maxSpan={n}
+            tone="blink"
+            onChange={onLoopRangeChange}
+            startName="Blink start frame"
+            endName="Blink end frame"
+          />
         )}
-
-        <div className={styles.trackLabel}>MY MARKS</div>
-        <div className={styles.markRow} ref={markRow}>
-          {field.frames.slice(0, n).map((f, k) => (
-            <div key={f.i} style={{ width: CLIP_W, marginLeft: margin(k) }} className={styles.markCell}>
-              {marked.has(f.i) && (
-                <span className={styles.markDot} style={{ borderColor: colors[k] ? rgbCss(colors[k]) : undefined }}>
-                  {k + 1}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+        {onion && onOnionRangeChange && n > 1 && (
+          <RangeLane
+            name="Color"
+            hint={`Drag the ends to choose which frames Color by time mixes (2 to ${ONION_MAX}).`}
+            range={onion}
+            n={n}
+            left={left}
+            total={total}
+            minSpan={2}
+            maxSpan={ONION_MAX}
+            tone="color"
+            onChange={onOnionRangeChange}
+            startName="Color by time start frame"
+            endName="Color by time end frame"
+          />
+        )}
       </div>
     </section>
   );

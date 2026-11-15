@@ -1,70 +1,185 @@
+/* Bottom timeline bar: toolbar on top, then labelled lanes (Frames, Blink, Color) that share one
+   column of x positions, so a range thumb sits exactly under the clips it selects. */
 .root {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: var(--space-3);
-  height: 100%;
-  min-height: 0;
-}
-
-.controls {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
   font-size: 12px;
 }
 
-.buttons {
+/* --- toolbar --- */
+.bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.transport,
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.transport {
   gap: var(--space-1);
 }
 
-.buttons button {
-  padding: var(--space-1) var(--space-3);
+.transport button {
+  min-height: 32px;
   font-size: 12px;
+  padding: 0 var(--space-3);
 }
 
-.buttons button:disabled {
+.step {
+  min-width: 40px;
+  padding: 0;
+}
+
+.play {
+  min-width: 84px;
+}
+
+.transport button:disabled,
+.stepper button:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
-.note {
-  margin: 0;
+.readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  margin: 0 0 0 var(--space-2);
+  min-width: 0;
   color: var(--text-dim);
 }
 
-.slot {
-  flex: 1;
-  border: 1px dashed var(--line);
+.readout b {
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.readout span {
+  white-space: nowrap;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.fieldName {
   color: var(--text-dim);
-  font-size: 11px;
-  padding: var(--space-2);
+  font-family: var(--font-display-stack);
   letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
 }
 
+.segments,
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--bg-0);
+  overflow: hidden;
+}
+
+.segments button,
+.stepper button {
+  min-width: 40px;
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.segments button + button {
+  border-left: 1px solid var(--line);
+}
+
+.segments button[aria-pressed="true"] {
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 22%, var(--bg-1));
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+
+.stepper output {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0 var(--space-1);
+  border-inline: 1px solid var(--line);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* --- lanes --- */
 .tracks {
   display: grid;
-  grid-template-columns: 72px 1fr;
-  grid-template-rows: 1fr auto auto;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-auto-rows: auto;
+  align-items: center;
   gap: var(--space-1) var(--space-2);
   min-width: 0;
   min-height: 0;
+  overflow-y: auto;
 }
 
-.trackLabel {
-  font-size: 10px;
+.laneLabel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+  font-size: 11px;
   color: var(--text-dim);
+}
+
+.laneName {
+  color: var(--text);
+  font-family: var(--font-display-stack);
   letter-spacing: 0.08em;
-  align-self: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laneValue {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .clips {
   position: relative;
   display: flex;
+  min-width: 0;
   overflow-x: auto;
   padding: 2px;
   touch-action: none;
   user-select: none;
+  scrollbar-width: thin;
 }
 
 .clip {
@@ -80,36 +195,18 @@
   opacity: 0.4;
 }
 
-.loopBracket {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border: 2px solid var(--cyan);
-  pointer-events: none;
-}
-
-.loopHandle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 10px;
-  background: var(--cyan);
-  cursor: ew-resize;
-  touch-action: none;
-}
-
-.loopHandle:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
-}
-
 .current {
   outline: 1px solid var(--text);
   outline-offset: 1px;
 }
 
+.inOnion {
+  background: var(--bg-1, var(--bg-0));
+}
+
 .thumbBox {
-  height: 64px;
+  position: relative;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -123,14 +220,33 @@
   image-rendering: pixelated;
 }
 
+.markBadge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--cyan);
+  color: var(--bg-0);
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 600;
+}
+
 .clipText {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-1);
+  flex-direction: column;
   padding: 2px var(--space-1);
   font-size: 10px;
+  line-height: 1.3;
   color: var(--text-dim);
   white-space: nowrap;
+  min-width: 0;
+}
+
+.clipText span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .clipText b {
@@ -147,69 +263,87 @@
   pointer-events: none;
 }
 
-.check {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.inOnion {
-  background: var(--bg-1, var(--bg-0));
-}
-
-.onionRow {
+/* --- range lanes --- */
+.laneRow {
+  min-width: 0;
   overflow: hidden;
   padding: 0 2px;
-  min-height: 20px;
 }
 
-.onionLane {
+.lane {
   position: relative;
-  height: 20px;
+  height: 28px;
+  --tone: var(--cyan);
 }
 
-.onionBar {
-  position: absolute;
-  top: 8px;
-  height: 4px;
-  background: var(--cyan);
-  opacity: 0.6;
+.laneRow[data-tone="color"] .lane {
+  --tone: var(--amber);
 }
 
-.handle {
+.rail {
   position: absolute;
-  top: 1px;
-  width: 10px;
-  height: 18px;
-  background: var(--cyan);
+  left: 0;
+  right: 0;
+  top: 13px;
+  height: 2px;
+  background: var(--line);
+}
+
+.span {
+  position: absolute;
+  top: 2px;
+  height: 24px;
+  border: 1px solid var(--tone);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--tone) 20%, transparent);
+  pointer-events: none;
+}
+
+.thumbHandle {
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--tone);
   cursor: ew-resize;
   touch-action: none;
-}
-
-.handle:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
-}
-
-.markRow {
-  overflow: hidden;
   display: flex;
-  padding: 0 2px;
-  min-height: 18px;
-}
-
-.markCell {
-  flex: none;
-  display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 3px;
 }
 
-.markDot {
-  min-width: 18px;
-  height: 18px;
-  border: 2px solid var(--cyan);
-  border-radius: 50%;
-  font-size: 10px;
-  line-height: 14px;
-  text-align: center;
+/* Two grip lines say "drag me". */
+.thumbHandle::before,
+.thumbHandle::after {
+  content: "";
+  width: 2px;
+  height: 12px;
+  background: var(--bg-0);
+  opacity: 0.7;
+}
+
+.thumbHandle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* --- phone: stack the lane label over its strip --- */
+@media (max-width: 900px) {
+  .tracks {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: visible;
+  }
+
+  .laneLabel {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+
+  .bar {
+    justify-content: flex-start;
+  }
 }

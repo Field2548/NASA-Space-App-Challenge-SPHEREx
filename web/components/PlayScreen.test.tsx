@@ -77,9 +77,9 @@ const infoCalls = () =>
 const boardCalls = () =>
   (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/leaderboard"));
 
-function stubFetch(ok: boolean, over: Partial<Field> = {}) {
-  const field = makeField({ slug: "fixture", ...over }, 3, 4, 2);
-  const bytes = new Uint16Array(3 * 4 * 2).fill(1000).buffer;
+function stubFetch(ok: boolean, over: Partial<Field> = {}, nFrames = 3) {
+  const field = makeField({ slug: "fixture", ...over }, nFrames, 4, 2);
+  const bytes = new Uint16Array(nFrames * 4 * 2).fill(1000).buffer;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -209,8 +209,8 @@ const known: CheckResponse = {
   noise_bar_sigma: null,
 };
 
-async function loadGame(props: Partial<Parameters<typeof PlayScreen>[0]> = {}, over: Partial<Field> = {}) {
-  stubFetch(true, over);
+async function loadGame(props: Partial<Parameters<typeof PlayScreen>[0]> = {}, over: Partial<Field> = {}, nFrames = 3) {
+  stubFetch(true, over, nFrames);
   render(<PlayScreen spot="fixture" {...props} />);
   const canvas = (await screen.findByTestId("field-canvas")) as HTMLCanvasElement;
   // Flush pending effects (the window keydown listener) so a key pressed next is never lost under load.
@@ -228,19 +228,77 @@ describe("PlayScreen wiring", () => {
     expect(screen.getByRole("button", { name: "Play blink" })).toBeTruthy();
   });
 
-  it("wires loop mode and the onion range into the Timeline, with no Real time spacing", async () => {
+  it("wires the Color by time range into the Timeline (only while Color by time is on), with no Real time spacing", async () => {
     await loadGame();
-    fireEvent.click(screen.getByRole("button", { name: /Blink order: loop/ }));
-    expect(screen.getByRole("button", { name: /Blink order: ping-pong/ })).toBeTruthy();
-    const end = screen.getByRole("slider", { name: "Onion range end" });
-    expect(end.getAttribute("aria-valuenow")).toBe("3"); // all 3 frames
+    expect(screen.queryByRole("slider", { name: "Color by time end frame" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
+    const end = screen.getByRole("slider", { name: "Color by time end frame" });
+    expect(end.getAttribute("aria-valuenow")).toBe("3"); // all 3 frames
+    expect(screen.getByRole("group", { name: "Color frames 1–3" })).toBeTruthy();
     expect(screen.getByText("Color by time: 3 frames")).toBeTruthy();
     fireEvent.keyDown(end, { key: "ArrowLeft" });
     expect(screen.getByText("Color by time: 2 frames")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Color frames 1–2" })).toBeTruthy();
     expect(screen.queryByText(/Real time spacing/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Blink order|ping-pong/i })).toBeNull();
     expect(screen.getByRole("button", { name: "Play blink" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next frame" })).toBeTruthy();
+  });
+
+  it("Previous on the first frame goes to the last, and Next on the last goes to the first", async () => {
+    await loadGame();
+    const readout = () => screen.getByText(/^Frame \d+ \/ \d+$/).textContent;
+    expect(readout()).toBe("Frame 1 / 3");
+    const prev = screen.getByRole("button", { name: "Previous frame" }) as HTMLButtonElement;
+    const next = screen.getByRole("button", { name: "Next frame" }) as HTMLButtonElement;
+    expect(prev.disabled).toBe(false);
+    fireEvent.click(prev);
+    expect(readout()).toBe("Frame 3 / 3");
+    expect(next.disabled).toBe(false);
+    fireEvent.click(next);
+    expect(readout()).toBe("Frame 1 / 3");
+    const list = screen.getByRole("listbox", { name: "Frames" });
+    fireEvent.keyDown(list, { key: "ArrowLeft" });
+    expect(readout()).toBe("Frame 3 / 3");
+    fireEvent.keyDown(list, { key: "ArrowRight" });
+    expect(readout()).toBe("Frame 1 / 3");
+  });
+
+  it("the Frames control shows an even subset, keeps original frame numbers and keeps marks on hidden frames", async () => {
+    const canvas = await loadGame({}, {}, 5);
+    const clipLabels = () => screen.getAllByRole("option").map((o) => o.getAttribute("aria-label") ?? "");
+    expect(clipLabels()).toHaveLength(5);
+    expect(screen.getByText("5 of 5")).toBeTruthy();
+    // Mark original frame 2 (second clip).
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 35, clientY: 15 });
+    expect(screen.getByText(/^1 mark in 5 frames/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer frames" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer frames" })); // 3 frames: originals 1, 3, 5
+    expect(screen.getByText("3 of 5")).toBeTruthy();
+    const labels = clipLabels();
+    expect(labels).toHaveLength(3);
+    expect(labels[1]).toContain("2026-01-08"); // original frame 3 (days 06, 07, 08, ...)
+    expect(labels[2]).toContain("2026-01-010"); // original frame 5 (the fixture writes its day as "0" + 10)
+    expect(labels[2]).toContain("+42.2 h"); // the gap is measured from the previous shown frame
+    expect(labels.some((l) => l.endsWith("marked"))).toBe(false); // frame 2 is hidden, not deleted
+    expect(screen.getByText(/^1 mark in 5 frames/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Show fewer frames" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+    expect(clipLabels()).toHaveLength(5);
+    expect(clipLabels()[1].endsWith("marked")).toBe(true); // the mark was kept
+  });
+
+  it("the speed control is a labelled set of buttons within the 3 frames per second cap", async () => {
+    await loadGame();
+    const group = screen.getByRole("group", { name: "Blink speed" });
+    const buttons = within(group).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual(["0.5/s", "1/s", "2/s", "3/s"]);
+    expect(buttons.map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "false", "false", "true"]);
+    fireEvent.click(within(group).getByRole("button", { name: "1 frame per second" }));
+    expect(within(group).getByRole("button", { name: "1 frame per second" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(group).getByRole("button", { name: "3 frames per second" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("shows the frame before and after the selected one, beside the viewer", async () => {
@@ -255,15 +313,14 @@ describe("PlayScreen wiring", () => {
     expect(within(ctx).queryByText(/^\+1/)).toBeNull(); // last frame has none after it
   });
 
-  it("limits the blink to the loop range and changes its speed", async () => {
+  it("limits the blink to the Blink range, labelled with the frames it covers", async () => {
     await loadGame();
-    const end = screen.getByRole("slider", { name: "Loop end" });
+    const end = screen.getByRole("slider", { name: "Blink end frame" });
     expect(end.getAttribute("aria-valuenow")).toBe("3"); // default: all frames
+    expect(screen.getByRole("group", { name: "Blink frames 1–3" })).toBeTruthy();
     fireEvent.keyDown(end, { key: "ArrowLeft" });
-    expect(screen.getByText("Loop frames 1 to 2")).toBeTruthy();
-    const speed = screen.getByRole("slider", { name: "Blink speed" }) as HTMLInputElement;
-    fireEvent.change(speed, { target: { value: "0" } });
-    expect(speed.getAttribute("aria-valuetext")).toBe("0.5 frames per second");
+    expect(screen.getByRole("group", { name: "Blink frames 1–2" })).toBeTruthy();
+    expect(screen.getByText("frames 1–2")).toBeTruthy();
   });
 
   it("coach-mark targets resolve to the play button and the frames track, not the footer", async () => {
@@ -294,10 +351,11 @@ const ALLOWED_AT_LEVEL_0 = ["Zoom in", "Zoom out", "Previous frame", "Play blink
 describe("PlayScreen tools", () => {
   it("shows every built tool by default; Known asteroids is there but locked during a round", async () => {
     await loadGame();
-    for (const name of [/Inspect off/, "Color by time", "Submit", /Blink order/]) {
+    for (const name of [/Inspect off/, "Color by time", "Submit", "1 frame per second"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
-    expect(screen.getByRole("slider", { name: "Onion range end" })).toBeTruthy();
+    expect(screen.getByRole("slider", { name: "Blink end frame" })).toBeTruthy();
+    expect(screen.queryByRole("slider", { name: "Color by time end frame" })).toBeNull(); // until Color by time is on
     expect(screen.queryByRole("combobox", { name: "Colour vision" })).toBeNull(); // moved to /settings
     expect((screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -470,10 +528,10 @@ describe("PlayScreen tools (more)", () => {
     const canvas = await loadGame({ tools: new Set(), onEvent });
     expect(screen.getByRole("button", { name: /Play blink/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next frame" })).toBeTruthy();
-    for (const name of [/Inspect/, "Color by time", "Known asteroids", "Submit", "Clear marks", /Blink order/]) {
+    for (const name of [/Inspect/, "Color by time", "Known asteroids", "Submit", "Clear marks", /frames? per second/]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
-    expect(screen.queryByRole("slider", { name: "Onion range end" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Blink end frame" })).toBeNull();
     expect(screen.queryByRole("complementary", { name: "Scoreboard panel" })).toBeNull();
     expect(document.querySelector('[data-slot="coordinate-box"], [data-slot="show-work"]')).toBeNull();
     const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim());

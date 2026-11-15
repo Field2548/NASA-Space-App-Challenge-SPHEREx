@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,9 +26,11 @@ function Harness({ onToggle }: { onToggle?: () => void }) {
 }
 
 describe("keyToIndex", () => {
-  it("steps and clamps", () => {
-    expect(keyToIndex("ArrowRight", 3, 4)).toBe(3);
-    expect(keyToIndex("ArrowLeft", 0, 4)).toBe(0);
+  it("steps and wraps round the ends", () => {
+    expect(keyToIndex("ArrowRight", 3, 4)).toBe(0);
+    expect(keyToIndex("ArrowRight", 1, 4)).toBe(2);
+    expect(keyToIndex("ArrowLeft", 0, 4)).toBe(3);
+    expect(keyToIndex("ArrowLeft", 0, 1)).toBe(0);
     expect(keyToIndex("End", 0, 4)).toBe(3);
     expect(keyToIndex("a", 0, 4)).toBeNull();
   });
@@ -49,8 +51,12 @@ describe("Timeline", () => {
     expect(list.getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[2].id);
     await user.keyboard("{ArrowLeft}");
     expect(selected()).toBe(1);
-    await user.keyboard("{End}{ArrowRight}");
+    await user.keyboard("{End}");
     expect(selected()).toBe(3);
+    await user.keyboard("{ArrowRight}");
+    expect(selected()).toBe(0); // wraps to the first frame
+    await user.keyboard("{ArrowLeft}");
+    expect(selected()).toBe(3); // and back to the last
   });
 
   it("labels clips with time and gap, shows my marks, Space toggles blink", async () => {
@@ -68,32 +74,34 @@ describe("Timeline", () => {
   });
 });
 
-describe("Timeline loop range and speed", () => {
+describe("Timeline Blink range and speed", () => {
+  const lane = (el: HTMLElement) => el.closest<HTMLElement>("[data-sync]") as HTMLElement;
   it("has no Real time spacing option and spaces clips evenly", () => {
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
     expect(screen.queryByRole("checkbox", { name: /Real time spacing/ })).toBeNull();
     const margins = screen.getAllByRole("option").map((o) => (o as HTMLElement).style.marginLeft);
     expect(margins).toEqual(["0px", "8px", "8px", "8px"]);
   });
-  it("draws the loop edges as handles on the strip, not range inputs", () => {
+  it("shows a labelled Blink range with the frames it covers, not a bare slider", () => {
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[1, 2]} onLoopRangeChange={() => {}} />);
-    expect(screen.queryByRole("slider", { name: "Loop start frame" })).toBeNull();
-    expect(screen.queryByRole("slider", { name: "Loop end frame" })).toBeNull();
-    expect(screen.getByText("Loop frames 2 to 3")).toBeTruthy();
-    const s = screen.getByRole("slider", { name: "Loop start" });
-    const e = screen.getByRole("slider", { name: "Loop end" });
+    expect(screen.getByRole("group", { name: "Blink frames 2–3" })).toBeTruthy();
+    expect(screen.getByText("frames 2–3")).toBeTruthy();
+    const s = screen.getByRole("slider", { name: "Blink start frame" });
+    const e = screen.getByRole("slider", { name: "Blink end frame" });
     expect(s.getAttribute("aria-valuenow")).toBe("2");
     expect(s.getAttribute("aria-valuemin")).toBe("1");
     expect(s.getAttribute("aria-valuemax")).toBe("4");
-    expect(s.getAttribute("aria-valuetext")).toBe("frame 2 of 4");
+    expect(s.getAttribute("aria-valuetext")).toBe("starts at frame 2 of 4");
     expect(e.getAttribute("aria-valuenow")).toBe("3");
-    expect(e.getAttribute("aria-valuetext")).toBe("frame 3 of 4");
+    expect(e.getAttribute("aria-valuetext")).toBe("ends at frame 3 of 4");
+    expect(s.getAttribute("title")).toMatch(/Drag the ends/);
+    expect(s.style.left).toBe("120px"); // aligned to the clip it starts on (frame 2)
   });
-  it("arrow keys, Home and End move a handle and never cross", () => {
+  it("arrow keys, Home and End move a thumb and never cross", () => {
     const onRange = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[1, 2]} onLoopRangeChange={onRange} />);
-    const s = screen.getByRole("slider", { name: "Loop start" });
-    const e = screen.getByRole("slider", { name: "Loop end" });
+    const s = screen.getByRole("slider", { name: "Blink start frame" });
+    const e = screen.getByRole("slider", { name: "Blink end frame" });
     fireEvent.keyDown(e, { key: "ArrowRight" });
     expect(onRange).toHaveBeenLastCalledWith([1, 3]);
     fireEvent.keyDown(s, { key: "Home" });
@@ -101,10 +109,10 @@ describe("Timeline loop range and speed", () => {
     fireEvent.keyDown(s, { key: "ArrowLeft" });
     expect(onRange).toHaveBeenLastCalledWith([0, 2]);
     onRange.mockClear();
-    fireEvent.keyDown(s, { key: "End" }); // stops at the end handle
+    fireEvent.keyDown(s, { key: "End" }); // stops at the end thumb
     expect(onRange).toHaveBeenLastCalledWith([2, 2]);
     onRange.mockClear();
-    fireEvent.keyDown(e, { key: "Home" }); // stops at the start handle
+    fireEvent.keyDown(e, { key: "Home" }); // stops at the start thumb
     expect(onRange).toHaveBeenLastCalledWith([1, 1]);
     onRange.mockClear();
     fireEvent.keyDown(e, { key: "ArrowLeft" });
@@ -113,21 +121,21 @@ describe("Timeline loop range and speed", () => {
     expect(onRange).toHaveBeenNthCalledWith(1, [1, 1]);
     expect(onRange).toHaveBeenNthCalledWith(2, [2, 2]);
   });
-  it("a one-frame loop keeps its handles from crossing", () => {
+  it("a one-frame range keeps its thumbs from crossing", () => {
     const onRange = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[2, 2]} onLoopRangeChange={onRange} />);
-    fireEvent.keyDown(screen.getByRole("slider", { name: "Loop end" }), { key: "ArrowLeft" });
-    fireEvent.keyDown(screen.getByRole("slider", { name: "Loop start" }), { key: "ArrowRight" });
+    expect(screen.getByRole("group", { name: "Blink frame 3" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Blink end frame" }), { key: "ArrowLeft" });
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Blink start frame" }), { key: "ArrowRight" });
     expect(onRange).not.toHaveBeenCalled();
   });
-  it("dragging a handle along the strip snaps to clip boundaries", () => {
+  it("dragging a thumb along its lane snaps to clip boundaries", () => {
     const onRange = vi.fn();
     const onIndex = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={onIndex} loopRange={[1, 2]} onLoopRangeChange={onRange} />);
-    const list = screen.getByRole("listbox", { name: "Frames" });
-    vi.spyOn(list, "getBoundingClientRect").mockReturnValue({ left: 100, top: 0, right: 600, bottom: 90, width: 500, height: 90, x: 100, y: 0, toJSON() {} });
+    const e = screen.getByRole("slider", { name: "Blink end frame" });
+    vi.spyOn(lane(e), "getBoundingClientRect").mockReturnValue({ left: 100, top: 0, right: 600, bottom: 28, width: 500, height: 28, x: 100, y: 0, toJSON() {} });
     // clip k centre = 100 + 2 + 120k + 56
-    const e = screen.getByRole("slider", { name: "Loop end" });
     fireEvent.pointerDown(e, { pointerId: 1, clientX: 400 });
     fireEvent.pointerMove(e, { pointerId: 1, clientX: 100 + 2 + 360 + 56 }); // over clip 3
     expect(onRange).toHaveBeenLastCalledWith([1, 3]);
@@ -135,15 +143,20 @@ describe("Timeline loop range and speed", () => {
     onRange.mockClear();
     fireEvent.pointerMove(e, { pointerId: 1, clientX: 100 }); // released: no move
     expect(onRange).not.toHaveBeenCalled();
-    const s = screen.getByRole("slider", { name: "Loop start" });
+    const s = screen.getByRole("slider", { name: "Blink start frame" });
     fireEvent.pointerDown(s, { pointerId: 1, clientX: 300 });
     fireEvent.pointerMove(s, { pointerId: 1, clientX: 100 + 2 + 56 }); // over clip 0
     expect(onRange).toHaveBeenLastCalledWith([0, 2]);
     fireEvent.pointerMove(s, { pointerId: 1, clientX: 100 + 2 + 360 + 56 }); // past the end: stops at it
     expect(onRange).toHaveBeenLastCalledWith([2, 2]);
-    expect(onIndex).not.toHaveBeenCalled(); // handles do not scrub
+    expect(onIndex).not.toHaveBeenCalled(); // thumbs do not scrub
   });
-  it("dims clips outside the loop and still selects a frame by pointer", () => {
+  it("puts the end thumb inside its clip, with a 24px-wide thumb", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[0, 3]} onLoopRangeChange={() => {}} />);
+    // The 24px width is in the stylesheet (not applied in jsdom); the end thumb is placed so it ends at the clip edge.
+    expect(screen.getByRole("slider", { name: "Blink end frame" }).style.left).toBe(`${3 * 120 + 112 - 24}px`);
+  });
+  it("dims clips outside the Blink range and still selects a frame by pointer", () => {
     const onIndex = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={onIndex} loopRange={[1, 2]} onLoopRangeChange={() => {}} />);
     const dim = screen.getAllByRole("option").map((o) => o.getAttribute("data-dimmed"));
@@ -152,21 +165,47 @@ describe("Timeline loop range and speed", () => {
     fireEvent.pointerDown(screen.getAllByRole("option")[3], { pointerId: 1, clientX: 2 + 360 + 56 }); // selection is by position on the strip
     expect(onIndex).toHaveBeenCalledWith(3);
   });
-  it("speed slider steps through the rates, with a readable value", () => {
+  it("speed is a group of labelled buttons, the current one pressed", () => {
     const onFps = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} fps={1} onFpsChange={onFps} />);
-    const s = screen.getByRole("slider", { name: "Blink speed" });
-    expect(s.getAttribute("aria-valuetext")).toBe("1 frame per second");
-    fireEvent.change(s, { target: { value: "3" } });
+    const group = screen.getByRole("group", { name: "Blink speed" });
+    const pressed = within(group).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true");
+    expect(pressed.map((b) => b.getAttribute("aria-label"))).toEqual(["1 frame per second"]);
+    fireEvent.click(within(group).getByRole("button", { name: "3 frames per second" }));
     expect(onFps).toHaveBeenLastCalledWith(3);
-    fireEvent.change(s, { target: { value: "0" } });
+    fireEvent.click(within(group).getByRole("button", { name: "0.5 frames per second" }));
     expect(onFps).toHaveBeenLastCalledWith(0.5);
   });
-  it("hides the loop and speed controls without their callbacks", () => {
+  it("hides the range, speed and Frames controls without their callbacks", () => {
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
-    expect(screen.queryByRole("slider", { name: "Blink speed" })).toBeNull();
-    expect(screen.queryByRole("slider", { name: "Loop end" })).toBeNull();
-    expect(screen.queryByRole("slider", { name: "Loop start" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Blink speed" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Frames shown" })).toBeNull();
+    expect(screen.queryByRole("slider")).toBeNull();
+  });
+  it("the Frames stepper goes from 2 up to the number the spot has", () => {
+    const onCount = vi.fn();
+    render(<Timeline field={field} frames={frames.slice(0, 3)} index={0} onIndexChange={() => {}} frameMax={4} onFrameCountChange={onCount} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+    expect(onCount).toHaveBeenLastCalledWith(4);
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer frames" }));
+    expect(onCount).toHaveBeenLastCalledWith(2);
+  });
+  it("Previous and Next wrap round and are never disabled with several frames", () => {
+    const onIndex = vi.fn();
+    const { rerender } = render(<Timeline field={field} frames={frames} index={0} onIndexChange={onIndex} />);
+    expect((screen.getByRole("button", { name: "Previous frame" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Previous frame" }));
+    expect(onIndex).toHaveBeenLastCalledWith(3);
+    rerender(<Timeline field={field} frames={frames} index={3} onIndexChange={onIndex} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    expect(onIndex).toHaveBeenLastCalledWith(0);
+  });
+  it("reduced motion disables Play and says why in its tooltip, without a note", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onTogglePlay={() => {}} reducedMotion />);
+    const play = screen.getByRole("button", { name: "Play blink" }) as HTMLButtonElement;
+    expect(play.disabled).toBe(true);
+    expect(play.getAttribute("title")).toMatch(/reduced motion/);
+    expect(screen.queryByText(/Max 3 frames/)).toBeNull();
   });
 });
 
@@ -180,12 +219,9 @@ describe("onion helpers", () => {
 });
 
 describe("Timeline v1 completion", () => {
-  it("toggles loop / ping-pong", async () => {
-    const user = userEvent.setup();
-    const onMode = vi.fn();
-    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopMode="loop" onLoopModeChange={onMode} />);
-    await user.click(screen.getByRole("button", { name: /Blink order: loop/ }));
-    expect(onMode).toHaveBeenCalledWith("pingpong");
+  it("has no ping-pong control", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onLoopRangeChange={() => {}} onFpsChange={() => {}} />);
+    expect(screen.queryByRole("button", { name: /ping-pong|Blink order/i })).toBeNull();
   });
 
   it("scrubs by dragging the pointer over clips", () => {
@@ -201,26 +237,30 @@ describe("Timeline v1 completion", () => {
     expect(onIndex).toHaveBeenLastCalledWith(2);
   });
 
-  it("onion handles are keyboard operable and keep 2..7 frames", async () => {
+  it("Color lane thumbs are keyboard operable and keep 2..7 frames", async () => {
     const user = userEvent.setup();
     const onRange = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onionRange={[0, 2]} onOnionRangeChange={onRange} />);
-    const end = screen.getByRole("slider", { name: "Onion range end" });
+    const end = screen.getByRole("slider", { name: "Color by time end frame" });
     expect(end.getAttribute("aria-valuenow")).toBe("3");
     end.focus();
     await user.keyboard("{ArrowRight}");
     expect(onRange).toHaveBeenLastCalledWith([0, 3]);
     await user.keyboard("{ArrowRight}");
     expect(onRange).toHaveBeenLastCalledWith([0, 3]); // props are fixed, so the same step repeats
-    const start = screen.getByRole("slider", { name: "Onion range start" });
+    const start = screen.getByRole("slider", { name: "Color by time start frame" });
     start.focus();
     await user.keyboard("{ArrowRight}{ArrowRight}{ArrowRight}");
     expect(onRange).toHaveBeenLastCalledWith([1, 2]);
   });
 
-  it("no ONION track without onionRange", () => {
-    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
-    expect(screen.queryByText("ONION")).toBeNull();
+  it("no Color lane without onionRange, and none while onionActive is false", () => {
+    const { rerender } = render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
+    expect(screen.queryByRole("group", { name: /^Color/ })).toBeNull();
+    rerender(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onionRange={[0, 2]} onOnionRangeChange={() => {}} onionActive={false} />);
+    expect(screen.queryByRole("group", { name: /^Color/ })).toBeNull();
+    rerender(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onionRange={[0, 2]} onOnionRangeChange={() => {}} />);
+    expect(screen.getByRole("group", { name: "Color frames 1–3" })).toBeTruthy();
   });
 });
 

@@ -36,7 +36,8 @@ import { loadVision } from "@/lib/settings";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
 import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
-import { type BlinkMode, MAX_BLINK_FPS, useBlink } from "@/lib/useBlink";
+import { visibleFrameIndices } from "@/lib/framePicker";
+import { MAX_BLINK_FPS, useBlink } from "@/lib/useBlink";
 import { ANNULUS_GAP, ANNULUS_WIDTH, RADIUS_DEFAULT } from "@/lib/aperture";
 import BrightnessSlider from "./BrightnessSlider";
 import CircleSpectrum from "./CircleSpectrum";
@@ -83,7 +84,7 @@ export type PlayTool =
   | "color-by-time" // the button and its onion range on the timeline
   | "overlays"
   | "brightness"
-  | "frames-spacing" // loop order, loop range and blink speed on the timeline
+  | "frames-spacing" // frame count, blink range and blink speed on the timeline
   | "wavelength"
   | "color-vision"
   | "coordinates" // coordinate box
@@ -228,26 +229,42 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange, knownLocal, picked }: GameProps) {
+function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange, knownLocal, picked }: GameProps) {
   const tools = toolsProp ?? ALL_TOOLS;
   const showOverlays = tools.has("overlays");
-  const [W, H] = field.size;
+  const [W, H] = fullField.size;
   // Colour vision is set on /settings; a ?vision= value in the URL (parseView gives "normal" when absent) wins.
   const [vision] = useState<Vision>(() => (initialView && initialView.vision !== "normal" ? initialView.vision : loadVision()));
   const [wavelength, setWavelength] = useState<WavelengthSelection>("all");
   // The exposures (up to ~1 MB) are fetched only once a band other than "all" is picked.
   const wlField = useMemo<Field>(
-    () => (wavelength === "all" ? { ...field, has: { ...field.has, exposures: false } } : field),
-    [field, wavelength],
+    () => (wavelength === "all" ? { ...fullField, has: { ...fullField.has, exposures: false } } : fullField),
+    [fullField, wavelength],
   );
   const wl = useWavelengthFrames(wlField, wavelength);
   // Frames shown: the originals for "all" or until the rebuild is ready. A frame with no
   // exposure on the chosen detectors becomes a blank (NaN) plane so indices stay aligned.
-  const shownFrames = useMemo(() => {
+  const allShown = useMemo(() => {
     if (wavelength === "all" || !wl.frames) return frames;
     const blank = new Float32Array(W * H).fill(NaN);
     return wl.frames.map((f) => f ?? blank);
   }, [wavelength, wl.frames, frames, W, H]);
+  // "Frames" on the timeline: show an evenly spread subset of the spot's frames. Everything below (viewer,
+  // blink, timeline, inspect) sees only that subset, but each frame keeps its own number (FrameMeta.i), so
+  // marks and the check request still use the original frame numbers and marks on hidden frames are kept.
+  const [frameCount, setFrameCount] = useState(fullField.frames.length);
+  const visible = useMemo(() => visibleFrameIndices(fullField.frames, frameCount), [fullField.frames, frameCount]);
+  const field = useMemo<Field>(() => {
+    if (visible.length === fullField.frames.length) return fullField;
+    return {
+      ...fullField,
+      frames: visible.map((j, pos) => {
+        const f = fullField.frames[j];
+        return { ...f, hours_since_prev: pos === 0 ? 0 : (f.mjd - fullField.frames[visible[pos - 1]].mjd) * 24 };
+      }),
+    };
+  }, [fullField, visible]);
+  const shownFrames = useMemo(() => (visible.length === allShown.length ? allShown : visible.map((j) => allShown[j])), [visible, allShown]);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [rawMode, setMode] = useState<ViewerMode>("mark");
   const canInspect = tools.has("inspect");
@@ -274,7 +291,6 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
   const statusId = useId();
-  const [loopMode, setLoopMode] = useState<BlinkMode>("loop");
   const defaultOnion = useMemo(() => clampOnion([0, ONION_MAX - 1], frames.length), [frames.length]);
   const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length));
   const [loopRange, setLoopRange] = useState<[number, number] | null>(null); // null: all frames
@@ -301,7 +317,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   }, [knownOverlay, knownUnlocked, knownLocal, fetchedKnown, spot]);
   const knownData = knownOverlay && knownUnlocked ? (knownLocal ?? fetchedKnown ?? null) : null;
   const knownMissing = knownOverlay && knownUnlocked && !knownLocal && fetchedKnown === null;
-  const blink = useBlink(frames.length, { mode: loopMode, fps, range: loopRange ?? undefined });
+  const blink = useBlink(shownFrames.length, { fps, range: loopRange ?? undefined });
   const { pause } = blink;
 
   const emit = useCallback(
@@ -330,7 +346,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     emit("mark-placed", next);
   };
 
-  const k = Math.min(Math.max(0, blink.index), Math.max(0, frames.length - 1));
+  const k = Math.min(Math.max(0, blink.index), Math.max(0, shownFrames.length - 1));
   const meta = field.frames[k];
   /** Open Inspect on pixel (x, y); the popup's anchor is that pixel's centre on screen. */
   const inspectAt = (x: number, y: number) => {
@@ -634,14 +650,22 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             emit("play-pressed", marks);
           }}
           reducedMotion={blink.reducedMotion}
-          loopMode={loopMode}
-          onLoopModeChange={tools.has("frames-spacing") ? setLoopMode : undefined}
           onionRange={tools.has("color-by-time") ? onionRange : undefined}
+          onionActive={overlay === "colorByTime"}
           onOnionRangeChange={tools.has("color-by-time") ? setOnionRange : undefined}
           loopRange={loopRange ?? undefined}
           onLoopRangeChange={tools.has("frames-spacing") ? setLoopRange : undefined}
           fps={fps}
           onFpsChange={tools.has("frames-spacing") ? setFps : undefined}
+          frameMax={fullField.frames.length}
+          onFrameCountChange={
+            tools.has("frames-spacing")
+              ? (c) => {
+                  setFrameCount(c);
+                  setLoopRange(null); // the old range counted the old frames
+                }
+              : undefined
+          }
         />
       </footer>
     </div>

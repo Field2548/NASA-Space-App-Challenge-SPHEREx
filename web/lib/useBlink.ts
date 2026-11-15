@@ -2,11 +2,9 @@
 // Blink playback (BP 8.8): starts paused, at most 3 frames per second (WCAG 2.3.1),
 // and no auto-play when the user prefers reduced motion. Manual stepping always works.
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 export const MAX_BLINK_FPS = 3;
-
-export type BlinkMode = "loop" | "pingpong";
 
 /** Milliseconds between frames for a requested rate, never faster than MAX_BLINK_FPS. */
 export function blinkIntervalMs(fps: number): number {
@@ -14,13 +12,14 @@ export function blinkIntervalMs(fps: number): number {
   return Math.ceil(1000 / f);
 }
 
-/** Next index and direction for one blink tick. */
-export function nextBlinkIndex(i: number, n: number, mode: BlinkMode, dir: 1 | -1): [number, 1 | -1] {
-  if (n <= 1) return [0, dir];
-  if (mode === "loop") return [(i + 1) % n, 1];
-  let d = dir;
-  if (i + d > n - 1 || i + d < 0) d = d === 1 ? -1 : 1;
-  return [i + d, d];
+/** Next index for one blink tick: forward, back to the first frame after the last. */
+export function nextBlinkIndex(i: number, n: number): number {
+  return n <= 1 ? 0 : (i + 1) % n;
+}
+
+/** Index after moving by delta frames, wrapping round the ends (never stuck on the first or last frame). */
+export function wrapIndex(i: number, delta: number, n: number): number {
+  return n <= 1 ? 0 : (((i + delta) % n) + n) % n;
 }
 
 const QUERY = "(prefers-reduced-motion: reduce)";
@@ -39,12 +38,11 @@ export function usePrefersReducedMotion(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
-/** Rates the speed slider steps through (frames per second), all within MAX_BLINK_FPS. */
+/** Rates the speed control offers (frames per second), all within MAX_BLINK_FPS. */
 export const BLINK_SPEEDS = [0.5, 1, 2, 3] as const;
 
 export interface BlinkOptions {
   fps?: number; // requested rate, capped at MAX_BLINK_FPS
-  mode?: BlinkMode;
   range?: [number, number]; // inclusive array indices the blink plays; default all frames
   initialIndex?: number;
 }
@@ -63,12 +61,10 @@ export interface Blink {
 }
 
 export function useBlink(n: number, opts: BlinkOptions = {}): Blink {
-  const mode = opts.mode ?? "loop";
   const intervalMs = blinkIntervalMs(opts.fps ?? MAX_BLINK_FPS);
   const reducedMotion = usePrefersReducedMotion();
   const [rawIndex, setRawIndex] = useState(opts.initialIndex ?? 0);
   const [wantPlay, setWantPlay] = useState(false);
-  const dir = useRef<1 | -1>(1);
   const lo = n > 0 ? Math.min(Math.max(0, opts.range ? Math.min(opts.range[0], opts.range[1]) : 0), n - 1) : 0;
   const hi = n > 0 ? Math.min(Math.max(lo, opts.range ? Math.max(opts.range[0], opts.range[1]) : n - 1), n - 1) : 0;
 
@@ -80,17 +76,15 @@ export function useBlink(n: number, opts: BlinkOptions = {}): Blink {
     const id = setInterval(() => {
       setRawIndex((i) => {
         // Positions inside the loop range; a frame outside it joins the loop at the nearest end.
-        const [next, d] = nextBlinkIndex(Math.min(Math.max(i, lo), hi) - lo, hi - lo + 1, mode, dir.current);
-        dir.current = d;
-        return lo + next;
+        return lo + nextBlinkIndex(Math.min(Math.max(i, lo), hi) - lo, hi - lo + 1);
       });
     }, intervalMs);
     return () => clearInterval(id);
-  }, [playing, lo, hi, mode, intervalMs]);
+  }, [playing, lo, hi, intervalMs]);
 
   const setIndex = useCallback((i: number) => setRawIndex(n > 0 ? Math.min(Math.max(0, Math.round(i)), n - 1) : 0), [n]);
   const step = useCallback(
-    (delta: number) => setRawIndex((i) => (n > 0 ? Math.min(Math.max(0, Math.min(i, n - 1) + delta), n - 1) : 0)),
+    (delta: number) => setRawIndex((i) => (n > 0 ? wrapIndex(Math.min(i, n - 1), delta, n) : 0)),
     [n],
   );
   const play = useCallback(() => {
