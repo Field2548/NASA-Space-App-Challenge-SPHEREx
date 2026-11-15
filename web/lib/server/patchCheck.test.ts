@@ -34,7 +34,7 @@ const list = {
   source: { service: "irsa_sia", collections: [], fetched_utc: "" },
 } as unknown as QuickLookList;
 
-function fakeStore(o: { solved?: boolean } = {}) {
+function fakeStore(o: { solved?: boolean; others?: { user_id: string | null; marks: unknown; created_at: string }[] } = {}) {
   const solves: SolveRow[] = [];
   const reports: ReportRow[] = [];
   const store: PatchStore = {
@@ -42,6 +42,7 @@ function fakeStore(o: { solved?: boolean } = {}) {
     saveSolve: async (r) => (solves.push(r), true),
     saveReport: async (r) => (reports.push(r), true),
     near: async () => [],
+    reportsFor: async () => o.others ?? [],
   };
   return { store, solves, reports };
 }
@@ -138,6 +139,25 @@ describe("POST /api/patch-check", () => {
     expect(s.reports[0].marks[0]).toMatchObject({ frame: 1, x: 5, y: 30, mjd: F[0].mjd });
     expect(s.reports[0].frame_times).toEqual(F);
     expect(s.solves).toHaveLength(0);
+  });
+
+  it("a candidate reports crowd agreement from other players, with no ids or marks", async () => {
+    const m = (frame: number, x: number, y: number, i: number) => ({ frame, x, y, mjd: F[i].mjd });
+    const same = [m(1, 5, 30, 0), m(3, 12, 36, 2)];
+    const other = [m(1, 5, 60, 0), m(3, 12, 66, 2)];
+    const at = "2026-01-01T00:00:00Z";
+    const others = [{ user_id: "a", marks: same, created_at: at }, { user_id: "b", marks: other, created_at: at }, { user_id: "u1", marks: same, created_at: at }];
+    const s = fakeStore({ others });
+    const r = await call(track(MISS), deps({ store: s.store, user: { id: "u1" } }));
+    expect(r.json.crowd).toEqual({ others: 2, agree: 1, first: false });
+    expect(r.text).not.toContain('"a"');
+  });
+
+  it("the first reporter is told so; with no database there is no crowd", async () => {
+    const r = await call(track(MISS), deps({ store: fakeStore().store }));
+    expect(r.json.crowd).toEqual({ others: 0, agree: 0, first: true });
+    const n = await call(track(MISS), deps({ store: null }));
+    expect(n.json.crowd).toBeUndefined();
   });
 
   it("with no database the check still answers, and nothing is saved", async () => {

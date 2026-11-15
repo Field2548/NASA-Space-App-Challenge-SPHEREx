@@ -14,7 +14,8 @@ import { isCorrect, scoreSubmission, type AnswerKey, type AnswerObject, type Sco
 import { responseBody } from "@/lib/server/checkResponse";
 import { userFromRequest } from "@/lib/server/db";
 import { ApiFail, parse, readJsonBody } from "@/lib/server/http";
-import { patchStore, type PatchStore } from "@/lib/server/patchStore";
+import { crowdAgreement, readMarks, type Crowd } from "@/lib/server/patchCrowd";
+import { patchStore,type PatchStore } from "@/lib/server/patchStore";
 import { rateLimit } from "@/lib/server/rateLimit";
 import { querySbIdent, type SbResult } from "@/lib/server/sbIdent";
 import { PIXEL_ARCSEC } from "@/lib/quicklook";
@@ -158,11 +159,15 @@ export async function runPatchCheck(request: Request, deps: PatchDeps = realPatc
     solve_saved = await store.saveSolve({ patch_id: patch.id, user_id: user?.id ?? null, ra: patch.ra, dec: patch.dec, objects });
   }
   let report: { saved: boolean; positions: SkyPoint[] } | undefined;
+  let crowd: Crowd | undefined;
   if (scored.verdict.kind === "candidate" && body.answer === "track") {
     const marks = body.marks.map((m) => {
       const [ra, dec] = pixelToSky(patch.wcs, patch.size[1], m.x, m.y);
       return { ...m, ra, dec, mjd: mjdOf.get(m.frame) as number };
     });
+    // Compare with the other players' reports before this one is stored. Feedback only: no points.
+    const rows = store ? await store.reportsFor(patch.id) : null;
+    if (rows) crowd = crowdAgreement(readMarks(marks), rows, user?.id ?? null);
     const saved = store
       ? await store.saveReport({ patch_id: patch.id, user_id: user?.id ?? null, ra: patch.ra, dec: patch.dec, marks, frame_times: sorted })
       : false;
@@ -184,6 +189,7 @@ export async function runPatchCheck(request: Request, deps: PatchDeps = realPatc
     patch: { id: patch.id, ra: patch.ra, dec: patch.dec },
     ...(correct ? { objects, known_objects } : {}),
     ...(report ? { report } : {}),
+    ...(crowd ? { crowd } : {}),
     solve_saved,
   });
 }

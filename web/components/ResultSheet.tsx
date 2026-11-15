@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { loadFieldIndex } from "@/lib/fields";
 import { stageInfo } from "@/lib/stageOrder";
+import type { PatchCheckResponse } from "@/lib/patchSolves";
 import type { CheckResponse, FieldSummary, Mark, VerdictKind } from "@/lib/types";
 import styles from "./ResultSheet.module.css";
 
@@ -36,6 +37,21 @@ export interface ResultSheetProps {
   onClose(): void;
 }
 
+type Crowd = NonNullable<PatchCheckResponse["crowd"]>;
+
+/** Plain-language crowd line for a possible new mover on a picked patch. */
+export function crowdText(c: Crowd): string[] {
+  if (c.first) return ["You’re the first to report a mover in this patch. Your track is saved — when other players report here, they’ll be compared with it."];
+  const who = c.others === 1 ? "1 other player" : `${c.others} other players`;
+  if (c.agree > 0) {
+    return [
+      `${c.agree} of ${who} marked the same track as you (${Math.round((100 * c.agree) / c.others)}%).`,
+      "There is no official answer for this patch, so agreement is the best signal.",
+    ];
+  }
+  return [`${who} reported here, but none marked the same track. You may have spotted something different.`];
+}
+
 function shiftPixels(marks: Mark[]): number | null {
   if (marks.length < 2) return null;
   const m = [...marks].sort((a, b) => a.tDays - b.tDays);
@@ -44,6 +60,7 @@ function shiftPixels(marks: Mark[]): number | null {
 
 export default function ResultSheet({ res, marks, spot, tutorial, index, onClose }: ResultSheetProps) {
   const { verdict: v, track, reveal } = res;
+  const crowd = v.kind === "candidate" ? (res as Partial<PatchCheckResponse>).crowd : undefined;
   const correct = CORRECT_KINDS.includes(v.kind);
   const nothing = v.kind === "nothing_correct";
   const [list, setList] = useState<FieldSummary[] | null>(index ?? null);
@@ -76,7 +93,9 @@ export default function ResultSheet({ res, marks, spot, tutorial, index, onClose
   const nextHref = info?.next ? `/play?spot=${encodeURIComponent(info.next)}` : "/stages";
   const last = !info?.next;
   const px = shiftPixels(marks);
-  const sentence = correct
+  const sentence = crowd
+    ? "No known object sits where your marks lead, so this could be something new. It is unconfirmed and scores no points."
+    : correct
     ? nothing
       ? "Nothing moves in this field, and you saw that."
       : px !== null
@@ -104,7 +123,7 @@ export default function ResultSheet({ res, marks, spot, tutorial, index, onClose
       <div className={styles.inner}>
         <div className={styles.head}>
           <h2 id="result-sheet-title" className={styles.title}>
-            {correct ? (nothing ? "★ CORRECT" : "★ FOUND IT!") : "✗ NOT QUITE"}
+            {crowd ? "◆ POSSIBLE NEW MOVER" : correct ? (nothing ? "★ CORRECT" : "★ FOUND IT!") : "✗ NOT QUITE"}
           </h2>
           {correct && (
             <span className={styles.points}>
@@ -118,6 +137,15 @@ export default function ResultSheet({ res, marks, spot, tutorial, index, onClose
           )}
         </div>
         <p className={styles.sentence}>{sentence}</p>
+        {crowd && (
+          <div role="status" data-testid="crowd">
+            {crowdText(crowd).map((t) => (
+              <p key={t} className={styles.sentence}>
+                {t}
+              </p>
+            ))}
+          </div>
+        )}
         {correct && (
           <details className={styles.details}>
             <summary>Details ⓘ</summary>

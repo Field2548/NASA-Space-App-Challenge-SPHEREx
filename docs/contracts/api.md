@@ -417,10 +417,13 @@ A picked patch (`web/lib/patch.ts`: HEALPix order-11 nested cell, id `p11-<ipix>
   objects?: { ra, dec }[],          // correct answers only: known objects' positions, no names
   known_objects?: { asteroids: OverlayAsteroid[], stars: [] }, // correct answers only, for the overlay
   report?: { saved: boolean, positions: { ra, dec }[] },       // `candidate` only: saved as a possible new mover
+  crowd?: { others: number, agree: number, first: boolean },   // `candidate` with a database only: see below
   solve_saved: boolean }
 ```
 
 `nothing`: `nothing_wrong` when a known object with V <= 18 is inside the picture, else `nothing_correct` with 0 points (unknown movers cannot be ruled out). No name appears in any answer before a correct verdict. One JPL call takes 35 to 110 s (measured), so an answer can take up to about 2.5 min; the JPL timeout is 150 s and the route's limit 180 s. JPL or IRSA failing or timing out is `502 upstream_failed` with `details.service` `"jpl"` or `"irsa"`, never a score. With a database (service role), a correct answer writes `patch_solves` (once per player; a repeat is practice, 0 points) and a `candidate` writes `patch_reports`; without one the answer is the same and the client keeps the solve in localStorage (`onionsky:patches:v1`).
+
+`crowd` is feedback only (no points, no achievements). `others` counts other signed-in players whose newest report on this patch was compared (the viewer's own reports and guest reports are left out: a guest cannot be told apart, so could be counted again and again; a player who resubmits counts once). `agree` counts those whose marks fit a straight line (position against time) within `CROWD_TOLERANCE_PX` = 2 px (about 12 arcsec) of the viewer's fitted line, averaged over the viewer's mark times; a report with fewer than 2 marks never agrees. `first` is `others === 0`. Compared before the viewer's own report is stored. Never carries names, ids or other players' marks. Logic: `web/lib/server/patchCrowd.ts`. "Nothing moved" answers on a patch are not stored, so they have no crowd.
 
 ## 15. `GET /api/patches?ra=&dec=&r=`
 
