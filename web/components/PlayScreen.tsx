@@ -25,6 +25,7 @@
 // Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools?; initialView?; onViewChange?; knownLocal? }
 
 import Link from "next/link";
+import BackLink from "./BackLink";
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import BrandMark from "./BrandMark";
@@ -210,9 +211,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
  .          .      *`}</pre>
       <h1 className="sr-only">{title}</h1>
       <p>{text}</p>
-      <p>
-        <Link href="/">Back to the start</Link>
-      </p>
+      <BackLink />
     </main>
   );
 }
