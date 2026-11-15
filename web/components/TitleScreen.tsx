@@ -1,12 +1,13 @@
-// Title screen `/` (BP 8.13): "PRESS START" feel over an ASCII starfield; Start training, Stages,
-// Explore the sky (/map) and Log in (AuthDialog). About and Credits sit in the site footer.
+// Title screen `/` (BP 8.13): arcade feel over an ASCII starfield; two main buttons (Game stages,
+// Explore the sky) and two small ones (Settings, Leaderboard). Log in / profile is the top-right
+// AccountControl in the layout. About and Credits sit in the site footer.
 // Server-safe: the starfield comes from a fixed seed (same HTML on server and client), the
 // twinkle, the two-layer drift and the shooting stars are CSS only and stop under prefers-reduced-motion.
 
 import Link from "next/link";
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
-import LoginButton from "./LoginButton";
 import SkyPreload from "./SkyPreload";
+import WorldProgress from "./WorldProgress";
 import styles from "./TitleScreen.module.css";
 
 type Cell = { ch: string; tw: 0 | 1 | 2 | 3 };
@@ -74,21 +75,23 @@ export default function TitleScreen() {
       <div className={styles.card}>
         <h1 className={styles.title}>{PROJECT_NAME}</h1>
         <p className={styles.tagline}>{PROJECT_TAGLINE}</p>
-        <p className={styles.press} aria-hidden="true">
-          PRESS START
-        </p>
         <nav aria-label="Start" className={styles.buttons}>
-          <Link href="/tutorial" className={styles.primary}>
-            Start training
-          </Link>
-          <Link href="/stages" className={styles.button}>
-            Stages
+          <Link href="/stages" className={styles.primary}>
+            Game stages
           </Link>
           <Link href="/map" className={styles.button}>
             Explore the sky
           </Link>
-          <LoginButton className={styles.button} />
+          <span className={styles.secondary}>
+            <Link href="/settings" className={`${styles.button} ${styles.small}`}>
+              Settings
+            </Link>
+            <Link href="/leaderboard" className={`${styles.button} ${styles.small}`}>
+              Leaderboard
+            </Link>
+          </span>
         </nav>
+        <WorldProgress />
         <SkyPreload />
       </div>
     </main>

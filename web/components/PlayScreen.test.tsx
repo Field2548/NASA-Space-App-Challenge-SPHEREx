@@ -127,7 +127,7 @@ describe("PlayScreen", () => {
     vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 40, height: 20 } as DOMRect);
     fireEvent.click(canvas, { clientX: 35, clientY: 15 });
     expect(screen.getByText("1 mark in 3 frames. Mark the mover in at least 2 frames.")).toBeTruthy();
-    for (const s of ["submit", "nothing-moved", "auth"]) {
+    for (const s of ["submit", "nothing-moved"]) {
       expect(document.querySelector(`[data-slot="${s}"]`)).not.toBeNull();
     }
     fireEvent.keyDown(window, { key: "i" });
@@ -286,7 +286,7 @@ describe("PlayScreen wiring", () => {
 });
 
 // Level 0 keeps the disabled login stub, zoom (part of the viewer) and the frame stepper.
-const ALLOWED_AT_LEVEL_0 = ["Log in / Sign up", "Zoom in", "Zoom out", "Previous frame", "Play blink", "Next frame"];
+const ALLOWED_AT_LEVEL_0 = ["Zoom in", "Zoom out", "Previous frame", "Play blink", "Next frame"];
 
 describe("PlayScreen tools", () => {
   it("shows every built tool by default; Known asteroids is there but locked during a round", async () => {
@@ -622,16 +622,9 @@ describe("PlayScreen round mode", () => {
     }
   });
 
-  it("Log in / Sign up opens the sign-in dialog", async () => {
-    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
-      this.setAttribute("open", "");
-    };
+  it("has no login button of its own (the layout's account control is top right)", async () => {
     await loadGame();
-    expect(document.querySelector("dialog")).toBeNull();
-    const login = screen.getByRole("button", { name: "Log in / Sign up" }) as HTMLButtonElement;
-    expect(login.disabled).toBe(false);
-    fireEvent.click(login);
-    expect(document.querySelector("dialog")?.open).toBe(true);
+    expect(screen.queryByRole("button", { name: /Log in/ })).toBeNull();
   });
 
   it("the tutorial gets no Next spot link (the coach leads on)", async () => {

@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveGuestSubmission } from "@/lib/auth";
 import { CELEBRATED_KEY } from "@/lib/celebrated";
-import { recordFind, resetGuest } from "@/lib/guest";
+import { TUTORIAL } from "@/lib/copy/tutorial";
+import { recordFind, resetGuest, saveGuest } from "@/lib/guest";
 import type { FieldSummary } from "@/lib/types";
 import StagesScreen from "./StagesScreen";
 import { makeField } from "./testFixtures";
@@ -141,8 +142,8 @@ describe("StagesScreen", () => {
     render(<StagesScreen />);
     await screen.findByTestId("stage-eros");
     const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(heads).toEqual(["Easy0/1", "Medium1/2", "Hard0/1", "Boss0/1"]);
-    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Stage 1", "Stage 2", "Stage 3", "Stage 4", "Stage 5"]);
+    expect(heads).toEqual(["Training0/1", "Easy0/1", "Medium1/2", "Hard0/1", "Boss0/1"]);
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Stage 0", "Stage 1", "Stage 2", "Stage 3", "Stage 4", "Stage 5"]);
     expect((await card("cygnus")).getByText("Stage 3")).toBeTruthy();
   });
 
@@ -157,7 +158,29 @@ describe("StagesScreen", () => {
     expect(bar.querySelectorAll("[data-filled=true]")).toHaveLength(1);
   });
 
+  it("starts with a Training stage 0 that links to /tutorial and is NEXT until the tutorial is done", async () => {
+    render(<StagesScreen />);
+    const t = within(await screen.findByTestId("training-card"));
+    expect(t.getByText("Stage 0")).toBeTruthy();
+    expect(t.getByRole("link", { name: "Play" }).getAttribute("href")).toBe("/tutorial");
+    expect(t.getByText("NEXT")).toBeTruthy();
+    expect(screen.getAllByText("NEXT")).toHaveLength(1);
+    const cards = screen.getAllByTestId(/^(stage-|training-card)/);
+    expect(cards[0].getAttribute("data-testid")).toBe("training-card");
+  });
+
+  it("marks Training solved once every tutorial level is done, and NEXT moves to the first spot", async () => {
+    saveGuest({ tutorial: { done: TUTORIAL.map((l) => l.id) } });
+    render(<StagesScreen />);
+    const t = within(await screen.findByTestId("training-card"));
+    expect(t.queryByText("NEXT")).toBeNull();
+    expect(t.getByRole("link", { name: "Play again" })).toBeTruthy();
+    expect(screen.getByTestId("training-card").getAttribute("data-status")).toBe("solved");
+    expect((await card("eros")).getByText("NEXT")).toBeTruthy();
+  });
+
   it("puts NEXT on the first unsolved stage in difficulty order only", async () => {
+    saveGuest({ tutorial: { done: TUTORIAL.map((l) => l.id) } });
     recordFind("eros", "known", 100);
     render(<StagesScreen />);
     await screen.findByTestId("stage-eros");

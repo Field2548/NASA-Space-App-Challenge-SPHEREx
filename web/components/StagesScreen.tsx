@@ -4,6 +4,8 @@
 // answer that was not a find is "Tried". The solution is shown only for a solved stage, and only what
 // GET /api/overlay?mode=explore returns (the server checks its signed unlock cookie; answer keys are
 // never imported here). An unsolved stage never asks the server and its DOM holds no object name.
+// Stage 0 "Training" (the tutorial at /tutorial) comes first; it is solved when every tutorial level is
+// in the guest store's tutorial.done, and while it is not done it is NEXT instead of the first spot.
 // Stages are grouped Easy -> Medium -> Hard -> Boss (index order inside a group). The first unsolved one
 // in that order is NEXT. A card expands in place (one at a time); arrow keys rove focus between cards.
 
@@ -13,6 +15,7 @@ import type { CSSProperties, KeyboardEvent, MouseEvent } from "react";
 import { loadGuestSubmissions } from "@/lib/auth";
 import { loadCelebrated, markCelebrated } from "@/lib/celebrated";
 import { FIELDS_BASE, loadField, loadFieldIndex } from "@/lib/fields";
+import { TUTORIAL } from "@/lib/copy/tutorial";
 import { loadGuest } from "@/lib/guest";
 import type { Field, FieldSummary } from "@/lib/types";
 import BackLink from "./BackLink";
@@ -58,6 +61,7 @@ const utcText = (utc: string) => `${utc.slice(0, 10)} ${utc.slice(11, 16)} UTC`;
 
 export default function StagesScreen() {
   const [stages, setStages] = useState<Stage[] | null>(null);
+  const [trained, setTrained] = useState(false);
   const [error, setError] = useState(false);
   const [burst, setBurst] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
@@ -73,6 +77,8 @@ export default function StagesScreen() {
         const fresh = read.filter((s) => s.status === "solved" && !done.has(s.spot.slug)).map((s) => s.spot.slug);
         if (fresh.length) markCelebrated(fresh);
         setBurst(new Set(fresh));
+        const tdone = loadGuest().tutorial.done;
+        setTrained(TUTORIAL.every((l) => tdone.includes(l.id)));
         setStages(read);
       })
       .catch(() => live && setError(true));
@@ -84,7 +90,7 @@ export default function StagesScreen() {
   const groups = stages ? groupStages(stages) : [];
   const ordered = groups.flatMap((g) => g.stages.map((s) => s.stage));
   const solved = ordered.filter((s) => s.status === "solved").length;
-  const nextSlug = ordered.find((s) => s.status !== "solved")?.spot.slug;
+  const nextSlug = trained ? ordered.find((s) => s.status !== "solved")?.spot.slug : undefined;
   const tabSlug = tab ?? ordered[0]?.spot.slug;
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -128,6 +134,44 @@ export default function StagesScreen() {
         </div>
       )}
       <div ref={groupsRef} onKeyDown={onKeyDown}>
+        {stages && (
+          <section className={styles.group}>
+            <h2 className={styles.groupHead}>
+              <span>Training</span>
+              <span className={styles.rule} aria-hidden="true" />
+              <span className={styles.count}>{trained ? "1/1" : "0/1"}</span>
+            </h2>
+            <ol className={styles.list}>
+              <li
+                className={`panel ${styles.card}`}
+                data-testid="training-card"
+                data-part="STG-00"
+                data-status={trained ? "solved" : "new"}
+              >
+                <div className={styles.head}>
+                  <h3>Stage 0</h3>
+                  <span className={styles.diff}>Training</span>
+                  <span className={styles.status} data-status={trained ? "solved" : "new"}>
+                    {trained ? "Solved" : "Not played"}
+                  </span>
+                </div>
+                <p className={styles.desc}>Learn the tools on a practice field before the first real stage.</p>
+                {trained ? (
+                  <span className={styles.badge} data-kind="solved" aria-hidden="true">
+                    ★✓
+                  </span>
+                ) : (
+                  <span className={styles.badge} data-kind="next">
+                    NEXT
+                  </span>
+                )}
+                <Link className={styles.play} href="/tutorial">
+                  {trained ? "Play again" : "Play"}
+                </Link>
+              </li>
+            </ol>
+          </section>
+        )}
         {groups.map((g) => (
           <section key={g.difficulty} className={styles.group}>
             <h2 className={styles.groupHead}>
