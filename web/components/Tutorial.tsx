@@ -24,7 +24,7 @@ export interface TutorialPos {
 }
 
 /** Resume at the first level not done; trust the saved step only when it is for that level. */
-export function resumePos(t: GuestData["tutorial"], levels: TutorialLevel[] = TUTORIAL): TutorialPos {
+export function resumePos(t: Omit<GuestData["tutorial"], "v">, levels: TutorialLevel[] = TUTORIAL): TutorialPos {
   const idx = levels.findIndex((l) => !t.done.includes(l.id));
   if (idx < 0) return { level: levels.length - 1, step: levels[levels.length - 1].steps.length };
   const saved = levels[idx].id === t.level ? t.step : 0;

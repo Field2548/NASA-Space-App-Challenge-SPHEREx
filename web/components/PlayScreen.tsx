@@ -629,7 +629,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
         </aside>
       )}
 
-      <footer className={styles.bottom} data-tutorial-target="timeline">
+      <footer className={styles.bottom} data-tutorial-target="timeline" data-tutorial-avoid="">
         <Timeline
           field={field}
           frames={shownFrames}

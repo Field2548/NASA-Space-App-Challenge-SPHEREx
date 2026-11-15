@@ -42,9 +42,9 @@ test("/tutorial level 0 completes by keyboard", async ({ page }) => {
   const coach = page.getByTestId("coach-mark");
   await expect(coach).toContainText("These are real SPHEREx pictures");
 
-  // The coach buttons work from the keyboard. (A single Tab did not land on Next first even before
-  // the tutorial update, so the button is focused directly.)
-  await coach.getByRole("button", { name: "Next", exact: true }).focus();
+  // The coach card takes focus when it first appears, so one Tab reaches its Next button.
+  await page.keyboard.press("Tab");
+  await expect(coach.getByRole("button", { name: "Next", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(coach).toContainText("Press Blink");
 

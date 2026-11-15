@@ -19,6 +19,10 @@
   border: 1px solid var(--magenta);
 }
 
+.card:focus {
+  outline: none; /* focused by script so Tab starts at its buttons; the card itself is not a control */
+}
+
 .docked {
   left: var(--space-3);
   bottom: var(--space-3);

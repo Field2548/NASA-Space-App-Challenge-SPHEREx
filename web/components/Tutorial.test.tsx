@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REVEAL_INSPECT_ON, TUTORIAL, TUTORIAL_MISS } from "@/lib/copy/tutorial";
-import { defaultGuest, GUEST_KEY, loadGuest, resetGuest } from "@/lib/guest";
+import { defaultGuest, GUEST_KEY, loadGuest, resetGuest, TUTORIAL_VERSION } from "@/lib/guest";
 import { placeCard } from "./CoachMark";
 import { makeField, mockCanvas } from "./testFixtures";
 import Tutorial, { backPos, EROS_HINT, nextPos, resumePos, toolsAt } from "./Tutorial";
@@ -46,7 +46,7 @@ const coach = () => screen.getByTestId("coach-mark");
 
 describe("tutorial position helpers", () => {
   it("starts a fresh guest at level 0 even though the default stores level 1", () => {
-    expect(defaultGuest().tutorial.level).toBe(1);
+    expect(defaultGuest().tutorial.level).toBe(0);
     expect(resumePos(defaultGuest().tutorial)).toEqual({ level: 0, step: 0 });
   });
 
@@ -77,6 +77,34 @@ describe("tutorial position helpers", () => {
     expect(placeCard({ left: 0, top: 0, width: 1440, height: 900 }, 1440, 900)).toBeNull();
   });
 
+  it("keeps the card off its target, above a target in the lower half, inside the viewport", () => {
+    const vw = 1600;
+    const vh = 900;
+    const boxes = [
+      { left: 8, top: 820, width: 900, height: 60 }, // bottom bar, left edge
+      { left: 300, top: 780, width: 40, height: 40 },
+      { left: 700, top: 100, width: 120, height: 40 },
+      { left: 1500, top: 400, width: 90, height: 200 },
+      { left: 0, top: 60, width: 1000, height: 700 },
+    ];
+    const low = placeCard(boxes[0], vw, vh);
+    expect(low).not.toBeNull();
+    expect(low!.top + 180).toBeLessThanOrEqual(boxes[0].top); // above the bottom bar
+    for (const b of boxes) {
+      const p = placeCard(b, vw, vh, 320, 200);
+      if (!p) continue;
+      const apart = p.left + 320 <= b.left || p.left >= b.left + b.width || p.top + 200 <= b.top || p.top >= b.top + b.height;
+      expect(apart, JSON.stringify(b)).toBe(true);
+      expect(p.left).toBeGreaterThanOrEqual(0);
+      expect(p.top).toBeGreaterThanOrEqual(0);
+      expect(p.left + 320).toBeLessThanOrEqual(vw);
+      expect(p.top + 200).toBeLessThanOrEqual(vh);
+    }
+    // A phone-sized viewport: below a target in the upper half, above one in the lower half.
+    expect(placeCard({ left: 20, top: 100, width: 350, height: 200 }, 390, 844, 320, 200)!.top).toBeGreaterThanOrEqual(312);
+    expect(placeCard({ left: 20, top: 560, width: 350, height: 200 }, 390, 844, 320, 200)!.top + 200).toBeLessThanOrEqual(560);
+  });
+
   it("derives the tool set from the position alone", () => {
     expect([...toolsAt(null)]).toEqual([]);
     expect([...toolsAt({ level: 0, step: 1 })]).toEqual([]);
@@ -105,6 +133,20 @@ describe("tutorial position helpers", () => {
 });
 
 describe("Tutorial", () => {
+  it("ignores progress saved by the old tutorial and starts at level 0, keeping other saved data", async () => {
+    stubEros();
+    window.localStorage.setItem(
+      GUEST_KEY,
+      JSON.stringify({ tutorial: { level: 2, step: 0, done: [0, 1] }, finds: [{ spot: "eros", kind: "known", points: 100, at: "t" }], name: "Ada" }),
+    );
+    render(<Tutorial />);
+    await screen.findByTestId("field-canvas");
+    expect(coach().textContent).toContain(TUTORIAL[0].steps[0].text);
+    expect(resumePos(loadGuest().tutorial)).toEqual({ level: 0, step: 0 });
+    expect(loadGuest().finds).toHaveLength(1);
+    expect(loadGuest().name).toBe("Ada");
+  });
+
   it("runs the three levels by events from the screen and saves progress", async () => {
     stubEros();
     render(<Tutorial />);
@@ -187,7 +229,7 @@ describe("Tutorial", () => {
     for (const [li, si, target] of targets) {
       window.localStorage.setItem(
         GUEST_KEY,
-        JSON.stringify({ tutorial: { level: TUTORIAL[li].id, step: si, done: TUTORIAL.slice(0, li).map((l) => l.id) } }),
+        JSON.stringify({ tutorial: { v: TUTORIAL_VERSION, level: TUTORIAL[li].id, step: si, done: TUTORIAL.slice(0, li).map((l) => l.id) } }),
       );
       const { unmount } = render(<Tutorial />);
       await screen.findByTestId("field-canvas");
@@ -202,7 +244,7 @@ describe("Tutorial", () => {
 
   it("refuses Eros marks after frame 3 with the plain hint", async () => {
     stubEros();
-    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 2, step: 0, done: [0, 1] } }));
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { v: TUTORIAL_VERSION, level: 2, step: 0, done: [0, 1] } }));
     render(<Tutorial />);
     await screen.findByTestId("field-canvas");
     expect(coach().textContent).toContain(TUTORIAL[2].steps[0].text);
@@ -256,7 +298,7 @@ describe("Tutorial", () => {
             : new Response(bytes, { status: 200 }),
       ),
     );
-    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 2, step: 0, done: [0, 1] } }));
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { v: TUTORIAL_VERSION, level: 2, step: 0, done: [0, 1] } }));
     render(<Tutorial />);
     const canvas = await screen.findByTestId("field-canvas");
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
@@ -278,7 +320,7 @@ describe("Tutorial", () => {
 
   it("the reveal step never stalls when Inspect is already on", async () => {
     stubEros();
-    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 2, step: 5, done: [0, 1] } }));
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { v: TUTORIAL_VERSION, level: 2, step: 5, done: [0, 1] } }));
     render(<Tutorial />);
     await screen.findByTestId("field-canvas");
     fireEvent.click(screen.getByRole("button", { name: /Inspect off/ })); // on during the overlay step
@@ -300,7 +342,7 @@ describe("Tutorial", () => {
 
   it("Inspect names the object from the level copy, not the public field title", async () => {
     stubEros();
-    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 2, step: 4, done: [0, 1] } }));
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { v: TUTORIAL_VERSION, level: 2, step: 4, done: [0, 1] } }));
     render(<Tutorial />);
     const canvas = await screen.findByTestId("field-canvas");
     fireEvent.click(screen.getByRole("button", { name: /Inspect off/ }));
@@ -311,7 +353,7 @@ describe("Tutorial", () => {
 
   it("resumes saved progress and lets a step be skipped", async () => {
     stubEros();
-    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { level: 2, step: 4, done: [0, 1] } }));
+    window.localStorage.setItem(GUEST_KEY, JSON.stringify({ tutorial: { v: TUTORIAL_VERSION, level: 2, step: 4, done: [0, 1] } }));
     render(<Tutorial />);
     await screen.findByTestId("field-canvas");
     expect(coach().textContent).toContain(TUTORIAL[2].steps[4].text);
