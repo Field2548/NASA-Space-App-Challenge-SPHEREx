@@ -18,6 +18,7 @@ import { FIELDS_BASE, loadField, loadFieldIndex } from "@/lib/fields";
 import { TUTORIAL } from "@/lib/copy/tutorial";
 import { loadGuest } from "@/lib/guest";
 import type { Field, FieldSummary } from "@/lib/types";
+import { GROUPS } from "@/lib/stageOrder";
 import BackLink from "./BackLink";
 import styles from "./StagesScreen.module.css";
 
@@ -28,14 +29,6 @@ type Asteroid = { name: string; positions: OverlayPosition[] };
 type Solution = "loading" | "locked" | { field: Field; asteroids: Asteroid[]; nothing: boolean };
 
 const STATUS_LABEL: Record<Status, string> = { new: "Not played", tried: "Tried", solved: "Solved" };
-const GROUPS: { difficulty: FieldSummary["difficulty"]; label: string }[] = [
-  { difficulty: "easy", label: "Easy" },
-  { difficulty: "medium", label: "Medium" },
-  { difficulty: "hard", label: "Hard" },
-  { difficulty: "expert", label: "Expert" }, // not in the current index; kept so no stage is dropped
-  { difficulty: "boss", label: "Boss" },
-  { difficulty: "control", label: "Control" }, // legacy
-];
 
 function readStages(index: FieldSummary[]): Stage[] {
   const finds = loadGuest().finds;

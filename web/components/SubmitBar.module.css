@@ -37,24 +37,3 @@
   margin: 0;
 }
 
-.verdict {
-  border: 1px solid var(--cyan);
-  padding: var(--space-2);
-  display: grid;
-  gap: var(--space-1);
-}
-
-.verdict p {
-  margin: 0;
-}
-
-.verdict[data-kind="static"],
-.verdict[data-kind="nothing_wrong"],
-.verdict[data-kind="candidate"] {
-  border-color: var(--magenta);
-}
-
-.kind {
-  font-family: var(--font-display);
-  letter-spacing: 0.08em;
-}
