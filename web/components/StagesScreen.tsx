@@ -147,17 +147,17 @@ export default function StagesScreen() {
                   <span className={styles.status} data-status={trained ? "solved" : "new"}>
                     {trained ? "Solved" : "Not played"}
                   </span>
+                  {trained ? (
+                    <span className={`${styles.badge} ${styles.badgeInline}`} data-kind="solved" aria-hidden="true">
+                      ★✓
+                    </span>
+                  ) : (
+                    <span className={`${styles.badge} ${styles.badgeInline}`} data-kind="next">
+                      NEXT
+                    </span>
+                  )}
                 </div>
                 <p className={styles.desc}>Learn the tools on a practice field before the first real stage.</p>
-                {trained ? (
-                  <span className={styles.badge} data-kind="solved" aria-hidden="true">
-                    ★✓
-                  </span>
-                ) : (
-                  <span className={styles.badge} data-kind="next">
-                    NEXT
-                  </span>
-                )}
                 <Link className={styles.play} href="/tutorial">
                   {trained ? "Play again" : "Play"}
                 </Link>
