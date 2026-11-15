@@ -4,6 +4,7 @@
 // only with a login). A guest sees "Not logged in" and a Log in button. Stages are counted, never named.
 
 import { useEffect, useState } from "react";
+import { validateDisplayName } from "@/lib/auth";
 import { fetchBoard } from "@/lib/boardFetch";
 import { loadFieldIndex } from "@/lib/fields";
 import { loadGuest } from "@/lib/guest";
@@ -20,6 +21,48 @@ export default function ProfileScreen() {
   const [total, setTotal] = useState<number | null>(null);
   const [me, setMe] = useState<MeRow | null | undefined>(undefined); // undefined: loading
   const [open, setOpen] = useState(false);
+  const [uid, setUid] = useState<string | null>(null); // set for a logged-in user
+  const [hasRow, setHasRow] = useState(true); // false: signed up without a profiles row
+  const [draft, setDraft] = useState("");
+  const [nameMsg, setNameMsg] = useState<string | null>(null);
+
+  // A logged-in user's profile row and solved stages come from the database; the guest count stays
+  // when the query fails.
+  async function loadAccount() {
+    const sb = getSupabaseBrowser();
+    if (!sb) return;
+    try {
+      const id = (await sb.auth.getSession()).data.session?.user.id;
+      if (!id) return;
+      setUid(id);
+      const { data: row } = await sb.from("profiles").select("display_name").eq("id", id).maybeSingle();
+      setHasRow(!!row);
+      setDraft(row?.display_name ?? "");
+      const { data: finds, error } = await sb.from("finds").select("spot_slug").eq("user_id", id).neq("spot_slug", "quicklook");
+      if (!error && finds) setSolved(new Set(finds.map((f) => f.spot_slug)).size);
+    } catch {
+      /* keep the local numbers */
+    }
+  }
+
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    const sb = getSupabaseBrowser();
+    const display_name = draft.trim();
+    const invalid = validateDisplayName(display_name);
+    if (invalid) return setNameMsg(invalid);
+    if (!sb || !uid) return;
+    setNameMsg(null);
+    // Update only display_name when the row exists (the column grant allows nothing else).
+    const { error } = hasRow
+      ? await sb.from("profiles").update({ display_name }).eq("id", uid)
+      : await sb.from("profiles").insert({ id: uid, display_name });
+    if (error) return setNameMsg(error.code === "23505" ? "That name is taken. Pick another." : "Could not save the name. Try again.");
+    setHasRow(true);
+    setName(display_name);
+    setNameMsg("Saved.");
+    await sb.auth.updateUser({ data: { display_name } }); // USER_UPDATED refreshes the header
+  }
 
   useEffect(() => {
     let live = true;
@@ -30,6 +73,7 @@ export default function ProfileScreen() {
       setName(n);
       setSolved(new Set(loadGuest().finds.map((f) => f.spot)).size);
       if (!n) return setMe(null);
+      void loadAccount();
       fetchBoard()
         .then((b) => live && setMe(b.me ?? null))
         .catch(() => live && setMe(null));
@@ -46,6 +90,7 @@ export default function ProfileScreen() {
     await getSupabaseBrowser()?.auth.signOut();
     setName(null);
     setMe(null);
+    setUid(null);
   }
 
   return (
@@ -69,6 +114,19 @@ export default function ProfileScreen() {
           </button>
         </>
       )}
+      {name && uid && (
+        <form onSubmit={(e) => void saveName(e)}>
+          {!hasRow && <p>Pick a display name so you appear on the scoreboard.</p>}
+          <label htmlFor="profile-name">Display name </label>
+          <input id="profile-name" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={20} autoComplete="nickname" aria-describedby="profile-name-msg" />{" "}
+          <button type="submit" className={styles.button}>
+            Save
+          </button>
+          <p id="profile-name-msg" role="status">
+            {nameMsg}
+          </p>
+        </form>
+      )}
       {name !== undefined && (
         <dl className={styles.stats}>
           <dt>Stages solved</dt>
@@ -90,6 +148,7 @@ export default function ProfileScreen() {
           onSignedIn={(n) => {
             setOpen(false);
             setName(n || "Signed in");
+            void loadAccount();
             fetchBoard()
               .then((b) => setMe(b.me ?? null))
               .catch(() => setMe(null));

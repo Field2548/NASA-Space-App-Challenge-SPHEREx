@@ -268,7 +268,7 @@ function AuthForm({
       const { data, error: signUpError } = await sb.auth.signUp({
         email: address,
         password,
-        options: { data: { display_name: name } },
+        options: { data: { display_name: name }, emailRedirectTo: `${window.location.origin}/profile` },
       });
       if (signUpError) {
         setError(friendlyAuthError(signUpError.message));
