@@ -28,7 +28,7 @@ import Link from "next/link";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
-import { loadField, loadFrames } from "@/lib/fields";
+import { loadField, loadFieldIndex, loadFrames } from "@/lib/fields";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { type BlinkMode, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
@@ -60,6 +60,7 @@ export type PlayEvent =
 export interface PlayEventDetail {
   markedFrames: number; // distinct frames with a mark, after the event
   inspectOn?: boolean; // Inspect mode after the event; set on inspect-opened / inspect-closed
+  unlocked?: boolean; // set on submitted: the verdict was correct and the spot unlocked
 }
 
 /** Parts of the screen a caller can show or hide (PlayScreenProps.tools). */
@@ -258,6 +259,24 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     viewCb.current?.({ frames: isDefault ? null : onionRange, realSpacing, vision });
   }, [onionRange, defaultOnion, realSpacing, vision]);
   const [verdictIn, setVerdictIn] = useState(false);
+  // The spot after this one in public/fields/index.json order (wrapping), fetched after the first verdict.
+  const [nextSlug, setNextSlug] = useState<string | null>(null);
+  const hasVerdict = verdicts > 0;
+  useEffect(() => {
+    if (!hasVerdict || showTitle) return;
+    let live = true;
+    loadFieldIndex()
+      .then((list) => {
+        const slugs = list.map((s) => s.slug);
+        const at = slugs.indexOf(spot);
+        const next = slugs.length > 1 ? slugs[(at + 1) % slugs.length] : null;
+        if (live) setNextSlug(next && next !== spot ? next : null);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [hasVerdict, showTitle, spot]);
   // undefined: not fetched yet; null: unavailable. Fetched once, only after the spot is unlocked.
   const [fetchedKnown, setFetchedKnown] = useState<KnownOverlay | null | undefined>(undefined);
   const knownUnlocked = showTitle || verdictIn;
@@ -340,7 +359,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     if (res.unlocked) setRevealTitle(res.spot_reveal?.title ?? res.verdict.object_name ?? field.title);
     if (res.unlocked && res.reveal) setRevealName(res.spot_reveal?.title ?? res.verdict.object_name ?? null);
     setVerdicts((v) => v + 1);
-    emit("submitted", marks);
+    onEvent?.("submitted", { markedFrames: distinctFrames(marks), unlocked: res.unlocked === true });
     if (res.reveal && canInspect) {
       inspectAt(Math.round(res.reveal.x), Math.round(res.reveal.y));
       if (mode !== "inspect") {
@@ -389,6 +408,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               type="button"
               aria-pressed={overlay === "colorByTime"}
               onClick={() => {
+                // Turning it on stops the blink: the colour composite is one still picture of all frames.
+                if (overlay !== "colorByTime") pause();
                 setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"));
                 emit("color-by-time-toggled", marks);
               }}
@@ -500,8 +521,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             />
           </div>
           {!showTitle && mode === "inspect" && inspected && (
-            // Round mode always: the server keeps names locked until an unlocked verdict. The key
-            // remounts the popup once the spot unlocks so it refetches the unlocked facts.
+            // Round before a correct answer; explore after it (api.md 2: the server still decides from
+            // the unlock cookie). The key remounts the popup once the spot unlocks so it refetches.
             <InspectPopup
               key={verdictIn ? "unlocked" : "locked"}
               field={field}
@@ -509,7 +530,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               x={inspected.x}
               y={inspected.y}
               click={inspected.click}
-              mode="round"
+              mode={verdictIn ? "explore" : "round"}
               onClose={() => setInspected(null)}
             />
           )}
@@ -545,6 +566,14 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
                 <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
                   Clear marks
                 </button>
+                {/* After any verdict a round can move on (the tutorial's coach leads instead). */}
+                {!showTitle && verdicts > 0 && (
+                  <p className={styles.small}>
+                    {nextSlug && <Link href={`/play?spot=${encodeURIComponent(nextSlug)}`}>Next spot →</Link>}
+                    {nextSlug && " · "}
+                    <Link href="/map">Sky map</Link>
+                  </p>
+                )}
               </section>
               {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
               {!showTitle && <Scoreboard slug={spot} refreshKey={verdicts} />}

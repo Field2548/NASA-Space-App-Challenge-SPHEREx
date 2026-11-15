@@ -83,6 +83,7 @@ function stubFetch(ok: boolean, over: Partial<Field> = {}) {
       if (url.startsWith("/api/info")) return new Response(JSON.stringify(info.reply), { status: 200 });
       if (url.startsWith("/api/leaderboard")) return new Response(JSON.stringify(board), { status: 200 });
       if (url.startsWith("/api/overlay")) return overlayReply.body ? new Response(JSON.stringify(overlayReply.body), { status: 200 }) : new Response("no", { status: 404 });
+      if (url.endsWith("/index.json")) return new Response(JSON.stringify([{ slug: "fixture" }, { slug: "other" }]), { status: 200 });
       if (url.endsWith("field.json")) return new Response(JSON.stringify(field), { status: 200 });
       return new Response(bytes, { status: 200 });
     }),
@@ -216,6 +217,14 @@ async function loadGame(props: Partial<Parameters<typeof PlayScreen>[0]> = {}, o
 }
 
 describe("PlayScreen wiring", () => {
+  it("Color by time stops a playing blink", async () => {
+    await loadGame();
+    fireEvent.click(screen.getByRole("button", { name: "Play blink" }));
+    expect(screen.getByRole("button", { name: "Pause blink" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
+    expect(screen.getByRole("button", { name: "Play blink" })).toBeTruthy();
+  });
+
   it("wires loop mode, the onion range and real spacing into the Timeline", async () => {
     await loadGame();
     fireEvent.click(screen.getByRole("button", { name: /Blink order: loop/ }));
@@ -540,14 +549,16 @@ describe("PlayScreen round mode", () => {
     fireEvent.keyDown(window, { key: "i" });
     fireEvent.click(canvas, { clientX: 15, clientY: 15 });
     expect((await screen.findAllByText(/\[LOCKED\]/)).length).toBeGreaterThan(0);
-    info.reply = { mode: "round", locked: false, sources: { jpl: "ok" }, solar_system: [{ name: "433 Eros", r_au: 1.2 }] };
+    info.reply = { mode: "explore", locked: false, sources: { jpl: "ok" }, solar_system: [{ name: "433 Eros", r_au: 1.2 }] };
     const before = infoCalls().length;
+    expect(infoCalls().every((u) => u.includes("mode=round"))).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
     expect(screen.getByRole("dialog", { name: "INSPECT // px 1,1" })).toBeTruthy();
     expect((await screen.findAllByText(/433 Eros/)).length).toBeGreaterThan(0);
     expect(infoCalls().length).toBeGreaterThan(before);
-    expect(infoCalls().every((u) => u.includes("mode=round"))).toBe(true);
+    // After a correct answer the popup asks for explore (api.md 2); the server still decides.
+    expect(infoCalls().slice(before).every((u) => u.includes("mode=explore"))).toBe(true);
   });
 
   it("anchors the popup at the inspected pixel's centre on screen", async () => {
@@ -591,10 +602,33 @@ describe("PlayScreen round mode", () => {
     expect(document.querySelector("dialog")?.open).toBe(true);
   });
 
+  it("the tutorial gets no Next spot link (the coach leads on)", async () => {
+    const canvas = await loadGame({ showTitle: true, fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    expect(screen.queryByRole("link", { name: /Next spot/ })).toBeNull();
+  });
+
   it("the tutorial shows no scoreboard", async () => {
     await loadGame({ showTitle: true, objectName: "433 Eros" });
     expect(screen.getByRole("complementary", { name: "Scoreboard panel" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
+  });
+
+  it("after a verdict offers the next spot and the sky map, so a round can move on", async () => {
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
+    expect(screen.queryByRole("link", { name: /Next spot/ })).toBeNull();
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    const next = await screen.findByRole("link", { name: /Next spot/ });
+    expect(next.getAttribute("href")).toBe("/play?spot=other");
+    expect(screen.getByRole("link", { name: /Sky map/ }).getAttribute("href")).toBe("/map");
   });
 
   it("the tutorial's Inspect names the object from the start", async () => {

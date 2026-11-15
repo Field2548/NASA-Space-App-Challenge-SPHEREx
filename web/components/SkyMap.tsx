@@ -26,6 +26,10 @@ import {
   findHipsUrl,
   HIPS_ID,
   HIPS_NAME,
+  IRSA_HIPS,
+  IRSA_HIPS_ID,
+  IRSA_HIPS_NAME,
+  IRSA_SLICE_ARG,
   loadAladin,
   releaseAladin,
   type AladinCatalog,
@@ -103,6 +107,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
   const [failReason, setFailReason] = useState("");
   const [programReady, setProgramReady] = useState(false); // Aladin Lite loaded; still waiting on CDS
   const [attempt, setAttempt] = useState(0);
+  const [fromIrsa, setFromIrsa] = useState(false); // CDS down: the base layer is IRSA's SPHEREx DR1 HiPS
   const [selected, setSelected] = useState<FieldSummary | null>(null);
   const [fov, setFov] = useState(360);
   const listId = useId();
@@ -162,14 +167,16 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       }
       if (cancelled) return;
       if (!url) {
-        fail("The SPHEREx sky picture from CDS (Strasbourg) is not answering right now.");
+        fail("The SPHEREx sky picture (CDS Strasbourg and IRSA) is not answering right now.");
         return;
       }
       try {
-        const survey = lib.HiPS(HIPS_ID, {
+        const irsa = url === IRSA_HIPS;
+        setFromIrsa(irsa);
+        const survey = lib.HiPS(irsa ? IRSA_HIPS_ID : HIPS_ID, {
           url,
-          name: HIPS_NAME,
-          errorCallback: () => fail("The SPHEREx sky picture from CDS (Strasbourg) stopped answering."),
+          name: irsa ? IRSA_HIPS_NAME : HIPS_NAME,
+          errorCallback: () => fail(`The SPHEREx sky picture from ${irsa ? "IRSA" : "CDS (Strasbourg)"} stopped answering.`),
         });
         const a = lib.aladin(el, {
           survey,
@@ -195,6 +202,13 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           showReticle: false,
           log: false,
         });
+        // IRSA's cube opens on its middle band, a blank dichroic channel (its properties file).
+        // IRSA_SLICE_ARG makes Aladin fetch tile suffix _3 (0.81 um), which matches the credit label.
+        // Aladin applies the slice only once the layer is attached, so set it again after that.
+        if (irsa) {
+          survey.setSliceNumber?.(IRSA_SLICE_ARG);
+          for (const ms of [0, 300, 1500]) setTimeout(() => !cancelled && survey.setSliceNumber?.(IRSA_SLICE_ARG), ms);
+        }
         a.gotoRaDec(GALACTIC_CENTER[0], GALACTIC_CENTER[1]);
         a.setFoV(360);
 
@@ -624,7 +638,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           pointerEvents: "none",
         }}
       >
-        SPHEREx QR2 HiPS: CDS
+        {fromIrsa ? "SPHEREx DR1 HiPS (0.81 µm): IRSA" : "SPHEREx QR2 HiPS: CDS"}
       </div>}
     </div>
   );

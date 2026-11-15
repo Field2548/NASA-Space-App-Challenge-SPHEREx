@@ -45,6 +45,8 @@ export interface AladinOverlay {
 
 export interface AladinHiPS {
   readonly id?: string;
+  /** Cube HiPS only: which band (0-based) to draw. */
+  setSliceNumber?(n: number): void;
 }
 
 export interface AladinStatic {
@@ -170,8 +172,9 @@ async function probeMirrors(): Promise<string | null> {
     if (!fresh.length) throw new Error("no extra mirrors");
     return Promise.any(fresh.map((url) => probeMirror(url)));
   });
-  // The site's own coarse copy (pipeline/mirror_hips.py), probed at the same time; used only when
-  // every CDS mirror fails, so a dead CDS still costs one timeout.
+  // IRSA's own SPHEREx HiPS, then the site's coarse copy (pipeline/mirror_hips.py). Both are probed at
+  // the same time and used only when every CDS mirror fails, so a dead CDS still costs one timeout.
+  const irsa = probeMirror(IRSA_HIPS).catch(() => null);
   const local =
     typeof window === "undefined"
       ? Promise.resolve(null)
@@ -179,9 +182,25 @@ async function probeMirrors(): Promise<string | null> {
   try {
     return await Promise.any([...known, extra]);
   } catch {
-    return await local;
+    return (await irsa) ?? (await local);
   }
 }
+
+/**
+ * IRSA's SPHEREx DR1 all-sky HiPS (a 102-band cube with PNG tiles and CORS open; Aladin draws its
+ * 0.81 um band, in grey). Not the CDS colour survey, but real SPHEREx data from the archive
+ * the game's pictures come from, so it is the fallback when CDS is down.
+ */
+export const IRSA_HIPS = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube";
+/** creator_did of IRSA_HIPS (its properties file). */
+export const IRSA_HIPS_ID = "IPAC/P/SPHEREx/DR1/cube";
+export const IRSA_HIPS_NAME = "SPHEREx DR1 all-sky (IRSA)";
+/**
+ * Argument for Aladin's setSliceNumber on IRSA_HIPS. Aladin turns it into a frequency and back, which
+ * reverses the order for this cube (0 asks for tile suffix _102, none for _50), so the value is set
+ * from the tile suffix the browser then requests (checked with tmp/probe-map.cjs).
+ */
+export const IRSA_SLICE_ARG = 82;
 
 /** Where pipeline/mirror_hips.py puts the coarse copy (web/public/hips/spherex-color). */
 export const LOCAL_HIPS = "/hips/spherex-color";
