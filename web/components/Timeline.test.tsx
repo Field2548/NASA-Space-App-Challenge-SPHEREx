@@ -7,6 +7,7 @@ import * as fields from "@/lib/fields";
 import { timeColors as libTimeColors } from "@/lib/palettes";
 import { timeColors as reTimeColors } from "./timeColors";
 import { makeField, makeFrames, mockCanvas } from "./testFixtures";
+import { resetArchiveStatus } from "@/lib/archiveStatus";
 import Timeline, { clampOnion, keyToIndex, onionRangeFrames } from "./Timeline";
 
 beforeEach(() => {
@@ -189,6 +190,45 @@ describe("Timeline Blink range and speed", () => {
     expect(onCount).toHaveBeenLastCalledWith(4);
     fireEvent.click(screen.getByRole("button", { name: "Show fewer frames" }));
     expect(onCount).toHaveBeenLastCalledWith(2);
+  });
+  describe("\"+\" at the limit", () => {
+    const health = (sia: string) => ({ ok: true, json: async () => ({ services: [{ id: "irsa_sia", status: sia }, { id: "irsa_s3", status: "green" }] }) });
+    const setup = () => render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} frameMax={4} onFrameCountChange={() => {}} />);
+    afterEach(() => resetArchiveStatus());
+    it("says the archive is not responding when IRSA is down", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => health("red")));
+      setup();
+      fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+      expect(await screen.findByText(/IRSA archive is not responding.*4 frames loaded/)).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "No more frames" })).toBeTruthy();
+      vi.unstubAllGlobals();
+    });
+    it("says all frames are shown when IRSA is up, and Escape closes it", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => health("green")));
+      setup();
+      fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+      const dlg = await screen.findByRole("dialog", { name: "No more frames" });
+      expect(await screen.findByText(/all shown/)).toBeTruthy();
+      fireEvent.keyDown(dlg, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      vi.unstubAllGlobals();
+    });
+    it("says the status is unknown when the health check fails, and an outside click closes it", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
+      setup();
+      fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+      expect(await screen.findByText(/couldn't check/)).toBeTruthy();
+      fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      vi.unstubAllGlobals();
+    });
+    it("below the limit it just adds a frame, no popup", () => {
+      const onCount = vi.fn();
+      render(<Timeline field={field} frames={frames.slice(0, 3)} index={0} onIndexChange={() => {}} frameMax={4} onFrameCountChange={onCount} />);
+      fireEvent.click(screen.getByRole("button", { name: "Show more frames" }));
+      expect(onCount).toHaveBeenCalledWith(4);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
   });
   it("Previous and Next wrap round and are never disabled with several frames", () => {
     const onIndex = vi.fn();

@@ -347,3 +347,29 @@
     justify-content: flex-start;
   }
 }
+
+
+.stepper button.atLimit {
+  opacity: 0.45;
+}
+
+.limitNote {
+  position: fixed; /* the bottom bar clips overflow, so the note is fixed and centred, like the (i) dialogs */
+  z-index: 50;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(300px, calc(100vw - 32px));
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3, 12px);
+  background: var(--bg-0);
+  color: var(--text);
+  border: 1px solid var(--cyan);
+  font-size: 13px;
+  text-align: left;
+}
+
+.limitNote p {
+  margin: 0;
+}

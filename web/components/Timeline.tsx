@@ -31,6 +31,7 @@
 // frames; otherwise, while loading, and on error, the frame-derived canvas at `brightness`.
 
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
+import { archiveMessage, getArchiveStatus, type ArchiveStatus } from "@/lib/archiveStatus";
 import { loadThumbs } from "@/lib/fields";
 import { makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB, Vision } from "@/lib/types";
@@ -261,6 +262,27 @@ export default function Timeline(props: TimelineProps) {
     return frames.map(st);
   }, [frames, field, black, useWebp]);
   const uid = useId();
+  // "+" at the limit opens a note about why there are no more frames (is NASA's IRSA archive down?).
+  const [limit, setLimit] = useState<ArchiveStatus | "checking" | null>(null);
+  const limitRef = useRef<HTMLDivElement>(null);
+  const plusRef = useRef<HTMLButtonElement>(null);
+  const closeLimit = () => {
+    setLimit(null);
+    plusRef.current?.focus();
+  };
+  useEffect(() => {
+    if (limit === null) return;
+    const onDown = (e: Event) => {
+      if (!limitRef.current?.contains(e.target as Node) && !plusRef.current?.contains(e.target as Node)) setLimit(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [limit]);
+  const openLimit = () => {
+    setLimit("checking");
+    getArchiveStatus().then((st) => setLimit((cur) => (cur === "checking" ? st : cur)));
+    window.setTimeout(() => limitRef.current?.focus(), 0);
+  };
   const clipId = (k: number) => `${uid}-clip-${k}`;
   const scrubbing = useRef(false);
   const tracksRef = useRef<HTMLDivElement>(null);
@@ -352,7 +374,7 @@ export default function Timeline(props: TimelineProps) {
         </div>
         <div className={styles.options}>
           {onFrameCountChange && n >= 1 && frameMax > 2 && (
-            <div className={styles.field} role="group" aria-label="Frames shown" title="How many of this spot's frames to use, spread evenly across the time span. Marks on hidden frames are kept.">
+            <div className={`${styles.field}`} role="group" aria-label="Frames shown" title="How many of this spot's frames to use, spread evenly across the time span. Marks on hidden frames are kept.">
               <span className={styles.fieldName}>Frames</span>
               <div className={styles.stepper}>
                 <button type="button" aria-label="Show fewer frames" onClick={() => onFrameCountChange(Math.max(2, n - 1))} disabled={n <= 2}>
@@ -361,10 +383,39 @@ export default function Timeline(props: TimelineProps) {
                 <output aria-live="polite">
                   {n} of {frameMax}
                 </output>
-                <button type="button" aria-label="Show more frames" onClick={() => onFrameCountChange(Math.min(frameMax, n + 1))} disabled={n >= frameMax}>
+                <button
+                  ref={plusRef}
+                  type="button"
+                  aria-label="Show more frames"
+                  aria-disabled={n >= frameMax ? true : undefined}
+                  aria-haspopup={n >= frameMax ? "dialog" : undefined}
+                  aria-expanded={n >= frameMax ? limit !== null : undefined}
+                  className={n >= frameMax ? styles.atLimit : undefined}
+                  onClick={() => (n >= frameMax ? (limit === null ? openLimit() : closeLimit()) : onFrameCountChange(Math.min(frameMax, n + 1)))}
+                >
                   +
                 </button>
               </div>
+              {limit !== null && n >= frameMax && (
+                <div
+                  ref={limitRef}
+                  role="dialog"
+                  aria-label="No more frames"
+                  tabIndex={-1}
+                  className={styles.limitNote}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.stopPropagation();
+                      closeLimit();
+                    }
+                  }}
+                >
+                  <p aria-live="polite">{archiveMessage(limit, n)}</p>
+                  <button type="button" onClick={closeLimit}>
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {onFpsChange && (
