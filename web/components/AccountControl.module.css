@@ -1,5 +1,10 @@
 .account {
-  position: fixed;
+  /* Absolute, not fixed: it sits in the top-right corner of the page and scrolls away with the page
+     header, so it never floats over content on a scrolled page. (<body> is not positioned, so this is
+     relative to the first screen.) Full-height screens do not scroll on a desktop, so it stays
+     visible there. On phones /play does scroll (min-height 600 px and taller panels), so the
+     control scrolls away there and a player scrolls up to reach Log in or the profile menu. */
+  position: absolute;
   top: 8px;
   right: var(--space-3);
   z-index: 30;

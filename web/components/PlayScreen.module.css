@@ -10,7 +10,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-3);
-  padding-right: 112px; /* room for the fixed account control (AccountControl) */
+  padding-right: 112px; /* room for the account control (AccountControl, top-right, scrolls with the page) */
   border-bottom: 1px solid var(--line);
   background: var(--bg-1);
 }

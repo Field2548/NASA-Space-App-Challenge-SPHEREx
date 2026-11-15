@@ -1,16 +1,73 @@
+/* Pinned to the bottom of the window on every page (a status bar). z-index 20 sits above page
+   content and below the account control (30), coach marks, popovers and the result sheet (40-50),
+   so modal UI that reaches the bottom edge stays usable. globals.css reserves its height as
+   padding-bottom on <body>, so the end of a long page scrolls fully into view above it. */
 .footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  /* "safe": right-aligned when the items fit; start-aligned (scrollable) when they do not. */
+  justify-content: safe flex-end;
   gap: var(--space-4);
+  /* Constant height. If viewport-fit=cover is ever added, add env(safe-area-inset-bottom) here, to
+     the body padding in globals.css and to the 100vh - var(--site-footer-h) full-height screens. */
   height: var(--site-footer-h, 32px);
-  margin-top: auto; /* body is a flex column: push to the window bottom on short pages */
   padding: 0 var(--space-4);
   border-top: 1px solid var(--line);
   background: var(--bg-0);
   font-size: 13px;
+  white-space: nowrap;
+  /* Narrow screens: the row scrolls sideways inside the bar instead of wrapping or overflowing. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.footer::-webkit-scrollbar {
+  display: none;
+}
+
+.footer > * {
+  flex-shrink: 0;
 }
 
 .footer a {
   color: var(--text-dim);
+}
+
+.narrow {
+  display: none;
+}
+
+/* Phones: smaller gap and type so all six items share one row; the long GitHub label shortens. */
+@media (max-width: 520px) {
+  .footer {
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+    font-size: 12px;
+  }
+
+  .wide {
+    display: none;
+  }
+
+  .narrow {
+    display: inline;
+  }
+}
+
+/* Still too tight: keep only the status dot (its link keeps its aria-label). */
+@media (max-width: 440px) {
+  .footer a[href="/status"] > span:not([aria-hidden]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }

@@ -1,9 +1,19 @@
 # Contract: API routes (owner: SERVER)
 
-Version 1.4, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1.6, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
 Source for behaviour: `docs/BUILD_PROMPT.md` (BP) sections 8.10 to 8.12, 8.14, 8.16, 8.19, 9, 10.
 Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts/field-schema.md` (DATA):
 `x`, `y` are 0-based, top-down, pixel centres at integers; frame numbers start at 1.
+
+**Changes in 1.6** (2026-11-15, play time):
+
+- New `POST /api/playtime` (section 7b) saves a logged-in player's play time; `GET /api/player` gains `seconds_played` and `seconds_week` (section 7a). Database: `play_time`, `add_play_time` and two new `player_stats` columns, in `supabase/migrations/20261118000000_leaderboard_v2.sql`.
+
+**Changes in 1.5** (2026-11-15, leaderboard v2):
+
+- `GET /api/leaderboard` gains `period=all|week`, `region=global|local`, `country=XX` and the response keys `period`, `region`, `country`, `detected_country`, `available`, `reason`, `countries`, and `finds` on rows and `me` (section 7). Old queries answer as before, with the new keys added.
+- New `GET /api/player?name=` (section 7a).
+- Database: `profiles.country`, `set_my_country`, `leaderboard_v2`, `leaderboard_countries`, `player_stats` (`supabase/migrations/20261118000000_leaderboard_v2.sql`). A player's country is saved from the `x-vercel-ip-country` header when a logged-in player's answer is saved or the leaderboard is opened; only the two letters are stored.
 
 **Changes in 1.3** (2026-11-15, after a second adversarial review):
 
@@ -261,9 +271,66 @@ Inspect answers in full by default, in a round too (lock back with `INSPECT_LOCK
 - Top 50 rows. `accuracy` is 0 to 1, or `null` with no counted submissions. `me` is absent for guests.
 - Accuracy counts only `counted` rows: a repeat of a find the player already has, a practice answer, and quick-look marks do not move it. Every wrong answer counts.
 - The bot row is scored from the bot's candidates that match known objects, and is always labelled as a bot.
-- **1.4 (spoiler fix):** with `scope=spot`, the bot row is present only when the caller's signed unlock cookie covers that spot (section 2); otherwise `rows` holds the humans only. Reason: the bot's score on one spot says whether something moves there (0 on the control field). `scope=all` always has it. Every response is `Cache-Control: private, no-store`. Display names `bot` and `Shift-and-stack bot` (any case) are reserved; the database refuses them.
+- **1.4 (spoiler fix):** with `scope=spot`, the bot row is present only when the caller's signed unlock cookie covers that spot (section 2); otherwise `rows` holds the humans only. Reason: the bot's score on one spot says whether something moves there. `scope=all` always has it. Every response is `Cache-Control: private, no-store`. Display names `bot` and `Shift-and-stack bot` (any case) are reserved; the database refuses them.
 - The route calls the `leaderboard` RPC **with the caller's token** (anon key client plus the caller's `Authorization` header), never with the service role: the function uses `auth.uid()` for `is_me` and `me`.
 - `source` is `db`, or `snapshot` when Supabase is missing or down: the route then serves `web/public/leaderboard-snapshot.json` (same shape) with status 200.
+
+### Leaderboard v2 (1.5): period, region, country
+
+Extra query parameters, all optional: `period=all|week` (default `all`; `week` = finds from the last 7 days, rolling), `region=global|local` (default `global`), `country=XX` (two letters, any case, only with `region=local`; when absent the caller's detected country is used). A malformed value is `400 bad_request`. They combine with `scope`/`slug`.
+
+```json
+{ "scope": "all", "slug": null, "source": "db", "updated_at": "2026-11-15T09:30:00Z",
+  "period": "week", "region": "local", "country": "TH", "detected_country": "TH", "available": true,
+  "countries": [ { "code": "TH", "players": 4 }, { "code": "US", "players": 2 } ],
+  "rows": [ { "rank": 1, "name": "nova", "score": 1850, "accuracy": 0.83, "finds": 14, "is_bot": false, "is_me": false } ],
+  "me": { "rank": 14, "name": "kt", "score": 350, "accuracy": 0.5, "finds": 6 } }
+```
+
+- `period`, `region`: echo of the board answered. `country`: the board's country, upper case, or `null` for `region=global`. `detected_country`: the caller's country from `x-vercel-ip-country` (two letters; `XX` and anything else ignored), or `null` (always `null` in local development).
+- `available: false`: the board cannot be computed now; `rows` is `[]`, `me` is absent and `reason` is `"no_database"` (Supabase missing or down), `"no_country"` (`region=local` and no country given or detected; `countries` is still listed so the page can offer a choice) or `"not_installed"` (the v2 database functions are not installed). The default board (`period=all&region=global`) never goes unavailable: without a database it serves the snapshot, and without the v2 functions it falls back to the old `leaderboard` RPC (rows then have no `finds`).
+- `countries`: present only with `region=local`: every country with at least one ranked player in the chosen period and scope, with the player count, sorted by `players` descending then `code`.
+- `finds` (rows and `me`): counted submissions in the chosen period and scope. May be absent (old function, snapshot); the bot row has `finds: null`.
+- The bot row appears only on the global all-time board (with the same unlock rule as before for `scope=spot`), never on a weekly or local board. Weekly and local boards keep the database's ranks (equal scores share a rank).
+- Local = players whose profile country equals `country`. A logged-in caller's detected country is saved (best effort, after the response, never affecting it) with `set_my_country` and the caller's token, only on `region=local` requests (and after a saved answer, `POST /api/check` / `/api/complete`); global boards write nothing.
+- The country is taken from the host's IP-country header, but a logged-in player can also set their own country through `set_my_country`, so local boards are a convenience, not proof of location.
+- The default board (`period=all&region=global`): when `leaderboard_v2` fails with any database error other than a timeout, the route tries the old `leaderboard` function before the snapshot; a timeout goes straight to the snapshot (the worst case stays one 5 s wait).
+- Migration `20261118000000_leaderboard_v2.sql` adds an index on `finds(created_at)` without `concurrently` (fine at the current table size, the table is small).
+
+## 7a. `GET /api/player?name=<display name>`
+
+One player's public numbers by exact display name (case-insensitive; names are unique). Light rate limit, 60 per minute. `Cache-Control: private, no-store`. Never returns user ids or emails. Send the login token to get `is_me`.
+
+```json
+{ "name": "nova", "is_bot": false, "is_me": false, "country": "TH",
+  "member_since": "2026-11-15T00:00:00.000Z", "last_active": "2026-11-15T00:00:00.000Z",
+  "points": 1850, "points_week": 600, "rank_all": 1, "rank_week": 2,
+  "classifications": 14, "correct": 11, "accuracy": 0.786,
+  "stages_completed": 6, "stages_total": 11,
+  "by_difficulty": { "easy": { "done": 1, "total": 1 }, "medium": { "done": 1, "total": 2 }, "hard": { "done": 1, "total": 1 },
+                     "boss": { "done": 0, "total": 1 }, "tool": { "done": 3, "total": 6 } },
+  "first_finds": 2, "patches_solved": 5, "active_days": 2,
+  "seconds_played": 12000, "seconds_week": 2700 }
+```
+
+- `classifications`: counted submissions on spots (quick look excluded); `correct`: those with a correct verdict; `accuracy` = correct / classifications, `null` with none.
+- `stages_completed`: distinct ready spots with a correct answer. `stages_total` and the `by_difficulty` totals come from `web/public/fields/index.json`; a difficulty with no stages is omitted. No stage names or slugs are returned.
+- The solved slugs are not in the public `player_stats` database function (the anon key is public, so anyone could call it): the route reads them with `player_spots(name)`, which only `service_role` may execute, through the server's service client. **Without the service key** (or if that call fails) the player is still answered, but `stages_completed`, `stages_total` and `by_difficulty` are **absent**; clients must treat them as optional.
+- `first_finds`: finds where the player was the first finder. `patches_solved`: rows in `patch_solves`. `active_days`: distinct UTC dates with any find or patch solve.
+- `rank_all` / `rank_week`: rank among players on the global all-stages board (all time / last 7 days), computed by the same function as `leaderboard_v2`; the same number the player has on that board whenever they appear on it (any find in the period, so a zero-point player listed on the board has a rank too), and `null` only when the player has no find in the period. `rank_all` counts the bot row the way the global all-time board shows it (+1 when the bot's total is strictly greater than the player's points); `rank_week` has no bot. `member_since`, `last_active`: ISO strings at **day level** (truncated to 00:00 UTC of the day, never the exact time) or `null`.
+- `seconds_played`: seconds the player has spent playing, all time; `seconds_week`: the same for the last 7 UTC days (today and the 6 before it; the days are whole UTC days, unlike the rolling `points_week`). Both are numbers (0 for a player who has not played), or `null` when the database function is the old one without them; clients hide the stat for `null`. See section 7b for what counts as play time.
+- The bot (`name` equal to `Shift-and-stack bot`, any case): `{ "name", "is_bot": true, "is_me": false, "points", "about" }` only, with no per-stage data (it would show which stage has nothing moving).
+- Errors: `400 bad_request` (missing, empty or over 40 characters), `404 not_found` (no such player), `503 db_unavailable` ("Player stats are not available right now."; no database, or the v2 functions are not installed or fail).
+
+## 7b. `POST /api/playtime`
+
+A logged-in player's browser reports how long they have been playing. Body: `{ "seconds": 60 }`, an integer from 1 to 120. Answer: `{ "credited": 60 }`, the seconds the database added to today's (UTC) total, which can be less than asked. Rate limit 60 per minute per address (a class behind one NAT shares an address; the database cap already bounds the credit). `Cache-Control: no-store`.
+
+- Needs a login (`Authorization: Bearer`). A guest, or a token the auth server says is invalid or expired, gets `401 unauthorized`. When the auth server itself errors or times out the answer is `503 db_unavailable`, never 401. Without a database: `503 db_unavailable` ("Play time cannot be saved right now."), also when `add_play_time` is not installed or fails. Bad body: `400 bad_request`.
+- The route calls `add_play_time(p_seconds)` with the caller's own token on the anon client (never the service client), so only the caller's own row can change.
+- **The credit is capped by real time.** `add_play_time` credits the smallest of: the seconds asked (never below 0), 90, the seconds since this player's last report today (for the first report of a UTC day: since the last report on the previous two days, and 90 only when there is none), and what is left of the 86,400 seconds of the day. A forged client can therefore never add more than the time that has really passed, at most one day of play per day.
+- The browser (`web/lib/playTimer.ts`) counts only while the player is logged in, the tab is visible and there was a pointer, key, wheel or touch input in the last 120 s, and reports every 60 s of counted time, when the tab is hidden and when the page is closed. A failed report (including 503 and 429) is dropped, not retried, and counting goes on. After a 401 nothing more is sent until the login changes to a new token or a new login.
+- Only the screen where a stage or a sky patch is being played reports. The server cannot tell real play from a script that sends the numbers itself: the cap bounds the abuse, it does not remove it.
 
 ## 8. `GET /api/density?layer=finds|checked&order=&who=me|others|all`
 

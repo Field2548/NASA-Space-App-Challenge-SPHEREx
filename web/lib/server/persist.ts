@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { firstFinderBonus, type FieldForScoring, type FindKey, type Scored } from "@/lib/scoring";
 import { hpxNest } from "@/lib/healpix";
 import { serviceClient, userFromRequest } from "@/lib/server/db";
+import { rememberCountry } from "@/lib/server/leaderboard";
 
 export type SaveResult = {
   persisted: boolean;
@@ -126,6 +127,9 @@ export async function saveFind(
     if (!result || typeof result.first_finder !== "boolean") {
       throw new Error("record_find returned no row");
     }
+    // The answer is saved: note the player's country (from the IP-country header) so they show up
+    // on their local leaderboard. Fire and forget; it cannot change this result.
+    rememberCountry(request);
     return {
       persisted: true,
       first_finder: result.first_finder,
