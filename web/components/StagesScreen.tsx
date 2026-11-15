@@ -101,6 +101,8 @@ export default function StagesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ordered is derived from stages
   }, [stages, nextSlug]);
 
+  const numbers = useMemo(() => Object.fromEntries(groups.flatMap((g) => g.stages.map((e) => [e.stage.spot.slug, e.n]))), [groups]);
+
   const pick = (slug: string) => setSelected(slug);
   const fromList = (stage: Stage) => {
     setSelected(stage.spot.slug);
@@ -133,7 +135,7 @@ export default function StagesScreen() {
         )}
       </header>
       <main className={styles.map}>
-        <SkyMap onPlay={() => {}} onSpot={pick} spotMarks={marks} target={target} showSpots />
+        <SkyMap onPlay={() => {}} onSpot={pick} spotMarks={marks} spotNumbers={numbers} target={target} showSpots />
         {error && <p role="alert" className={styles.note}>The list of stages could not be loaded.</p>}
         {!stages && !error && <p role="status" className={styles.note}>Loading the stages…</p>}
         {stages && (

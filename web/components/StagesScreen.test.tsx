@@ -139,6 +139,14 @@ describe("StagesScreen", () => {
     expect(last.props?.spotMarks).toEqual({ hektor: "Tried" });
   });
 
+  it("passes each stage's number to the map markers, matching the list", async () => {
+    render(<StagesScreen />);
+    await waitFor(() => expect(last.props?.spotNumbers).toBeTruthy());
+    const nums = last.props?.spotNumbers as Record<string, number>;
+    expect(Object.values(nums).sort((a, b) => a - b)).toEqual(Object.values(nums).map((_, i) => i + 1));
+    expect(screen.getByRole("button", { name: new RegExp(`^Stage ${nums.eros}, `) })).toBeTruthy();
+  });
+
   it("keeps the solution locked for an unsolved stage: no object name in the DOM and no explore request", async () => {
     render(<StagesScreen />);
     for (const slug of ["eros", "hektor", "cygnus", "makemake", "eris"]) {
