@@ -1,14 +1,42 @@
+/* Pinned to the bottom of the window on every page (a status bar). z-index 20 sits above page
+   content and below the account control (30), coach marks, popovers and the result sheet (40-50),
+   so modal UI that reaches the bottom edge stays usable. globals.css reserves its height as
+   padding-bottom on <body>, so the end of a long page scrolls fully into view above it. */
 .footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-4);
-  height: var(--site-footer-h, 32px);
-  margin-top: auto; /* body is a flex column: push to the window bottom on short pages */
-  padding: 0 var(--space-4);
+  /* Constant height; the phone home-indicator inset is added below the row. */
+  height: calc(var(--site-footer-h, 32px) + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--space-4) env(safe-area-inset-bottom, 0px);
   border-top: 1px solid var(--line);
   background: var(--bg-0);
   font-size: 13px;
+  white-space: nowrap;
+  /* Narrow screens: the row scrolls sideways inside the bar instead of wrapping or overflowing. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.footer::-webkit-scrollbar {
+  display: none;
+}
+
+/* With overflow, justify-content: flex-end would hide the first items; margin auto keeps them
+   reachable (right-aligned when they fit, scrollable from the left when they do not). */
+.footer > :first-child {
+  margin-left: auto;
+}
+
+.footer > * {
+  flex-shrink: 0;
 }
 
 .footer a {

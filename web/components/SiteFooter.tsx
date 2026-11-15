@@ -1,7 +1,9 @@
 "use client";
 // Site footer, mounted once by app/layout.tsx: About, Credits and SERVER's status light.
-// Its height is --site-footer-h (set on <body>), so full-height screens subtract it and stay in
-// one viewport. Hidden on /embed, which is a bare viewer for iframes.
+// Pinned to the bottom of the window (position: fixed) on every page, so it stays visible while
+// scrolling. Its height is --site-footer-h (set on <body>); <body> reserves that height as
+// padding-bottom, and full-height screens subtract it so they fit one viewport. On narrow screens
+// the row scrolls sideways inside the bar. Hidden on /embed, which is a bare viewer for iframes.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";

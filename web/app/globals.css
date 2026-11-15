@@ -42,11 +42,14 @@ body {
   min-height: 100%;
 }
 
-/* Column layout so the site footer sits at the bottom of the window on short pages (Settings). */
+/* The site footer is position: fixed to the window bottom, so <body> reserves its height (plus the
+   phone safe-area inset) and the end of a long page scrolls fully into view above it. Full-height
+   screens are 100vh - var(--site-footer-h), which with this padding fills the window exactly. */
 body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-bottom: calc(var(--site-footer-h, 0px) + env(safe-area-inset-bottom, 0px));
 }
 
 body > * {
