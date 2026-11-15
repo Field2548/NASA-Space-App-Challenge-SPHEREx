@@ -56,7 +56,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
 
 function PlayerName({ name, onOpen }: { name: string; onOpen: OpenPlayer }) {
   return (
-    <button type="button" className={styles.nameBtn} aria-label={`View stats for ${name}`} onClick={(e: MouseEvent<HTMLButtonElement>) => onOpen(name, e.currentTarget)}>
+    <button type="button" className={styles.nameBtn} title={name} aria-label={`View stats for ${name}`} onClick={(e: MouseEvent<HTMLButtonElement>) => onOpen(name, e.currentTarget)}>
       {name}
     </button>
   );
@@ -65,15 +65,15 @@ function PlayerName({ name, onOpen }: { name: string; onOpen: OpenPlayer }) {
 function Tags({ row }: { row: { is_bot?: boolean; is_me?: boolean } }) {
   return (
     <>
-      {row.is_bot && <span className={styles.tag}> (bot)</span>}
-      {row.is_me && <span className={styles.tag}> (you)</span>}
+      {row.is_bot && <span className={styles.badge}>bot</span>}
+      {row.is_me && <span className={styles.badge}>you</span>}
     </>
   );
 }
 
 function Podium({ rows, onOpen }: { rows: BoardRow[]; onOpen: OpenPlayer }) {
   return (
-    <ol className={styles.podium} data-count={rows.length}>
+    <ol className={styles.podium}>
       {rows.map((r, i) => (
         <li key={`${r.rank}-${r.name}`} className={styles.card} data-medal={MEDALS[i]} data-me={r.is_me ? "true" : "false"}>
           <span className={styles.cardRank}>#{r.rank}</span>
@@ -90,7 +90,7 @@ function Podium({ rows, onOpen }: { rows: BoardRow[]; onOpen: OpenPlayer }) {
   );
 }
 
-function BoardTable({ rows, me, meShown, onOpen }: { rows: BoardRow[]; me: BoardMe | null; meShown: boolean; onOpen: OpenPlayer }) {
+function BoardTable({ label, rows, me, meShown, onOpen }: { label: string; rows: BoardRow[]; me: BoardMe | null; meShown: boolean; onOpen: OpenPlayer }) {
   // I am pinned at the bottom only when I am not among the rows already shown (podium or table).
   const pinned = me && !meShown ? me : null;
   if (rows.length === 0 && !pinned) return null;
@@ -98,8 +98,10 @@ function BoardTable({ rows, me, meShown, onOpen }: { rows: BoardRow[]; me: Board
     <tr key={`${r.rank}-${r.name}`} data-me={r.is_me ? "true" : "false"}>
       <td className={styles.num}>{r.rank}</td>
       <td className={styles.player}>
-        <PlayerName name={r.name} onOpen={onOpen} />
-        <Tags row={r} />
+        <span className={styles.cardName}>
+          <PlayerName name={r.name} onOpen={onOpen} />
+          <Tags row={r} />
+        </span>
       </td>
       <td className={styles.num}>{r.score}</td>
       <td className={`${styles.num} ${styles.hideNarrow}`}>{formatAccuracy(r.accuracy)}</td>
@@ -108,7 +110,7 @@ function BoardTable({ rows, me, meShown, onOpen }: { rows: BoardRow[]; me: Board
   );
   return (
     <div className={styles.tableWrap}>
-      <table className={styles.table}>
+      <table className={styles.table} aria-label={label}>
         <thead>
           <tr>
             <th scope="col">Rank</th>
@@ -139,13 +141,13 @@ function BoardTable({ rows, me, meShown, onOpen }: { rows: BoardRow[]; me: Board
 }
 
 /** Podium + table for one available board, or an honest empty line. */
-function BoardRows({ board, onOpen, period }: { board: BoardV2; onOpen: OpenPlayer; period: Period }) {
+function BoardRows({ label, board, onOpen, period }: { label: string; board: BoardV2; onOpen: OpenPlayer; period: Period }) {
   const { podium, rest } = splitPodium(board.rows);
   if (board.rows.length === 0 && !board.me) return <p className={styles.note}>{period === "week" ? "No scores this week yet." : "No scores yet."}</p>;
   return (
     <>
       {podium.length > 0 && <Podium rows={podium} onOpen={onOpen} />}
-      <BoardTable rows={rest} me={board.me} meShown={board.rows.some((r) => r.is_me)} onOpen={onOpen} />
+      <BoardTable label={label} rows={rest} me={board.me} meShown={board.rows.some((r) => r.is_me)} onOpen={onOpen} />
     </>
   );
 }
@@ -232,7 +234,7 @@ export default function LeaderboardScreen() {
   const countrySelect = (
     <div className={styles.field}>
       <label htmlFor={ids.country}>Country</label>
-      <select id={ids.country} value={pickerValue} onChange={(e) => setCountry(e.target.value || null)}>
+      <select id={ids.country} className={styles.countrySelect} value={pickerValue} onChange={(e) => setCountry(e.target.value || null)}>
         {!pickerValue && (
           <option value="" disabled>
             Choose a country
@@ -288,9 +290,10 @@ export default function LeaderboardScreen() {
     } else if (board.source === "snapshot") {
       standing = <p className={styles.note}>Your rank is not in the saved copy. It will show when live scores are back.</p>;
     } else {
-      standing = <p className={styles.bigMsg}>{period === "week" ? "You have no points this week yet." : "You have no points yet."} Classify a field to get on the board.</p>;
+      standing = <p className={styles.msg}>{period === "week" ? "You have no points this week yet." : "You have no points yet."} Classify a field to get on the board.</p>;
     }
   }
+  const guest = standingView?.ok === true && !standingView.data.signedIn;
   const standingCaption = `${mine === "global" ? "Global" : localCountry ? `Local, ${countryName(localCountry)}` : "Local"} · ${periodLabel} · ${stageLabel}`;
 
   // ----- boards
@@ -302,7 +305,7 @@ export default function LeaderboardScreen() {
     globalBody = (
       <>
         {board.source === "snapshot" && <p className={styles.note}>Showing a saved copy; live scores are unavailable.</p>}
-        {board.available ? <BoardRows board={board} onOpen={openPlayer} period={period} /> : <p className={styles.note}>{unavailableText(board.reason)}</p>}
+        {board.available ? <BoardRows label="Global ranking" board={board} onOpen={openPlayer} period={period} /> : <p className={styles.note}>{unavailableText(board.reason)}</p>}
       </>
     );
   }
@@ -317,7 +320,7 @@ export default function LeaderboardScreen() {
       localBody = (
         <>
           {board.source === "snapshot" && <p className={styles.note}>Showing a saved copy; live scores are unavailable.</p>}
-          <BoardRows board={board} onOpen={openPlayer} period={period} />
+          <BoardRows label="Local ranking" board={board} onOpen={openPlayer} period={period} />
         </>
       );
     } else if (board.reason === "no_country") {
@@ -361,15 +364,17 @@ export default function LeaderboardScreen() {
             </h2>
             <p className={styles.caption}>{standingCaption}</p>
           </div>
-          <Segmented
-            label="Compare my rank with"
-            value={mine}
-            options={[
-              { value: "global", label: "Global" },
-              { value: "local", label: "Local" },
-            ]}
-            onChange={setMine}
-          />
+          {!guest && (
+            <Segmented
+              label="Compare my rank with"
+              value={mine}
+              options={[
+                { value: "global", label: "Global" },
+                { value: "local", label: "Local" },
+              ]}
+              onChange={setMine}
+            />
+          )}
         </div>
         {standing}
       </section>

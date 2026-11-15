@@ -96,6 +96,7 @@ describe("LeaderboardScreen boards", () => {
     expect(kt.closest("tr")?.getAttribute("data-me")).toBe("true");
     expect(within(kt.closest("tr")!).getByText("350")).toBeTruthy();
     expect(within(globalBoard()).getByRole("button", { name: "View stats for lyra" }).closest("tr")?.getAttribute("data-me")).toBe("false");
+    expect(within(globalBoard()).getByRole("table", { name: "Global ranking" })).toBeTruthy();
     expect(within(globalBoard()).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Rank", "Player", "Points", "Accuracy", "Classifications"]);
     // Local: heading with the country, podium of the two rows, and the small print.
     const local = await screen.findByRole("region", { name: "Local Thailand" });
@@ -114,7 +115,7 @@ describe("LeaderboardScreen boards", () => {
       );
     render(<LeaderboardScreen />);
     expect(await screen.findByText(/Showing a saved copy/)).toBeTruthy();
-    expect(within(globalBoard()).getByText("(bot)")).toBeTruthy();
+    expect(within(globalBoard()).getByText("bot")).toBeTruthy();
     expect(within(globalBoard()).queryByRole("table")).toBeNull(); // only podium rows, no pinned me
   });
 
@@ -257,8 +258,8 @@ describe("LeaderboardScreen standing card", () => {
     expect(await within(standing()).findByText("Log in to get a rank")).toBeTruthy();
     expect(within(standing()).getByText(/Log in button at the top right/)).toBeTruthy();
     expect(within(standing()).queryByText(/^#/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
-    expect(within(standing()).getByText("Log in to get a rank")).toBeTruthy();
+    // No rank to compare, so no Global/Local toggle.
+    expect(screen.queryByRole("group", { name: "Compare my rank with" })).toBeNull();
   });
 
   it("shows my rank, points, accuracy and classifications, and switches between global and local", async () => {

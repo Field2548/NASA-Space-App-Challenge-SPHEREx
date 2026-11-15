@@ -13,9 +13,10 @@
   /* "safe": right-aligned when the items fit; start-aligned (scrollable) when they do not. */
   justify-content: safe flex-end;
   gap: var(--space-4);
-  /* Constant height; the phone home-indicator inset is added below the row. */
-  height: calc(var(--site-footer-h, 32px) + env(safe-area-inset-bottom, 0px));
-  padding: 0 var(--space-4) env(safe-area-inset-bottom, 0px);
+  /* Constant height. If viewport-fit=cover is ever added, add env(safe-area-inset-bottom) here, to
+     the body padding in globals.css and to the 100vh - var(--site-footer-h) full-height screens. */
+  height: var(--site-footer-h, 32px);
+  padding: 0 var(--space-4);
   border-top: 1px solid var(--line);
   background: var(--bg-0);
   font-size: 13px;
@@ -36,4 +37,37 @@
 
 .footer a {
   color: var(--text-dim);
+}
+
+.narrow {
+  display: none;
+}
+
+/* Phones: smaller gap and type so all six items share one row; the long GitHub label shortens. */
+@media (max-width: 520px) {
+  .footer {
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
+    font-size: 12px;
+  }
+
+  .wide {
+    display: none;
+  }
+
+  .narrow {
+    display: inline;
+  }
+}
+
+/* Still too tight: keep only the status dot (its link keeps its aria-label). */
+@media (max-width: 440px) {
+  .footer a[href="/status"] > span:not([aria-hidden]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }

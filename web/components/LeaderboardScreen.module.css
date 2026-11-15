@@ -1,8 +1,11 @@
 /* /leaderboard dashboard. Cards on --bg-1 with --line borders; medal colours come from the site tokens. */
 .page {
-  max-width: 1200px;
+  /* <body> is a flex column, so without width: 100% this block shrinks to its content. */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-3);
+  padding: var(--space-5) var(--space-4);
   line-height: 1.6;
 }
 
@@ -88,8 +91,7 @@
 
 .caption,
 .note,
-.fine,
-.tag {
+.fine {
   color: var(--text-dim);
 }
 
@@ -108,8 +110,16 @@
   font-size: 12px;
 }
 
-.tag {
-  font-size: 13px;
+/* "you" / "bot" tags: small badges that never wrap or split. */
+.badge {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 /* Your standing */
@@ -126,7 +136,13 @@
   border-top: 2px solid var(--cyan);
 }
 
+.countrySelect {
+  /* Wide enough for the placeholder and the longest country name. */
+  min-width: 24ch;
+}
+
 .standingHead {
+  margin-bottom: var(--space-3);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -164,6 +180,11 @@
   margin: 0;
 }
 
+.msg {
+  margin: 0;
+  font-size: 15px;
+}
+
 .bigMsg {
   margin: 0 0 var(--space-2);
   font-family: var(--font-display-stack);
@@ -171,10 +192,10 @@
   letter-spacing: 0.06em;
 }
 
-/* Two boards side by side; the board itself is the container for the narrow-width rules. */
+/* Two boards side by side from 1000px up; the board itself is the container for the narrow-width rules. */
 .boards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
@@ -183,34 +204,26 @@
   container-type: inline-size;
 }
 
-/* Podium */
+/* Podium: three rows, each on one line: rank, name (takes the free space), points. */
 .podium {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
   margin: 0 0 var(--space-3);
   padding: 0;
   list-style: none;
 }
 
-.podium[data-count="1"] {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.podium[data-count="2"] {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .card {
   --medal: var(--amber);
   display: grid;
-  align-content: start;
-  gap: var(--space-1);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   background: color-mix(in srgb, var(--medal) 9%, var(--bg-1));
   border: 1px solid color-mix(in srgb, var(--medal) 55%, var(--line));
-  border-top: 3px solid var(--medal);
+  border-left: 3px solid var(--medal);
 }
 
 .card[data-medal="silver"] {
@@ -228,18 +241,22 @@
 .cardRank {
   color: var(--medal);
   font-family: var(--font-display-stack);
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1.1;
 }
 
+/* Name + badges on one line; the name gives way with an ellipsis, never breaking mid-word. */
 .cardName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .cardPoints {
   font-size: 18px;
+  white-space: nowrap;
 }
 
 .unit {
@@ -266,7 +283,10 @@
   text-transform: none;
   text-decoration: underline dotted var(--text-dim);
   text-underline-offset: 3px;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nameBtn:hover:not(:disabled) {
@@ -304,8 +324,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* width + max-width 0: the Player cell takes the free space and its name truncates inside it. */
 .player {
-  overflow-wrap: anywhere;
+  width: 100%;
+  max-width: 0;
 }
 
 .table tr[data-me="true"] {
@@ -324,38 +346,21 @@
   border-bottom: 0;
 }
 
-/* Narrow boards (a phone, or half a small laptop): fewer columns, podium cards in a stack. */
-@container (max-width: 480px) {
+/* Narrow boards (a phone, or a small laptop's half screen): drop Accuracy and Classifications.
+   At 1280-1440 the board content is about 540px wide, so they show there. */
+@container (max-width: 479px) {
   .hideNarrow {
     display: none;
   }
 }
 
-@container (max-width: 400px) {
-  .podium,
-  .podium[data-count="2"] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .card {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border-top-width: 1px;
-    border-left: 3px solid var(--medal);
-  }
-
-  .cardRank {
-    font-size: 22px;
+@media (min-width: 1000px) {
+  .boards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 900px) {
-  .boards {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

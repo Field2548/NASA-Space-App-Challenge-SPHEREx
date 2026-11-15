@@ -78,6 +78,16 @@ describe("PlayerStatsDialog", () => {
     expect(screen.getByText("3 days ago")).toBeTruthy();
   });
 
+  it("hides the whole stages section when the server left the stage totals out", async () => {
+    const rest: Record<string, unknown> = { ...PLAYER };
+    for (const k of ["stages_completed", "stages_total", "by_difficulty"]) delete rest[k];
+    reply({ ...rest, name: "nova" });
+    render(<PlayerStatsDialog name="nova" onClose={vi.fn()} />);
+    expect(await screen.findByText("1850")).toBeTruthy();
+    expect(screen.queryByText(/Stages completed/)).toBeNull();
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
   it("shows only points and the description for the bot, with no stage bars", async () => {
     reply(BOT);
     render(<PlayerStatsDialog name="Shift-and-stack bot" onClose={vi.fn()} />);

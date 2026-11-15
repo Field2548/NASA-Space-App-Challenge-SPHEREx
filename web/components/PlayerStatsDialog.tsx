@@ -47,7 +47,14 @@ export default function PlayerStatsDialog({ name, onClose }: { name: string; onC
     let live = true;
     fetchPlayer(name)
       .then((player) => live && setState({ status: "ok", player, now: Date.now() }))
-      .catch((e: unknown) => live && setState({ status: "error", code: e instanceof PlayerError ? e.status : 0 }));
+      .catch(
+        (e: unknown) =>
+          live &&
+          setState({
+            status: "error",
+            code: e instanceof PlayerError ? e.status : 0,
+          }),
+      );
     return () => {
       live = false;
     };
@@ -119,27 +126,34 @@ export default function PlayerStatsDialog({ name, onClose }: { name: string; onC
               </Stat>
             </dl>
 
-            <section aria-labelledby={`${titleId}-stages`} className={styles.stages}>
-              <h3 id={`${titleId}-stages`} className={styles.subtitle}>
-                Stages completed:{" "}
-                <span className={styles.mono}>
-                  {player.stages_completed ?? "–"} / {player.stages_total ?? "–"}
-                </span>
-              </h3>
-              <ul className={styles.bars}>
-                {difficultyRows(player.by_difficulty).map((d) => (
-                  <li key={d.key} className={styles.bar}>
-                    <span className={styles.barLabel}>{d.label}</span>
-                    <span className={styles.track} aria-hidden="true">
-                      <span className={styles.fill} style={{ width: `${Math.min(100, (d.done / d.total) * 100)}%` }} />
-                    </span>
-                    <span className={styles.mono}>
-                      {d.done} / {d.total}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            {player.stages_total !== null && (
+              <section aria-labelledby={`${titleId}-stages`} className={styles.stages}>
+                <h3 id={`${titleId}-stages`} className={styles.subtitle}>
+                  Stages completed:{" "}
+                  <span className={styles.mono}>
+                    {player.stages_completed ?? "–"} / {player.stages_total ?? "–"}
+                  </span>
+                </h3>
+                <ul className={styles.bars}>
+                  {difficultyRows(player.by_difficulty).map((d) => (
+                    <li key={d.key} className={styles.bar}>
+                      <span className={styles.barLabel}>{d.label}</span>
+                      <span className={styles.track} aria-hidden="true">
+                        <span
+                          className={styles.fill}
+                          style={{
+                            width: `${Math.min(100, (d.done / d.total) * 100)}%`,
+                          }}
+                        />
+                      </span>
+                      <span className={styles.mono}>
+                        {d.done} / {d.total}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </>
         )}
       </div>
