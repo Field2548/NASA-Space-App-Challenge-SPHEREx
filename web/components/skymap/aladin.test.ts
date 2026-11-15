@@ -119,6 +119,51 @@ describe("findHipsUrl, shared check and local fallback", () => {
     expect(m.IRSA_HIPS).toBe("https://irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube");
   });
 
+  it("uses IRSA about a second after it answers when a CDS mirror hangs, not after the CDS timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((url: string, init?: { signal?: AbortSignal }) => {
+          if (url.startsWith("https://irsa.ipac.caltech.edu/")) return Promise.resolve(new Response(PROPS));
+          if (url.includes("MocServer")) return Promise.resolve(new Response("[]"));
+          // CDS hangs until its timeout aborts it
+          return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("timeout"))));
+        }),
+      );
+      const m = await fresh();
+      let got: string | null | undefined;
+      void m.findHipsUrl().then((u) => (got = u));
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(got).toBe(m.IRSA_HIPS);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still prefers CDS when it answers within the grace after IRSA", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((url: string) => {
+          if (url.startsWith("https://irsa.ipac.caltech.edu/")) return Promise.resolve(new Response(PROPS));
+          if (url.includes("MocServer")) return Promise.resolve(new Response("[]"));
+          if (url.startsWith("https://alasky.cds"))
+            return new Promise<Response>((r) => setTimeout(() => r(new Response(PROPS)), 500));
+          return Promise.resolve(new Response("down", { status: 404 }));
+        }),
+      );
+      const m = await fresh();
+      let got: string | null | undefined;
+      void m.findHipsUrl().then((u) => (got = u));
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(got).toBe("https://alasky.cds.unistra.fr/SPHEREx/color");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not keep a failed check, so a retry looks again", async () => {
     let up = false;
     vi.stubGlobal(

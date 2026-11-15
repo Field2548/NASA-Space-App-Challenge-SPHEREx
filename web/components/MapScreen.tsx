@@ -14,7 +14,10 @@ import { SkyMap } from "./SkyMap";
 import { flyFovForSpot, spotCovering } from "./skymap/geometry";
 import { loadSpotsOnce } from "./skymap/spots";
 
-export const playHref = (slug: string) => `/play?spot=${encodeURIComponent(slug)}`;
+/** Field of view (degrees) at or under which a click on the sky picks that patch. */
+export const PICK_FOV = 3;
+
+export const playHref =(slug: string) => `/play?spot=${encodeURIComponent(slug)}`;
 
 export default function MapScreen() {
   const router = useRouter();
@@ -41,7 +44,15 @@ export default function MapScreen() {
         <h1 className={styles.title}>Sky map</h1>
       </header>
       <main className={styles.map}>
-        <SkyMap onPlay={play} target={target} />
+        <SkyMap
+          onPlay={play}
+          target={target}
+          onClickSky={({ ra, dec, fov }) => {
+            // Pick a patch: a wide view zooms in on the click; a close view opens Quick look there.
+            if (fov !== undefined && fov > PICK_FOV) setTarget({ ra, dec, fov: PICK_FOV / 2 });
+            else setQuick({ ra, dec });
+          }}
+        />
         <div className={styles.box}>
           <CoordinateBox
             spots={spots}
