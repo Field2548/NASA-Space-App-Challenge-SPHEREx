@@ -6,6 +6,7 @@
 // stars are CSS only and stop under prefers-reduced-motion.
 
 import { PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/brand";
+import BrandMark from "./BrandMark";
 import SkyPreload from "./SkyPreload";
 import TitleMenu from "./TitleMenu";
 import TitleSky from "./TitleSky";
@@ -28,7 +29,10 @@ export default function TitleScreen() {
       </div>
       <div className={styles.panel}>
         <header>
-          <h1 className={styles.title}>{PROJECT_NAME}</h1>
+          <h1 className={styles.title}>
+            <BrandMark className={styles.titleMark} />
+            {PROJECT_NAME}
+          </h1>
           <p className={styles.tagline}>{PROJECT_TAGLINE}</p>
         </header>
         <TitleMenu />

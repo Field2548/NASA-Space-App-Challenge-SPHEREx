@@ -41,6 +41,8 @@ describe("MapScreen", () => {
   it("has one h1 and, with the HiPS down, lists ready spots that open /play?spot=<slug>", async () => {
     render(<MapScreen />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "← Back" })).toBeTruthy(); // same Back control as the other pages
+    expect(screen.queryByText("Back to the start")).toBeNull();
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/not answering/);
     fireEvent.click(await screen.findByRole("button", { name: /Play Field One/ }));
