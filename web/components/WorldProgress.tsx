@@ -40,8 +40,8 @@ export default function WorldProgress() {
         <span className={styles.fill} style={{ width: `${(now / WORLD_TOTAL) * 100}%` }} />
       </div>
       <p className={styles.text}>
-        <span className={styles.label}>WORLD PROGRESS</span>{" "}
-        {offline ? "World progress offline" : checked === null ? "Loading…" : `${now.toLocaleString("en-US")} / ${WORLD_TOTAL.toLocaleString("en-US")} sky boxes checked (${pct}%)`}
+        <span className={styles.label}>WORLD PROGRESS</span> <strong data-testid="world-pct">{checked === null ? "–%" : `${pct}%`}</strong>{" "}
+        {offline ? "World progress offline" : checked === null ? "Loading…" : `${now.toLocaleString("en-US")} / ${WORLD_TOTAL.toLocaleString("en-US")} sky boxes checked`}
       </p>
     </div>
   );
