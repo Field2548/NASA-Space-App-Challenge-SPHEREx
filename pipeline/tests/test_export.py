@@ -504,7 +504,7 @@ def test_public_title_kind_difficulty():
             field = json.load(f)
         assert field["title"].startswith("Field in ")
         assert field["kind"] == "spot"
-        assert field["difficulty"] in ("easy", "medium", "hard", "boss")
+        assert field["difficulty"] in ("easy", "medium", "hard", "boss", "tool")
         entry = index[slug]
         assert (entry["title"], entry["kind"], entry["difficulty"]) == \
             (field["title"], field["kind"], field["difficulty"])

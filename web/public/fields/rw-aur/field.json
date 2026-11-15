@@ -1,0 +1,128 @@
+{
+ "slug": "rw-aur",
+ "title": "Test your tool on RW Aurigae",
+ "kind": "spot",
+ "difficulty": "tool",
+ "ra": 76.9566,
+ "dec": 30.4013,
+ "fov_deg": 0.1,
+ "pixel_arcsec": 6.15,
+ "size": [
+  59,
+  59
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   76.9566,
+   30.4013
+  ],
+  "crpix": [
+   30.0,
+   30.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60920.979603,
+   "utc": "2025-09-02T23:30:37",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60936.601041,
+   "utc": "2025-09-18T14:25:29",
+   "hours_since_prev": 374.91,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 61091.721854,
+   "utc": "2026-02-20T17:19:28",
+   "hours_since_prev": 3722.9,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61109.44165,
+   "utc": "2026-03-10T10:35:58",
+   "hours_since_prev": 425.28,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61285.099408,
+   "utc": "2026-09-02T02:23:08",
+   "hours_since_prev": 4215.79,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 6,
+   "mjd": 61299.285813,
+   "utc": "2026-09-16T06:51:34",
+   "hours_since_prev": 340.47,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.196,
+  "offset": -2.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp",
+  "thumbs/6.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 1795.402
+ },
+ "psf_fwhm_px": 1.663,
+ "has": {
+  "exposures": true,
+  "spectrum": false
+ }
+}

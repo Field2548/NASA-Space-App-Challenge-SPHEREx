@@ -327,10 +327,12 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     (max of the 3x3 pixels, as the repo's --track check does). change_snr is the same 3x3
     maximum in the frame minus the median of the other frames (motion_frames.residuals): stars
     cancel, so it tells whether the object itself is seen there. star is reserved for the
-    Tier 2 star targets and not used yet. Each bot candidate gets a status (known, alias or
+    a star target (star_targets.STAR_SPOTS 'star' dict): its object gets the expected position
+    per frame (SIMBAD + proper motion + parallax), the measured centroid and offset, and the
+    brightness per frame. Each bot candidate gets a status (known, alias or
     unconfirmed), see candidate_status."""
-    if star is not None:
-        raise NotImplementedError("star targets are not built yet")
+    if star is not None and not isinstance(star, dict):
+        raise NotImplementedError("star must be a STAR_SPOTS entry's 'star' dict (star_targets.py)")
     _repo_imports()
     height, width = wcs.array_shape if wcs.array_shape else frames.shape[1:]
     mjds = np.asarray(mjds, dtype=float)
@@ -360,6 +362,13 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
                         "positions": positions,
                         "vx_px_per_day": round(float(np.polyfit(days, x, 1)[0]), 3),
                         "vy_px_per_day": round(float(np.polyfit(days, y, 1)[0]), 3)})
+    if star is not None:
+        from star_targets import star_object
+        resid = None
+        if frames is not None:
+            from motion_frames import residuals
+            resid = np.array(residuals(list(frames)))
+        objects.append(star_object(folder, wcs, mjds, frames, star, resid))
     cands = read_candidates(folder, height)
     if noise_bar is None:
         cands = []          # never report a bot candidate without its noise bar
@@ -540,8 +549,6 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     The public files get a neutral title, kind 'spot' and a non-revealing difficulty; the real
     ones go into the answer key's 'reveal' block (issue #10).
     Returns field.json as a dict."""
-    if star is not None:
-        raise NotImplementedError("star targets are not built yet")
     out_dir = os.path.abspath(out_dir)
     answers_dir = answers_dir or os.path.join(os.path.dirname(os.path.dirname(out_dir)),
                                               "data", "answers")
@@ -564,7 +571,8 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     if len(meta) != n:
         raise ValueError(f"{folder}: frames.csv has {len(meta)} rows but there are {n} frames")
     field = {
-        "slug": slug, "title": public_title(ra, dec), "kind": "spot",
+        # tool tests name their star on purpose ("Test your tool on Barnard's Star")
+        "slug": slug, "title": title if difficulty == "tool" else public_title(ra, dec), "kind": "spot",
         "difficulty": public_difficulty(difficulty),
         "ra": ra, "dec": dec, "fov_deg": fov, "pixel_arcsec": PIXEL_ARCSEC, "size": [w, h],
         "wcs": {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec],
@@ -620,12 +628,14 @@ def parse_args():
     p.add_argument("--all", action="store_true", help="export the five ready spots (SPOTS table)")
     p.add_argument("--slug")
     p.add_argument("--title")
-    p.add_argument("--difficulty", choices=["easy", "medium", "hard", "boss", "control"])
+    p.add_argument("--difficulty", choices=["easy", "medium", "hard", "boss", "tool", "control"])
     p.add_argument("--kind", default="asteroid",
                    choices=["asteroid", "dwarf-planet", "control", "star"])
     p.add_argument("--fov", type=float, default=0.2, help="field of view in degrees (default 0.2)")
     p.add_argument("--track", help="JPL Horizons small-body id of the known object")
-    p.add_argument("--star", help="reserved for star targets")
+    p.add_argument("--stars", action="store_true",
+                   help="export the tool-test star spots (STAR_SPOTS in star_targets.py)")
+    p.add_argument("--star", help="reserved")
     p.add_argument("--noise-bar", type=float, help="the bot search's noise bar (sigma)")
     p.add_argument("--nothing-moves", action="store_true", help="control spot")
     p.add_argument("--bands", help="a data/bands_* folder (cube.fits) for the spectrum tiles; "
@@ -637,8 +647,13 @@ def parse_args():
 def main():
     a = parse_args()
     if a.star:
-        raise SystemExit("--star is reserved for star targets, which are not built yet")
-    if a.all:
+        raise SystemExit("--star is reserved; use --stars for the tool-test spots")
+    if a.stars:
+        from star_targets import STAR_SPOTS
+        jobs = [{"slug": s["slug"], "folder": os.path.join(ROOT, s["folder"]), "title": s["title"],
+                 "kind": "star", "difficulty": "tool", "fov": s["fov"], "star": s["star"],
+                 "noise_bar": None} for s in STAR_SPOTS]
+    elif a.all:
         jobs = [dict(s, folder=os.path.join(ROOT, s["folder"])) for s in SPOTS]
     elif a.folder and a.slug and a.title and a.difficulty:
         jobs = [{"slug": a.slug, "folder": a.folder, "title": a.title, "kind": a.kind,
@@ -649,7 +664,7 @@ def main():
     for j in jobs:
         bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all else None)
         f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out, bands=bands,
-                         track=j.get("track"), kind=j["kind"], fov=j["fov"],
+                         track=j.get("track"), star=j.get("star"), kind=j["kind"], fov=j["fov"],
                          noise_bar=j.get("noise_bar"), nothing_moves=j.get("nothing_moves", False))
         print(f"{j['slug']}: {len(f['frames'])} frames {f['size'][0]}x{f['size'][1]}, "
               f"{f['data']['precision']}, scale {f['data']['scale']}, white {f['stretch']['white']}"
@@ -658,7 +673,9 @@ def main():
         # real spots have landed: the index lists them in game order, without the fixture
         with open(os.path.join(a.out, "index.json"), encoding="utf-8") as f:
             by_slug = {e["slug"]: e for e in json.load(f)}
-        write_json(os.path.join(a.out, "index.json"), [by_slug[s["slug"]] for s in SPOTS])
+        ready = [s["slug"] for s in SPOTS]
+        extra = [s for s in by_slug if s not in ready and s != "fixture"]      # e.g. the tool-test stars
+        write_json(os.path.join(a.out, "index.json"), [by_slug[s] for s in ready + extra])
 
 
 if __name__ == "__main__":

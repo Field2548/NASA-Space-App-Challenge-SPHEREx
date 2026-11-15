@@ -30,6 +30,7 @@ const row = (slug: string, difficulty: FieldSummary["difficulty"]): FieldSummary
   thumbnail: `${slug}/thumbs/1.webp`,
 });
 const INDEX = [row("eros", "easy"), row("hektor", "medium"), row("makemake", "hard"), row("eris", "boss"), row("cygnus", "medium")];
+let served: FieldSummary[] = INDEX;
 
 const overlayBody = {
   locked: false,
@@ -47,13 +48,14 @@ beforeEach(() => {
   localStorage.removeItem("onion-sky:guest-replay");
   localStorage.removeItem(CELEBRATED_KEY);
   overlay = overlayBody;
+  served = INDEX;
   calls = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       const u = String(url);
       calls.push(u);
-      if (u.endsWith("/fields/index.json")) return new Response(JSON.stringify(INDEX), { status: 200 });
+      if (u.endsWith("/fields/index.json")) return new Response(JSON.stringify(served), { status: 200 });
       if (u.endsWith("/field.json")) return new Response(JSON.stringify(makeField({ slug: u.split("/").at(-2) })), { status: 200 });
       if (u.startsWith("/api/overlay")) return new Response(JSON.stringify(overlay), { status: 200 });
       return new Response("nope", { status: 404 });
@@ -145,6 +147,15 @@ describe("StagesScreen", () => {
     expect(heads).toEqual(["Training0/1", "Easy0/1", "Medium1/2", "Hard0/1", "Boss0/1"]);
     expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Stage 0", "Stage 1", "Stage 2", "Stage 3", "Stage 4", "Stage 5"]);
     expect((await card("cygnus")).getByText("Stage 3")).toBeTruthy();
+  });
+
+  it("lists tool-test stages in their own group after Boss", async () => {
+    served = [...INDEX, row("barnard", "tool")];
+    render(<StagesScreen />);
+    await screen.findByTestId("stage-barnard");
+    const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(heads).toEqual(["Training0/1", "Easy0/1", "Medium0/2", "Hard0/1", "Boss0/1", "Tool tests0/1"]);
+    expect((await card("barnard")).getByText("Stage 6")).toBeTruthy();
   });
 
   it("shows progress as a progressbar with solved count", async () => {

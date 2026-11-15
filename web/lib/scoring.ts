@@ -145,6 +145,7 @@ const BASE_POINTS: Record<string, number> = {
   hard: 500,
   boss: 1000,
   expert: 750,
+  tool: 250, // tool-test stars (Barnard's Star, variables...): scored like medium
   control: 250, // SERVER decision (BP is silent): the "Nothing moved" spot scores like medium
   fixture: 100,
 };

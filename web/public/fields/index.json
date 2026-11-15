@@ -48,5 +48,55 @@
   "difficulty": "medium",
   "kind": "spot",
   "thumbnail": "cygnus/thumbs/1.webp"
+ },
+ {
+  "slug": "barnard",
+  "title": "Test your tool on Barnard's Star",
+  "ra": 269.4464,
+  "dec": 4.7686,
+  "fov_deg": 0.2,
+  "difficulty": "tool",
+  "kind": "spot",
+  "thumbnail": "barnard/thumbs/1.webp"
+ },
+ {
+  "slug": "eps-indi-b",
+  "title": "Test your tool on Epsilon Indi B",
+  "ra": 331.0964,
+  "dec": -56.8006,
+  "fov_deg": 0.2,
+  "difficulty": "tool",
+  "kind": "spot",
+  "thumbnail": "eps-indi-b/thumbs/1.webp"
+ },
+ {
+  "slug": "wise0855",
+  "title": "Test your tool on WISE 0855",
+  "ra": 133.76,
+  "dec": -7.2422,
+  "fov_deg": 0.1,
+  "difficulty": "tool",
+  "kind": "spot",
+  "thumbnail": "wise0855/thumbs/1.webp"
+ },
+ {
+  "slug": "rw-aur",
+  "title": "Test your tool on RW Aurigae",
+  "ra": 76.9566,
+  "dec": 30.4013,
+  "fov_deg": 0.1,
+  "difficulty": "tool",
+  "kind": "spot",
+  "thumbnail": "rw-aur/thumbs/1.webp"
+ },
+ {
+  "slug": "r-dra",
+  "title": "Test your tool on R Draconis",
+  "ra": 248.1672,
+  "dec": 66.755,
+  "fov_deg": 0.1,
+  "difficulty": "tool",
+  "kind": "spot",
+  "thumbnail": "r-dra/thumbs/1.webp"
  }
 ]
