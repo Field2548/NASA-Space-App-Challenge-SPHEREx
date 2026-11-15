@@ -1,8 +1,8 @@
-# Contract: API routes (owner: SERVER)
+# Contract: API routes
 
-Version 1.6, 2026-11-15 Bangkok. Change only through a `contract` issue (coordination 3.5).
+Version 1.6, 2026-11-15 Bangkok.
 Source for behaviour: `docs/BUILD_PROMPT.md` (BP) sections 8.10 to 8.12, 8.14, 8.16, 8.19, 9, 10.
-Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts/field-schema.md` (DATA):
+Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts/field-schema.md`:
 `x`, `y` are 0-based, top-down, pixel centres at integers; frame numbers start at 1.
 
 **Changes in 1.6** (2026-11-15, play time):
@@ -22,7 +22,7 @@ Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts
 - **Shared budget charged after login** (section 4): `/api/complete` charges the shared `/api/check` budget only after the 503 and 401 checks, so anonymous calls cannot drain a player's budget. Rate-limit address order and eviction are described in section 1.
 - **Request de-duplication** (section 9): `POST /api/request-spot` returns the existing request when one lies within 0.05 degrees (`200`, `duplicate: true`) and answers `429` when 200 requests are queued. Database: repeated `candidate`/`static` rows are not counted and a player has at most 50 `finds` rows per spot (section 8, migration).
 
-**Changes in 1.2** (2026-11-15, after an independent adversarial review of the SERVER code):
+**Changes in 1.2** (2026-11-15, after an independent adversarial review of the server code):
 
 - Only a **correct** answer unlocks a spot. Wrong answers leave it locked, so the player can try again (section 2).
 - Answers on a spot that is already open are still judged but earn 0 points, with `"practice": true` (section 3).
@@ -34,7 +34,7 @@ Pixel coordinates, frame numbers and the answer-key shape follow `docs/contracts
 - Database: `find_key` and `counted` columns, display-name rules, and a `p_who` form of `density` (sections 3, 7, 8, and the migration).
 - Smaller fixes: `0 ≤ ra < 360` (section 9), `/api/keepalive` without `CRON_SECRET` (section 11), the JPL `sb_ident` observer (section 3), and a request/response example that matches the real Eros data (section 3).
 
-Routes owned by DATA (`/api/quicklook/*`, `/api/overlay`) are listed in section 12 for completeness only.
+Overlay and quick-look routes (`/api/quicklook/*`, `/api/overlay`) are listed in section 12 for completeness only.
 
 ## 1. Rules for every route
 
@@ -59,13 +59,13 @@ Routes owned by DATA (`/api/quicklook/*`, `/api/overlay`) are listed in section 
 | 500 | `internal` | anything else, including a ready spot whose answer key or `field.json` the server cannot read |
 
 - **Login.** Supabase Auth runs in the browser. A logged-in call sends `Authorization: Bearer <supabase access token>`. No header = guest. Guests can call every route; routes that write to the database answer as noted per route.
-- **No database is a normal state** (issue #3 item 1 default). Each route below says what it does without one. Nothing crashes.
+- **No database is a normal state**. Each route below says what it does without one. Nothing crashes.
 - **Rate limit:** light, per IP, in memory. About 30 calls per minute for `/api/check`, 60 for the read routes. The address is `x-vercel-forwarded-for` (first entry), else `x-real-ip`, else the last `x-forwarded-for` entry (added by the nearest proxy; the first entry is written by the client), else `local`. When the in-memory table is full it drops the roughly 10% of addresses whose window ends soonest, never all of them. On Vercel each serverless instance counts on its own, so this is best effort only: it slows a runaway loop, it is not a security control.
 - **Points and verdicts are computed only on the server.** The client never sends points and never reads an answer key. Nothing under `web/data/` is ever served.
 
 ## 2. The spoiler rule: `mode=round|explore`
 
-Used by `/api/info` (and DATA's `/api/overlay`).
+Used by `/api/info` (and the data pipeline's `/api/overlay`).
 
 | `mode` | When the client sends it | What the server returns |
 | --- | --- | --- |
@@ -76,7 +76,7 @@ Used by `/api/info` (and DATA's `/api/overlay`).
 - **The server decides, not the client** (BP section 3: "The server enforces this"). Asking for `mode=explore` is only a request:
   - For a **ready spot** (a call with `spot=`, or `ra`/`dec` inside a ready spot's picture), the server answers as `explore` only if this player has a **correct** answer on that spot (`known`, `bot_match` or `nothing_correct`). Otherwise it answers exactly as `round`, with `"mode": "round", "locked": true`. Always read `locked` from the response; never assume.
   - For a position **outside every ready spot** (sky map, quick look), `explore` is always granted.
-- **SERVER decision (differs from BP 3 and 8.16, "always open in free explore and on the sky map"):** a ready spot stays locked on the sky map and in free explore too, until the player has a correct answer there. Reason: otherwise one click on the sky map shows the answer to every ready spot before it is played.
+- **Server decision (differs from BP 3 and 8.16, "always open in free explore and on the sky map"):** a ready spot stays locked on the sky map and in free explore too, until the player has a correct answer there. Reason: otherwise one click on the sky map shows the answer to every ready spot before it is played.
 - **Wrong answers do not unlock.** `candidate`, `static` and `nothing_wrong` leave the spot locked and answer `"unlocked": false`, so the player can try again.
 - **How the server knows:** a correct `/api/check` answer (and a correct entry in `/api/complete`) sets a cookie `unlock` (`HttpOnly`, `SameSite=Lax`, `Secure` on https, `Path=/api`, 30 days). It holds the list of unlocked spot slugs, signed with HMAC-SHA256 by a server secret, so it cannot be forged or edited. Later, a logged-in player with a saved visit to the spot is also unlocked, on any device (a visit is saved only with a correct answer, the same moment the cookie is set). Works for guests and with no database.
   - Client: call the API with `credentials: "same-origin"` (the `fetch` default). Nothing else to do; the cookie is not readable from JavaScript.
@@ -135,7 +135,7 @@ Response `200` for the request above, as a guest with no database, before the sp
   "noise_bar_sigma": null }
 ```
 
-The example above has no `spot_reveal`: today's Eros answer key has no `reveal` block, so the server adds nothing. Once DATA's keys carry one, the same open response adds `"spot_reveal": { "title": ..., "kind": ..., "difficulty": ... }`.
+The example above has no `spot_reveal`: today's Eros answer key has no `reveal` block, so the server adds nothing. Once the data pipeline's keys carry one, the same open response adds `"spot_reveal": { "title": ..., "kind": ..., "difficulty": ... }`.
 
 `verdict` is the `Verdict` type in `web/lib/types.ts`. **The checks run in the order of this table, and the first that fits wins:**
 
@@ -152,8 +152,8 @@ The example above has no `spot_reveal`: today's Eros answer key has no `reveal` 
 - **Following a bot candidate** means: in every marked frame, the mark is within 2 px of the candidate's predicted position `x + vx * (mjd_frame - t_ref_mjd)` (same for `y`) from the answer key, in at least 2 frames. There is **no separate velocity check** (removed in 1.2): marks on the path in every marked frame already fix the velocity.
 - **A bot candidate "is" a known object** when its predicted path is within **3 px** of that object's `in_grid` answer positions in at least 2 frames (3 px, not 2: the bot's straight-line path for Hektor is up to 2.5 px from JPL's positions). Marks that follow such a candidate get `known` for that object: same name, same points, same `reveal`, never `bot_match`.
 - **`bot_match` needs both** `above_noise_bar: true` and `stacked_snr > noise_bar_sigma`, and never happens when `noise_bar_sigma` is `null`. Its message always carries the numbers: "Matches the bot: 6.2σ against a 5.9σ noise bar. Not a confirmed object, so no points."
-- **SERVER decision made after the review (replaces 1.1's "bot_match gives full points"):** `bot_match` earns 0 points. It still counts as a correct submission for accuracy and it unlocks the spot. Reason: marginal candidates such as Eris's rank 2 (6.24σ against a 5.9σ bar) paid 1000 points for marking what is most likely noise.
-- **Known gap (planned, phase 3):** BP 8.10's third step, "otherwise `sb_ident` checks for a known asteroid", is not done live for ready spots. It will use DATA's pre-made `web/data/catalog/<slug>.json` `asteroids[]` when that file exists (not built yet). Until then such a mark is a `candidate`.
+- **Server decision made after the review (replaces 1.1's "bot_match gives full points"):** `bot_match` earns 0 points. It still counts as a correct submission for accuracy and it unlocks the spot. Reason: marginal candidates such as Eris's rank 2 (6.24σ against a 5.9σ bar) paid 1000 points for marking what is most likely noise.
+- **Known gap (planned, phase 3):** BP 8.10's third step, "otherwise `sb_ident` checks for a known asteroid", is not done live for ready spots. It will use the data pipeline's pre-made `web/data/catalog/<slug>.json` `asteroids[]` when that file exists (not built yet). Until then such a mark is a `candidate`.
 
 Other keys:
 
@@ -169,18 +169,18 @@ Other keys:
 | `reveal` | where to open Inspect as the reward (answer-key position of the found object). Present only for `known`. |
 | `track` | the server's fit: `x0, y0` at the first marked frame's time, `vx, vy` in px/day, `rms` in px. Absent for `answer: "nothing"`. |
 | `noise_bar_sigma` | the spot's noise bar, or `null` when no bot search was run. Never show a bot match without it. |
-| `spot_reveal` | `{ title, kind, difficulty }`: the spot's real title, sent once the spot is open (`unlocked` or `practice` is `true`), never on a wrong answer to a locked spot. Absent until DATA's answer keys carry a `reveal` block. |
+| `spot_reveal` | `{ title, kind, difficulty }`: the spot's real title, sent once the spot is open (`unlocked` or `practice` is `true`), never on a wrong answer to a locked spot. Absent until the data pipeline's answer keys carry a `reveal` block. |
 
 **Find key** (server only, never sent): what "the same find" means in a spot, so one thing scores once. `object:<id>` for a known object however it was reached, `bot:<rank>` for a bot candidate that is no known object, `nothing` for `nothing_correct`; none for wrong answers. The route passes it to `record_find(p_find_key)`, which decides `already_found` and the first finder per find key.
 
 **Practice rule.** For a logged-in player with a database, `practice` is true only when they have a saved visit to the spot (`hasVisit`); the unlock cookie lifts the spoiler lock but never costs points, so a spot a guest session unlocked before sign-up still scores once for the new account. For a guest, or with no database, `practice` is true when the signed cookie covers the spot.
 
 Points (BP 8.10): easy 100, medium 250, hard 500, boss 1000, expert 750; first finder +50 percent, rounded, for `known` only.
-SERVER decisions where BP is silent, object within 20 minutes on the board if you disagree:
+Server decisions where BP is silent:
 `control` spots (Cygnus) give 250 for `nothing_correct`; `bot_match` gives 0 (above); `fixture` is scored as easy.
 Accuracy = (`known` + `bot_match` + `nothing_correct`) / all submissions, both counted over `counted` rows only (section 7).
 
-Quick-look marks (phase 4, draft): same route with `"spot": "quicklook"` plus `"field": { "ra", "dec", "fov_deg", "size", "frames": [{ "i", "mjd" }] }`. The server runs JPL `sb_ident` for a **geocentric observer, `xobs=0,0,0,0,0,0`** (not `mpc-code=500`, which DATA found refused; SPHEREx's low orbit is at most about 7000 km from the Earth's centre, well under a pixel of parallax for anything past the Moon). It answers `known` (with the name, **0 points**) or `candidate`. Quick-look rows never score, are never a first finder and are not counted. Final shape comes with a `contract` issue before 16:00.
+Quick-look marks (phase 4, draft): same route with `"spot": "quicklook"` plus `"field": { "ra", "dec", "fov_deg", "size", "frames": [{ "i", "mjd" }] }`. The server runs JPL `sb_ident` for a **geocentric observer, `xobs=0,0,0,0,0,0`** (not `mpc-code=500`, which was found refused; SPHEREx's low orbit is at most about 7000 km from the Earth's centre, well under a pixel of parallax for anything past the Moon). It answers `known` (with the name, **0 points**) or `candidate`. Quick-look rows never score, are never a first finder and are not counted. Final shape comes with a `contract` issue before 16:00.
 
 Errors: `404 not_found` (unknown spot), `400 bad_request` (fewer than 2 frames marked, a frame number the spot does not have, a frame marked twice, a mark outside the picture), `500 internal` (a spot listed in `web/public/fields/index.json` whose answer key or `field.json` the server cannot read).
 
@@ -249,9 +249,9 @@ Inspect answers in full by default, in a round too (lock back with `INSPECT_LOCK
 - `sources.*` is one of `ok`, `premade` (from the catalog file), `empty` (asked, nothing there), `timeout`, `error`, `skipped`. The popup says which source failed.
 - `gaia` is `null` when nothing is within 6 arcsec. `simbad` and `solar_system` are `[]` when empty.
 - `r_au`, `delta_au` are present only when JPL Horizons gave them (ready-spot objects). Never estimated.
-- The server returns catalog values only. Distances in light-years, light-minutes or from redshift are worked out in the popup with DATA's `parallaxDistance` and `redshiftDistance` (BP 8.16 rules), so each number keeps its source.
+- The server returns catalog values only. Distances in light-years, light-minutes or from redshift are worked out in the popup with the data pipeline's `parallaxDistance` and `redshiftDistance` (BP 8.16 rules), so each number keeps its source.
 - A spot with no catalog file yet answers `sources: { "simbad": "skipped", ... }` and empty lists, not an error.
-- **Built against the real `web/data/catalog/<slug>.json` (1.2 addendum, SERVER):** the files differ from the field-schema section 9 draft in these ways, and the server follows the real files:
+- **Built against the real `web/data/catalog/<slug>.json` (1.2 addendum):** the files differ from the field-schema section 9 draft in these ways, and the server follows the real files:
   - A top-level `sources` block (`sources.simbad`, `sources.gaia`, `sources.jpl`). A source block that the file marks `"unavailable"` (SIMBAD, in every file so far: CDS was down) answers `error`. A source the file lacks answers `skipped`. Otherwise `premade` when the file has something near the pixel, `empty` when the file has the source and nothing is near. A `"timeout"` status answers `timeout`.
   - `objects[]` has `id`, `name`, `source` (no `kind`, no `positions`). Its `r_au` and `delta_au` are one value per frame; the entry takes the value for its frame. The per-frame pixel positions come from `asteroids[]`, matched by name.
   - `stars[].xy` is one `[x, y]` per frame. A Gaia distance uses the smallest pixel distance over the frames, times `pixel_arcsec` from `field.json`. A star without `xy` uses its sky position.
@@ -359,7 +359,7 @@ De-duplication and the queue limit (database function `request_spot(p_user, p_ra
 - A request within 0.05 degrees (a box: dec difference, and RA difference times cos(dec)) of one that is `queued`, `processing` or `done` inserts nothing and answers `200 { "id": 9, "status": "processing", "duplicate": true }` with the existing row.
 - With 200 requests already `queued` a new one is refused: `429 rate_limited` with a plain message. Duplicates are still answered when the queue is full.
 
-`GET` lists the queue for `/requests`, newest first, at most 100 (a SERVER addition to BP 8.14, which only asks for the page):
+`GET` lists the queue for `/requests`, newest first, at most 100 (a server addition to BP 8.14, which only asks for the page):
 `{ "requests": [ { "id": 17, "ra": 133.795, "dec": -7.245, "fov": 0.2, "status": "queued", "created_at": "2026-11-15T09:30:00Z" } ] }`.
 `status` is `queued`, `processing`, `done` or `failed`. With no database: `{ "requests": [], "source": "none" }`.
 
@@ -383,13 +383,13 @@ Checks every outside service in parallel, 5 s each, cached 60 s. Always `200`.
 ## 11. `GET /api/keepalive` and `GET /api/s3range?key=`
 
 - `/api/keepalive`: Vercel Cron calls it once a day with `Authorization: Bearer <CRON_SECRET>`. Wrong or missing secret: `401`. When `CRON_SECRET` itself is not set, every call answers `401` (nobody can trigger it). Response `{ "ok": true, "db": "ok" }` (`"not_configured"` with no database).
-- `/api/s3range`: built **only if** DATA's day-one check shows the browser cannot read the S3 bucket directly. Passes the `Range` header through to `https://nasa-irsa-spherex.s3.us-east-1.amazonaws.com/<key>` and returns the bytes with `206`. `key` must match `^[A-Za-z0-9._/-]+\.fits$`, no `..`; one range per call, at most 4 MB. No other bucket or host is reachable through it.
+- `/api/s3range`: built **only if** the data pipeline's day-one check shows the browser cannot read the S3 bucket directly. Passes the `Range` header through to `https://nasa-irsa-spherex.s3.us-east-1.amazonaws.com/<key>` and returns the bytes with `206`. `key` must match `^[A-Za-z0-9._/-]+\.fits$`, no `..`; one range per call, at most 4 MB. No other bucket or host is reachable through it.
 
-## 12. Routes owned by DATA (not defined here)
+## 12. Overlay and quick-look routes (not defined here)
 
 `GET /api/quicklook/list?ra=&dec=` and `GET /api/overlay?spot=|ra=&dec=&mjd=...&mode=`. They follow section 1 (error shape) and section 2 (`/api/overlay?mode=round` returns nothing). DATA publishes their JSON.
 
-## 13. Client helpers and environment (SERVER provides)
+## 13. Client helpers and environment
 
 ```ts
 // web/lib/supabase.ts

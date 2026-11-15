@@ -1,4 +1,4 @@
-// Browser-side Supabase helpers (owner: SERVER). Contract: docs/contracts/api.md section 13.
+// Browser-side Supabase helpers. Contract: docs/contracts/api.md section 13.
 // Imported by client components: no node:* imports, and never the service key.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";

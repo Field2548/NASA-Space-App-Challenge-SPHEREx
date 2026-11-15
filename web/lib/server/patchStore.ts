@@ -1,4 +1,4 @@
-// Database side of picked patches (owner: SERVER). Server only.
+// Database side of picked patches. Server only.
 // Tables: supabase/migrations/20261116000000_patches.sql (service role only).
 // Every function here never throws: no database, or a failing one, is a normal state.
 

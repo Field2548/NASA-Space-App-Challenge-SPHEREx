@@ -1,4 +1,4 @@
-// JPL Small-Body Identification API client (owner: SERVER). Server only.
+// JPL Small-Body Identification API client. Server only.
 // Docs: https://ssd-api.jpl.nasa.gov/doc/sb_ident.html (read 2026-11-15).
 //
 // Observer: the Earth's centre as a zero geocentric state vector, `xobs=0,0,0,0,0,0`. The API
