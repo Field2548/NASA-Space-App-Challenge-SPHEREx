@@ -19,7 +19,8 @@
 //                                                          the ONION track shows when onionRange is given;
 //                                                          FieldViewer overlayFrames = onionRangeFrames(range)
 //   loopRange?: [a, b]; onLoopRangeChange?(r)           inclusive array indices the blink plays (default all);
-//                                                          two sliders show when the callback is given
+//                                                          two edge handles on the thumbnail strip show when the
+//                                                          callback is given; clips outside the loop are dimmed
 //   fps?: number; onFpsChange?(f)                       blink speed, one of BLINK_SPEEDS; the slider shows
 //                                                          when the callback is given
 //
@@ -173,12 +174,41 @@ export default function Timeline(props: TimelineProps) {
   const onion = props.onionRange ? clampOnion(props.onionRange, n) : null;
   const speedAt = (BLINK_SPEEDS as readonly number[]).indexOf(props.fps ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1]);
   const loop: [number, number] | null = n > 0 ? [Math.min(n - 1, Math.max(0, props.loopRange?.[0] ?? 0)), Math.min(n - 1, Math.max(0, props.loopRange?.[1] ?? n - 1))] : null;
-  // Moving one end past the other drags the other end along, so at least one frame stays in the loop.
+  // A handle stops at the other one, so at least one frame stays in the loop.
   const moveLoop = (which: 0 | 1, k: number) => {
     if (!loop || !onLoopRangeChange) return;
-    const v = Math.min(n - 1, Math.max(0, k));
-    onLoopRangeChange(which === 0 ? [v, Math.max(v, loop[1])] : [Math.min(v, loop[0]), v]);
+    const v = which === 0 ? Math.min(loop[1], Math.max(0, k)) : Math.max(loop[0], Math.min(n - 1, k));
+    if (v === loop[which]) return;
+    onLoopRangeChange(which === 0 ? [v, loop[1]] : [loop[0], v]);
   };
+  const clipsRow = useRef<HTMLDivElement>(null);
+  const onLoopKey = (which: 0 | 1) => (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!loop) return;
+    const cur = loop[which];
+    const next = e.key === "ArrowLeft" ? cur - 1 : e.key === "ArrowRight" ? cur + 1 : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    e.stopPropagation(); // the strip's own arrow keys step the frame
+    moveLoop(which, next);
+  };
+  const loopDrag = (which: 0 | 1) => ({
+    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation(); // the handle drags the loop edge; it does not scrub the playhead
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      e.currentTarget.dataset.drag = "1";
+    },
+    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+      const row = clipsRow.current;
+      if (e.currentTarget.dataset.drag !== "1" || !row) return;
+      moveLoop(which, nearestClip(e.clientX - row.getBoundingClientRect().left + row.scrollLeft - 2, left));
+    },
+    onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
+      delete e.currentTarget.dataset.drag;
+    },
+    onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
+      delete e.currentTarget.dataset.drag;
+    },
+  });
   const onionRow = useRef<HTMLDivElement>(null);
   const markRow = useRef<HTMLDivElement>(null);
 
@@ -299,8 +329,6 @@ export default function Timeline(props: TimelineProps) {
         {onLoopRangeChange && loop && n > 1 && (
           <div className={styles.check} role="group" aria-label="Loop range">
             <span>Loop frames {loop[0] + 1} to {loop[1] + 1}</span>
-            <input type="range" min={1} max={n} step={1} value={loop[0] + 1} aria-label="Loop start frame" aria-valuetext={`frame ${loop[0] + 1} of ${n}`} onChange={(e) => moveLoop(0, Number(e.target.value) - 1)} />
-            <input type="range" min={1} max={n} step={1} value={loop[1] + 1} aria-label="Loop end frame" aria-valuetext={`frame ${loop[1] + 1} of ${n}`} onChange={(e) => moveLoop(1, Number(e.target.value) - 1)} />
           </div>
         )}
         <p className={styles.note}>{reducedMotion ? "Auto-play off (reduced motion). Step with ← →." : "Max 3 frames/s. Step with ← →."}</p>
@@ -315,6 +343,7 @@ export default function Timeline(props: TimelineProps) {
         <div className={styles.trackLabel}>FRAMES</div>
         <div
           className={styles.clips}
+          ref={clipsRow}
           role="listbox"
           aria-label="Frames"
           data-tutorial-target="frame-picker"
@@ -340,6 +369,7 @@ export default function Timeline(props: TimelineProps) {
               aria-selected={k === index}
               aria-label={`Frame ${k + 1} of ${n}, ${f.utc}, ${formatGap(f.hours_since_prev, k === 0)}`}
               className={`${styles.clip} ${k === index ? styles.current : ""} ${onion && k >= onion[0] && k <= onion[1] ? styles.inOnion : ""}`}
+              data-dimmed={loop && (k < loop[0] || k > loop[1]) ? "true" : undefined}
               style={{ width: CLIP_W, marginLeft: margin(k), borderColor: colors[k] ? rgbCss(colors[k]) : undefined }}
             >
               <div className={`science-viewport ${styles.thumbBox}`}>
@@ -354,6 +384,28 @@ export default function Timeline(props: TimelineProps) {
             </div>
           ))}
           {n > 0 && <div className={styles.playhead} style={{ left: playheadLeft }} aria-hidden="true" />}
+          {onLoopRangeChange && loop && n > 1 && (
+            <>
+              <div className={styles.loopBracket} style={{ left: left[loop[0]] + 2, width: left[loop[1]] + CLIP_W - left[loop[0]] }} aria-hidden="true" />
+              {([0, 1] as const).map((which) => (
+                <div
+                  key={which}
+                  role="slider"
+                  tabIndex={0}
+                  aria-label={which === 0 ? "Loop start" : "Loop end"}
+                  aria-orientation="horizontal"
+                  aria-valuemin={1}
+                  aria-valuemax={n}
+                  aria-valuenow={loop[which] + 1}
+                  aria-valuetext={`frame ${loop[which] + 1} of ${n}`}
+                  className={styles.loopHandle}
+                  style={{ left: which === 0 ? left[loop[0]] + 2 : left[loop[1]] + 2 + CLIP_W - HANDLE_W }}
+                  onKeyDown={onLoopKey(which)}
+                  {...loopDrag(which)}
+                />
+              ))}
+            </>
+          )}
         </div>
 
         {onion && (

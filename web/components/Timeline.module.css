@@ -76,6 +76,33 @@
   cursor: pointer;
 }
 
+.clip[data-dimmed="true"] {
+  opacity: 0.4;
+}
+
+.loopBracket {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px solid var(--cyan);
+  pointer-events: none;
+}
+
+.loopHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: var(--cyan);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.loopHandle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
 .current {
   outline: 1px solid var(--text);
   outline-offset: 1px;
