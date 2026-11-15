@@ -131,7 +131,6 @@ The owner of a cut item announces the cut on the board so nobody builds against 
 
 ## 8. Rules every agent follows (from BP sections 13 and 18)
 
-- Ideas from other teams only, all code our own. Credit every dataset, API, library, font, paper, and borrowed idea in `docs/credits/<agent>.csv`.
 - No NASA logos, no wireframe pictures, no AI images, no hotlinked media. Lucide icons and own SVG only.
 - No secrets in git. Service key never reaches the browser. Points are computed only on the server.
 - Never change an existing Python function signature. Never claim a detection without its noise bar. Never invent data.

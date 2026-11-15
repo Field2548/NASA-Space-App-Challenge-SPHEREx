@@ -44,7 +44,6 @@ You are the lead engineer for a team of 3 AI engineers at the **NASA Space Apps 
    - `asset-license-audit` before every production deploy
 6. `docs/wireframe.pdf`, if present (it is described in section 8.1).
 7. PR #1 (`refs/pull/1/head`: an M101 sample plus `scripts/download_sample.py`). It is useful background only. Do **not** use its frames in the game (see section 14).
-8. Other teams' public SPHEREx projects are listed in section 13. **Borrow ideas only; write all code yourself** (team decision). Every idea you borrow gets a credit line.
 
 ## 3. Decisions already made (do not ask again)
 
@@ -54,7 +53,6 @@ You are the lead engineer for a team of 3 AI engineers at the **NASA Space Apps 
 | "Type any coordinate" | **Ready spots + live quick look + request queue.** The game plays the pre-processed spots. Any other coordinate gets a **live quick look** (section 8.20): the browser downloads only the small pieces of SPHEREx files it needs. "Request this spot" queues full processing, which the team runs on a laptop with the Python scripts. No live Python on Vercel (see section 7 for why). |
 | Quick look rules | Players can **look and mark** there. Marks are checked against JPL known asteroids and saved as candidates, but **earn no points**: there is no answer key, and the data is not masked. |
 | Overlays | Known-asteroid and catalog-star overlays are a **full feature**, available in free explore, in quick look, and after Submit. **One short tutorial step** shows them (section 8.13). |
-| Other teams' code | **Ideas only, our own code.** Credit each borrowed idea by team name and link (section 13). Never copy code, even from MIT/Apache repos. |
 | Spectrum view | A **rainbow spectrum chart**, **compare to known types**, and a **temperature guess** (section 8.16 C). |
 | Density map | **Two layers on a HEALPix tree:** (1) **Checked**: sky areas players have finished; (2) **Finds**: where players marked moving objects. Each layer has "Show my work" and "Show others' work" toggles. |
 | Sky viewer | **Aladin Lite v3** (CDS, GPL-3.0). The team accepts GPL: **add a GPL-3.0 `LICENSE` at the repo root** and credit Aladin Lite. |
@@ -460,7 +458,6 @@ Sections, top to bottom:
    - Use the per-exposure planes (section 6.2). For each exposure, put an aperture (radius ≈1.5 px, background from a ring) at the track's position **at that exposure's time**.
    - Convert to mJy: sum of MJy/sr × (6.15″ pixel as a solid angle, about 8.9×10⁻¹⁰ sr) × 10⁹. Plot it at the wavelength that exposure saw at that spot (the coarse wavelength map).
    - Label it "N of 102 bands, measured along its path." Caveat: "Brightness can also change between visits as the object spins or its distance changes."
-   - Idea credit: "Spectrum along its path" in Andrei25Ciuta/SPHEREx, and Cipher-X Crew's comet spectral trace (section 13).
 3. **"Looks most like…" (compare to known types)**
    - Normalize the pixel's (or mover's) spectrum and each reference to their median over the shared bands. Resample each reference to the measured wavelengths and compute χ² with the measured errors.
    - Show the best match and the runner-up, each drawn over the data as a thin dashed line, with a match-quality word: "good," "rough," or "poor."
@@ -496,7 +493,7 @@ Never compute a star's distance from SPHEREx positions. Even Barnard's Star's ye
 - **Ready spots:** everything is pre-made by `export_web.py` (section 6.5), so the demo needs no live calls.
 - **Elsewhere (sky map):** `/api/info` calls SIMBAD TAP, Gaia TAP, and JPL live, in parallel, with an 8 s timeout each. Partial results are OK. Cache by position rounded to 1″.
 
-### 8.17 Wavelength switch (team request; idea from Blackhole 102 and Andrei25Ciuta/SPHEREx)
+### 8.17 Wavelength switch (team request)
 
 - Segmented control: **All** · **Short (D1–3, 0.75–2.4 µm)** · **Long (D4–6, 2.4–5 µm)** · **Longest (D5–6, 3.8–5 µm)** · single detector D1…D6. Detector ranges come from `spectral_bands.NOMINAL_RANGE`.
 - Rebuild each frame **in the browser** from the per-exposure planes (section 6.2) using only the chosen detectors. Use the same method as `build_frame`: each plane in S/N units, then a 3σ-clipped mean.
@@ -505,27 +502,27 @@ Never compute a star's distance from SPHEREx positions. Even Barnard's Star's ye
 - Why it matters: every burst sees one short and one long detector (pairs D1+D4, D2+D5, D3+D6). Very cold objects such as WISE 0855 only show up at long wavelengths.
 - Hidden in PNG-fallback spots. In quick look, it filters which exposures are downloaded.
 
-### 8.18 Overlays: known asteroids and catalog stars (team request; idea from Andrei25Ciuta/SPHEREx)
+### 8.18 Overlays: known asteroids and catalog stars (team request)
 
 - **Known asteroids & comets:** amber diamonds at JPL's predicted position **for each frame's date**, outlined in that frame's time color, with the name on hover. Data: SB Identification API results pre-made in `catalog/<slug>.json` (6.5), or fetched live in quick look.
 - **Catalog stars:** teal rings for Gaia DR3 and SIMBAD objects, moved to each frame's date with their proper motion. Stars moving more than 1″/yr also get their name and a short path line.
 - **Spoiler rule:** both overlays are locked during a round. They are available after Submit, in free explore, and in quick look. `/api/overlay?mode=round` returns nothing.
 - **Tutorial:** one short step in level 1 (the asteroid diamonds land on Eros) and one in level 4 (star rings), as in section 8.13.
 
-### 8.19 Status page (team request; idea from Driftnet)
+### 8.19 Status page (team request)
 
 - `/status` lists every outside service with a green/amber/red light, response time, and "last checked":
   - IRSA SIA, IRSA S3 (a `HEAD` on one known file), CDS Sesame, CDS HiPS (the SPHEREx HiPS `properties` file), SIMBAD TAP, Gaia TAP, JPL Horizons, JPL SB Identification, Supabase
 - `/api/health` checks them in parallel with a 5 s timeout and caches the results for 60 s, so the services are not overloaded.
 - The app uses this to explain failures in plain words, for example: "IRSA is not answering right now. Ready spots still work; quick look may fail." The footer light links here.
 
-### 8.20 Quick look: any coordinate, live, with partial downloads (team request; ideas from Blackhole 102, Cosmic Time Machine, and Driftnet)
+### 8.20 Quick look: any coordinate, live, with partial downloads (team request)
 
 **Flow:**
 1. `GET /api/quicklook/list?ra=&dec=` (server).
    - Query IRSA SIA for SPHEREx images that cover the position. Return, per exposure: time, detector, `obs_id`, and the S3 key from the `cloud_access` column (fall back to the `access_url` path).
    - Group exposures into bursts, like `group_bursts` (15-minute gap).
-   - Retry with backoff for up to ~45 s, because IRSA's SIA often answers 502 and other teams logged many failures on Nov 14. Cache each answer for a day.
+   - Retry with backoff for up to ~45 s, because IRSA's SIA often answers 502. Cache each answer for a day.
 2. A **Web Worker** in the browser picks the bursts with the player's Frames & spacing settings (8.9) and the wavelength switch (8.17), using 3–4 exposures per burst. For each exposure it:
    - reads the FITS header blocks with `Range` requests (2880-byte blocks until `END`)
    - finds the IMAGE HDU's data offset
@@ -739,18 +736,7 @@ Run the `web-design-guidelines` review at the end. Fix keyboard focus, labels, a
   - **AWS Open Data / IRSA cloud:** SPHEREx files read from the `nasa-irsa-spherex` S3 bucket. Credit IRSA and the Registry of Open Data on AWS, using the "How to cite" wording on the dataset's registry page.
   - **SPIFF** (Gagné et al. 2026, arXiv:2604.22012; github.com/jgagneastro/SPIFF; MIT). Keep its MIT license text with the converted templates, and cite the paper.
   - **Mamajek's dwarf color/Teff table**, citing Pecaut & Mamajek (2013, ApJS 208, 9) as the table asks. The table's author also asks users to email him; tell the team.
-- **Acknowledge every outside thing (team rule).** Every dataset, API, library, font, icon set, paper, method, and **borrowed idea** gets one row in `CREDITS.md`: name, author, link, license, what we used it for, and the date checked. It must also appear on `/credits` and in a short README "Acknowledgments" section. When unsure, add the row.
-- **Ideas borrowed from other Space Apps 2026 projects (credit by name; no code copied):**
-
-  | Project | Team / author | Link | License | Idea we used |
-  | --- | --- | --- | --- | --- |
-  | SPHEREx Blink | Andrei25Ciuta (LICENSE names mateibut; a practice project, per its README) | github.com/Andrei25Ciuta/SPHEREx | MIT | wavelength / detector picker; known-asteroid and catalog-star overlays moved to each frame's date; spectrum along a mover's path |
-  | Blackhole 102 | FearmessOp | github.com/FearmessOp/blackhole-spherex · blackhole-spherex.vercel.app | Apache-2.0 | short/long detector selection; browser quick look from the public cloud copy with Range reads; checking browser TAN-SIP against astropy |
-  | Cosmic Time Machine | Newstein123 | github.com/Newstein123/nasa-app-challengev1 | none stated | reading only the needed rows with Range requests; checking pixels against IRSA's cutout service |
-  | Driftnet | epsretriever | github.com/epsretriever/spherex-planet-x · driftnet-sky.vercel.app | MIT | the live service status page; reading from the `nasa-irsa-spherex` bucket |
-  | Cipher-X Omega | Cipher-X Crew | github.com/sanaasif1217/cipher-x-crew-spherex · sanaasif1217.github.io/cipher-x-crew-spherex | none stated | a mover's spectral trace across the detector |
-
-  Write this table into `CREDITS.md` and `docs/DECISIONS.md`, with the sentence "We read these projects for ideas; all code here is our own."
+- **Acknowledge every outside thing (team rule).** Every dataset, API, library, font, icon set, paper, and method gets one row in `CREDITS.md`: name, author, link, license, what we used it for, and the date checked. It must also appear on `/credits` and in a short README "Acknowledgments" section. When unsure, add the row.
 - **Reference screenshot:** the team's brown-dwarf spectrum screenshot is a style reference only. Its credit line names Zafar Rustamkulov / International Gemini Observatory / NOIRLab/NSF/AURA, M.H. Wong (UC Berkeley) et al. **Do not copy it, trace it, or use its planet images.** Draw our own chart from our own data.
 - **Space Apps rules:** the participant terms say every resource used must be cited, even open-source ones. The project-submission guide (2025 edition; check for a 2026 update) says to state where and how AI tools were used, and that AI-generated images or video need a visible "AI-generated" watermark.
   - Add a **"How we used AI"** section to the README and `/about`, saying that Claude Code helped write the code.
@@ -785,12 +771,11 @@ Run the `web-design-guidelines` review at the end. Fix keyboard focus, labels, a
 | Inspect names and distances **locked until Submit** | Catalogs would give away the answer mid-round. Unlocking them becomes the reward. |
 | Inspect shows **no age** and no "exact" chemical amounts. Star distances come from **Gaia, not SPHEREx**. | These can't be measured honestly from this data. Even Barnard's Star's parallax is under a tenth of a pixel. |
 | Inspect spectra come from **pre-made cubes**, not live from IRSA | IRSA's spectrum tool is queue-based and slow. Pre-made cubes keep working during judging. |
-| Added a **live quick look** for any coordinate, with **no points** there | Other teams showed that partial downloads make live viewing possible without Python. There is no answer key and no bad-pixel masking, so scoring there would be unfair. |
+| Added a **live quick look** for any coordinate, with **no points** there | Partial downloads make live viewing possible without Python. There is no answer key and no bad-pixel masking, so scoring there would be unfair. |
 | Added the **wavelength switch** | Cold objects such as WISE 0855 only appear at long wavelengths, and every burst mixes a short and a long detector. |
 | Added **overlays**, locked during rounds | They show JPL and catalog facts on the image, but would give answers away mid-round. |
 | Added a **status page** | IRSA often fails. Players should see why something isn't loading instead of a blank screen. |
 | Spectrum as a **rainbow chart** with "looks most like…" and a temperature guess | The team asked for it. The rainbow is decoration only, the match needs enough signal, and the temperature is always "approx." with no age. Movers get no temperature. |
-| Other teams' work: **ideas only, credited by name** | Keeps the code original for judging, and the Space Apps terms require citing every resource. |
 | **PR #1 M101 frames not used in the game** | They are single exposures at different wavelengths, so stars change brightness between frames and create false "changes." M101 is a galaxy, so nothing in it moves. |
 
 ## 15. Build order, time boxes, and cut list (Bangkok time)
@@ -833,7 +818,7 @@ Run the `web-design-guidelines` review at the end. Fix keyboard focus, labels, a
   - `planQuickLook` stays under the byte budget and respects the detector filter
 - **Quick look checks:** TAN-SIP in the browser vs astropy ≤ 0.01 px on 3 real files. Range-read pixels equal IRSA's cutout service for the same file and area. Commit a small fixture so the test runs offline.
 - **Overlay check:** on Eros, the JPL diamonds fall within 2 px of the answer-key positions in every frame.
-- **Credits check:** every package in `package.json`, every API in section 7, every file in `public/ref/`, and every project in the section 13 ideas table has a row in `CREDITS.md`. A small script fails the build if one is missing.
+- **Credits check:** every package in `package.json`, every API in section 7, every file in `public/ref/`, has a row in `CREDITS.md`. A small script fails the build if one is missing.
 - **Science check:** your client-side Color by time for Eros must look like the repo's `onion_dark.png`. Downsample both and require a correlation of at least 0.9. Cygnus must have **no** bot candidates above the noise bar (all `False` in `candidates.csv`).
 - **End-to-end (`webapp-testing`, Playwright):**
   - tutorial levels 0–1 finish when the answer-key positions are clicked
@@ -870,6 +855,6 @@ Follow the `deploy-to-vercel` skill. Deploy **previews** while working. **Ask th
 - [ ] Rainbow spectrum chart with molecule bands, the along-path spectrum for movers, "looks most like…", and an approximate temperature (none for movers).
 - [ ] Wavelength switch, known-asteroid + catalog-star overlays (locked during rounds, shown in tutorial levels 1 and 4), and the `/status` page.
 - [ ] Quick look at any coordinate: live partial downloads, the "unmasked" label, marking checked by `sb_ident`, and no points.
-- [ ] `CREDITS.md`, `/credits`, and the README Acknowledgments list every dataset, API, library, paper, and borrowed idea (including the other teams' table); the credits check passes.
+- [ ] `CREDITS.md`, `/credits`, and the README Acknowledgments list every dataset, API, library, and paper; the credits check passes.
 - [ ] `CREDITS.md` + `/credits`, `LICENSE` (GPL-3.0), README "Website" + "How we used AI" sections, `docs/DECISIONS.md`, `docs/DEMO.md`, CLAUDE.md updated with a short web section.
 - [ ] License audit: zero blockers. Tests green. Live URL checked.

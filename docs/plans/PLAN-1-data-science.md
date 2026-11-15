@@ -54,7 +54,7 @@ Your job in one line: turn the repo's processed data into files the web app can 
 - [ ] `lib/spectra.ts` (BP section 9): `wavelengthColor`, `spectrumAlongPath`, `matchReferences`, `blackbodyFit`, `temperatureGuess`. `lib/inspect.ts` pure functions: `loadSpectrumAt`, `colorHint`, `findFeatures`, `lightCurveAt`, `parallaxDistance`, `redshiftDistance`, `eclipticLatitude`, `toPlainType`. Molecule band ranges in one config file with a source comment.
 - [ ] `SpectrumChart.tsx` and `LightCurveBars.tsx` (BP 8.16 C). Gray dots in `mono` vision. Always-visible caveat line. SERVER mounts them inside the Inspect popup.
 - [ ] Quick look step 4 data side: expose the track so SERVER's check route can call `sb_ident`.
-- [ ] `scripts/credits-check.*`: fails if any npm production dependency, API in BP 7, file in `public/ref/`, or idea-table project lacks a row. Merge `docs/credits/*.csv` into `CREDITS.md`. Include the borrowed-ideas table from BP 13 and the sentence "We read these projects for ideas; all code here is our own."
+- [ ] `scripts/credits-check.*`: fails if any npm production dependency, API in BP 7, file in `public/ref/`, lacks a row. Merge `docs/credits/*.csv` into `CREDITS.md`. Include the borrowed-ideas table from BP 13 and the sentence "We read these projects for ideas; all code here is our own."
 - [ ] `LICENSE` (GPL-3.0), `docs/DECISIONS.md` (BP section 14 table), README "Website", "How we used AI", "Acknowledgments" sections (SERVER links them from `/about`).
 - [ ] Optional if time: star targets (`pipeline/run_star_targets.ps1` and `.sh`, BP 6.3), `build_pool.py` (BP 6.4). Both are on the cut list.
 

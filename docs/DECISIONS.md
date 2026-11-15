@@ -28,12 +28,11 @@ This file is kept in step with section 14 of `docs/BUILD_PROMPT.md`.
 | Inspect names and distances **locked until Submit** | Catalogs would give away the answer mid-round. Unlocking them becomes the reward. |
 | Inspect shows **no age** and no "exact" chemical amounts. Star distances come from **Gaia, not SPHEREx**. | These can't be measured honestly from this data. Even Barnard's Star's parallax is under a tenth of a pixel. |
 | Inspect spectra come from **pre-made cubes**, not live from IRSA | IRSA's spectrum tool is queue-based and slow. Pre-made cubes keep working during judging. |
-| Added a **live quick look** for any coordinate, with **no points** there | Other teams showed that partial downloads make live viewing possible without Python. There is no answer key and no bad-pixel masking, so scoring there would be unfair. |
+| Added a **live quick look** for any coordinate, with **no points** there | Partial downloads make live viewing possible without Python. There is no answer key and no bad-pixel masking, so scoring there would be unfair. |
 | Added the **wavelength switch** | Cold objects such as WISE 0855 only appear at long wavelengths, and every burst mixes a short and a long detector. |
 | Added **overlays**, locked during rounds | They show JPL and catalog facts on the image, but would give answers away mid-round. |
 | Added a **status page** | IRSA often fails. Players should see why something isn't loading instead of a blank screen. |
 | Spectrum as a **rainbow chart** with "looks most like…" and a temperature guess | The team asked for it. The rainbow is decoration only, the match needs enough signal, and the temperature is always "approx." with no age. Movers get no temperature. |
-| Other teams' work: **ideas only, credited by name** | Keeps the code original for judging, and the Space Apps terms require citing every resource. |
 | **PR #1 M101 frames not used in the game** | They are single exposures at different wavelengths, so stars change brightness between frames and create false "changes." M101 is a galaxy, so nothing in it moves. |
 
 ## Decided during the build
