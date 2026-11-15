@@ -108,3 +108,11 @@ def test_missing_paper_row_fails_once_its_file_exists(tmp_path):
     r = run(dst, "--check")
     assert r.returncode != 0
     assert "Heinze" in r.stderr
+
+
+def test_output_hides_audit_dates_and_mentions_claude_code_once():
+    text = (ROOT / "CREDITS.md").read_text(encoding="utf-8")
+    assert "Checked" not in text and "date_checked" not in text
+    assert text.count("Claude Code") == 1
+    for word in ("DATA agent", "SERVER", "GAME", "HUMAN"):
+        assert word not in text
