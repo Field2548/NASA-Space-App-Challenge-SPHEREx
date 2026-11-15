@@ -1,19 +1,18 @@
 name,author,link,license,used_for,date_checked
-Next.js 16.4.6,Vercel,https://github.com/vercel/next.js,MIT,web framework,2026-11-15
-React 19.3.0,Meta,https://github.com/facebook/react,MIT,UI library,2026-11-15
-Orbitron,Matt McInerney,https://fonts.google.com/specimen/Orbitron,OFL-1.1,headings and buttons,2026-11-15
-JetBrains Mono,JetBrains,https://fonts.google.com/specimen/JetBrains+Mono,OFL-1.1,numbers and terminal text,2026-11-15
-lucide-react 1.73.0,Lucide contributors,https://github.com/lucide-icons/lucide,ISC,icons,2026-11-15
-zod 4.6.7,Colin McDonnell,https://github.com/colinhacks/zod,MIT,input validation,2026-11-15
-vitest 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,unit tests,2026-11-15
-Playwright 1.65.1,Microsoft,https://github.com/microsoft/playwright,Apache-2.0,end-to-end tests,2026-11-15
-jsdom 31.0.1,jsdom contributors,https://github.com/jsdom/jsdom,MIT,test DOM,2026-11-15
-@testing-library/react 16.3.3,Kent C. Dodds,https://github.com/testing-library/react-testing-library,MIT,component tests,2026-11-15
-@testing-library/user-event 14.6.10,Giorgio Polvara,https://github.com/testing-library/user-event,MIT,component tests,2026-11-15
-@testing-library/dom 10.4.2,Kent C. Dodds,https://github.com/testing-library/dom-testing-library,MIT,component tests,2026-11-15
-Machado et al. 2009 colour-vision simulation,"Machado, Oliveira, Fernandes",https://doi.org/10.1109/TVCG.2009.113,idea (paper),colour-blind palette check,2026-11-15
-CIEDE2000 colour difference,"Sharma, Wu, Dalal",https://doi.org/10.1002/col.20070,idea (paper),palette distance check,2026-11-15
-@vitest/coverage-v8 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,test coverage,2026-11-15
-Cinematic Space Background (Pixabay 263169),Delosound,https://pixabay.com/music/ (track id 263169; file name from the download),"Pixabay Content License (free use, no attribution required)","web/public/music/space-ambient.mp3, map and menus",2026-11-15
-Cinematic Cello (Pixabay 115667),Lexin_Music,https://pixabay.com/music/ (track id 115667; file name from the download),"Pixabay Content License (free use, no attribution required)","web/public/music/play-cello.mp3, game rounds",2026-11-15
-Deep Cinematic Ballad 42 sec (Pixabay 178307),Grand_Project,https://pixabay.com/music/ (track id 178307; file name from the download),"Pixabay Content License (free use, no attribution required)","web/public/music/solved-ballad.mp3, solved spot",2026-11-15
+Next.js 16.4.6,Vercel,https://github.com/vercel/next.js,MIT,Web framework.,2026-11-15
+React 19.3.0,Meta and contributors,https://github.com/react/react,MIT,User interface library.,2026-11-15
+Orbitron,Matt McInerney,https://fonts.google.com/specimen/Orbitron,SIL Open Font License 1.1,Headings and buttons.,2026-11-15
+JetBrains Mono,JetBrains,https://fonts.google.com/specimen/JetBrains+Mono,SIL Open Font License 1.1,Numbers and terminal text.,2026-11-15
+lucide-react 1.73.0,Lucide contributors,https://github.com/lucide-icons/lucide,ISC,Icons.,2026-11-15
+vitest 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,Unit tests.,2026-11-15
+@vitest/coverage-v8 5.1.0,Vitest team,https://github.com/vitest-dev/vitest,MIT,Test coverage.,2026-11-15
+Playwright 1.65.1,Microsoft,https://github.com/microsoft/playwright,Apache-2.0,End-to-end tests.,2026-11-15
+jsdom 31.0.1,jsdom contributors,https://github.com/jsdom/jsdom,MIT,Browser DOM for tests.,2026-11-15
+@testing-library/react 16.3.3,Kent C. Dodds,https://github.com/testing-library/react-testing-library,MIT,Component tests.,2026-11-15
+@testing-library/user-event 14.6.10,Giorgio Polvara,https://github.com/testing-library/user-event,MIT,Component tests.,2026-11-15
+@testing-library/dom 10.4.2,Kent C. Dodds,https://github.com/testing-library/dom-testing-library,MIT,Component tests.,2026-11-15
+"Machado et al. 2009, colour-vision simulation","Machado, Oliveira, Fernandes",https://doi.org/10.1109/TVCG.2009.113,"Published work, cited. No code or data copied.",Colour-blind check of the palette.,2026-11-15
+CIEDE2000 colour difference,"Sharma, Wu, Dalal",https://doi.org/10.1002/col.20070,"Published work, cited. No code or data copied.",Colour distance check of the palette.,2026-11-15
+Cinematic Space Background (Pixabay track 263169),Delosound,https://pixabay.com/music/,"Pixabay Content License: free to use, no attribution required.","web/public/music/space-ambient.mp3, used on the map and menus.",2026-11-15
+Cinematic Cello (Pixabay track 115667),Lexin_Music,https://pixabay.com/music/,"Pixabay Content License: free to use, no attribution required.","web/public/music/play-cello.mp3, used during rounds.",2026-11-15
+Deep Cinematic Ballad 42 sec (Pixabay track 178307),Grand_Project,https://pixabay.com/music/,"Pixabay Content License: free to use, no attribution required.","web/public/music/solved-ballad.mp3, used when a spot is solved.",2026-11-15
