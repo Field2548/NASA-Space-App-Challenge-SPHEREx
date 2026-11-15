@@ -24,6 +24,16 @@ describe("findHipsUrl", () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
+  it("falls back to the site's own coarse copy when every CDS mirror is down", async () => {
+    vi.stubGlobal("window", { location: { origin: "http://site.test" } });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("MocServer")) return new Response("[]");
+      return url.startsWith("http://site.test/hips/") ? new Response(PROPS) : new Response("down", { status: 404 });
+    }));
+    const { findHipsUrl } = await fresh();
+    await expect(findHipsUrl()).resolves.toBe("http://site.test/hips/spherex-color");
+  });
+
   it("does not keep a failed check, so a retry looks again", async () => {
     let up = false;
     const fetchMock = vi.fn(async (url: string) => {

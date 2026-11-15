@@ -148,9 +148,17 @@ async function probeMirrors(): Promise<string | null> {
   try {
     return await Promise.any([...KNOWN_MIRRORS.map(probe), extra]);
   } catch {
-    return null;
+    // CDS is down: the site's own copy of orders 0-3 (pipeline/mirror_hips.py), if it has one.
+    try {
+      return await probe(`${window.location.origin}${LOCAL_HIPS}`);
+    } catch {
+      return null;
+    }
   }
 }
+
+/** Where pipeline/mirror_hips.py puts the coarse copy (web/public/hips/spherex-color). */
+export const LOCAL_HIPS = "/hips/spherex-color";
 
 const PROBE_MS = 5000;
 let mirror: Promise<string | null> | null = null;
