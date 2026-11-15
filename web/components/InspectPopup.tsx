@@ -183,7 +183,8 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
   };
 
   const onTitleDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
+    // A press on a button (Close) is not a drag: capturing it retargets the click to the bar.
+    if (e.button !== 0 || (e.target as Element).closest("button")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { pointerX: e.clientX, pointerY: e.clientY, left: pos.left, top: pos.top };
   };
