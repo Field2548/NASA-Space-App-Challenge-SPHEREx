@@ -39,6 +39,23 @@ async function get(query: string, unlocked?: string[]) {
 
 const erosXy = `spot=eros&x=${erosFrame1.x}&y=${erosFrame1.y}`;
 
+describe("GET /api/info: the mode parameter", () => {
+  it("an unknown mode is a 400 bad_request, not a silent round", async () => {
+    const { status, body } = await get(`${erosXy}&mode=zz`);
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("bad_request");
+    const outside = await get(`ra=${erosCentre.ra}&dec=${erosCentre.dec}&mode=Explore`);
+    expect(outside.status).toBe(400);
+    expect(outside.body.error.code).toBe("bad_request");
+  });
+
+  it("a missing mode is round", async () => {
+    const { status, body } = await get(`${erosXy}`);
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ mode: "round", locked: true });
+  });
+});
+
 describe("GET /api/info: the lock", () => {
   it("mode=round on eros returns exactly mode, locked and position, with no name or number 433", async () => {
     const { status, text, res } = await call(`${erosXy}&mode=round`);

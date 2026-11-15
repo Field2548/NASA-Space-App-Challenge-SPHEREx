@@ -92,16 +92,27 @@ describe("clientIp", () => {
   it("prefers x-vercel-forwarded-for (first entry), whatever else is sent", () => {
     expect(ip({ "x-vercel-forwarded-for": "198.51.100.1, 10.0.0.1", "x-real-ip": "192.0.2.5", "x-forwarded-for": "1.1.1.1, 2.2.2.2" })).toBe("198.51.100.1");
   });
-  it("then x-real-ip", () => {
-    expect(ip({ "x-real-ip": "192.0.2.5", "x-forwarded-for": "1.1.1.1, 2.2.2.2" })).toBe("192.0.2.5");
-  });
   it("then the LAST x-forwarded-for entry, the one added by the nearest proxy (a client-written first entry is ignored)", () => {
     expect(ip({ "x-forwarded-for": "6.6.6.6, 203.0.113.7" })).toBe("203.0.113.7");
     expect(ip({ "x-forwarded-for": "203.0.113.8" })).toBe("203.0.113.8");
   });
+  it("x-real-ip is only used when there is no x-forwarded-for, so a client cannot set it to dodge the limit", () => {
+    expect(ip({ "x-real-ip": "192.0.2.5", "x-forwarded-for": "1.1.1.1, 2.2.2.2" })).toBe("2.2.2.2");
+    expect(ip({ "x-real-ip": "192.0.2.5", "x-forwarded-for": "" })).toBe("192.0.2.5");
+    expect(ip({ "x-real-ip": "192.0.2.5" })).toBe("192.0.2.5");
+  });
   it("else local", () => {
     expect(ip({})).toBe("local");
     expect(ip({ "x-forwarded-for": "" })).toBe("local");
+  });
+});
+
+describe("errorResponse", () => {
+  it("always has a details object, empty when there is none", async () => {
+    const plain = await handle(() => Promise.reject(new ApiFail("unauthorized", "no")));
+    expect((await plain.json()).error).toEqual({ code: "unauthorized", message: "no", details: {} });
+    const withDetails = await handle(() => Promise.reject(new ApiFail("rate_limited", "wait", { retry_after_s: 5 })));
+    expect((await withDetails.json()).error.details).toEqual({ retry_after_s: 5 });
   });
 });
 

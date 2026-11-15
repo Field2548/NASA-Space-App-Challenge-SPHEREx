@@ -205,6 +205,23 @@ describe("lookupLive: shared in-flight lookups and per-caller separations", () =
   });
 });
 
+describe("lookupLive: cache key across the RA wrap", () => {
+  it("359.99999 and 0.00001 (within 1 arcsec, across 0 degrees) share one cache entry", async () => {
+    const { fetchImpl, calls } = fake(json(EMPTY), json(EMPTY));
+    await lookupLive(359.99999, DEC, { fetchImpl, now: () => 0 });
+    expect(calls).toHaveLength(2);
+    await lookupLive(0.00001, DEC, { fetchImpl, now: () => 1000 });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("positions 4 arcsec apart across the wrap do not share an entry", async () => {
+    const { fetchImpl, calls } = fake(json(EMPTY), json(EMPTY));
+    await lookupLive(359.99944, DEC, { fetchImpl, now: () => 0 });
+    await lookupLive(0.00056, DEC, { fetchImpl, now: () => 0 });
+    expect(calls).toHaveLength(4);
+  });
+});
+
 describe("ADQL", () => {
   it("SIMBAD: basic table, 9 arcsec cone, exact text", () => {
     expect(simbadAdql(RA, DEC)).toBe(

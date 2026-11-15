@@ -29,6 +29,7 @@ Routes owned by DATA (`/api/quicklook/*`, `/api/overlay`) are listed in section 
 ## 1. Rules for every route
 
 - JSON in, JSON out (`Content-Type: application/json; charset=utf-8`), except `/api/s3range` (bytes).
+  A JSON request body is parsed whatever its `Content-Type` header says. A wrong HTTP method on a route answers 405 with an empty body (Next's default), and an unknown `/api/...` path answers Next's HTML 404 page, not the error shape above.
 - Every input is validated with `zod`. Unknown keys are ignored. Numbers in query strings are parsed with `z.coerce.number()`.
 - JSON bodies are limited to 64 kB: refused when `Content-Length` says more, and again when the body itself is more than 64,000 bytes in UTF-8 (`400 bad_request`, "That request is too large.").
 - **Errors** always have this shape, with a matching HTTP status:
@@ -61,7 +62,7 @@ Used by `/api/info` (and DATA's `/api/overlay`).
 | `round` | a tutorial level, or play before a correct answer | **no names, types, spectral types, distances, parallaxes, redshifts, JPL results or links.** Those keys are absent from the JSON, not `null`. |
 | `explore` | after a correct answer on that spot, on the sky map outside ready spots, in quick look | everything, if the server grants it (see below) |
 
-- A missing or unknown `mode` is treated as `round` (the safe side).
+- A missing `mode` (or an empty one, `mode=`) is treated as `round`. Any other value than `round` or `explore` answers `400 bad_request`.
 - **The server decides, not the client** (BP section 3: "The server enforces this"). Asking for `mode=explore` is only a request:
   - For a **ready spot** (a call with `spot=`, or `ra`/`dec` inside a ready spot's picture), the server answers as `explore` only if this player has a **correct** answer on that spot (`known`, `bot_match` or `nothing_correct`). Otherwise it answers exactly as `round`, with `"mode": "round", "locked": true`. Always read `locked` from the response; never assume.
   - For a position **outside every ready spot** (sky map, quick look), `explore` is always granted.
@@ -202,6 +203,8 @@ Name to coordinates through CDS Sesame. Cached for 1 day.
 ## 6. `GET /api/info?spot=&x=&y=&ra=&dec=&mode=round|explore`
 
 Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need no server.
+
+`mode` is `round` or `explore` (section 2): missing means `round`, and any other value (for example `mode=zz`) answers `400 bad_request`.
 
 - Ready spot: send `spot`, `x`, `y`. The server reads `web/data/catalog/<slug>.json` (no network).
 - Anywhere else (sky map, quick look): send `ra`, `dec` in degrees. The server asks SIMBAD TAP and Gaia TAP live, in parallel, 8 s each. Partial results are fine. Cached by position rounded to 1 arcsec, for 10 minutes (30 seconds when a source failed).
