@@ -254,9 +254,9 @@ describe("PlayScreen wiring", () => {
 
   it("limits the blink to the loop range and changes its speed", async () => {
     await loadGame();
-    const end = screen.getByRole("slider", { name: "Loop end frame" }) as HTMLInputElement;
-    expect(end.value).toBe("3"); // default: all frames
-    fireEvent.change(end, { target: { value: "2" } });
+    const end = screen.getByRole("slider", { name: "Loop end" });
+    expect(end.getAttribute("aria-valuenow")).toBe("3"); // default: all frames
+    fireEvent.keyDown(end, { key: "ArrowLeft" });
     expect(screen.getByText("Loop frames 1 to 2")).toBeTruthy();
     const speed = screen.getByRole("slider", { name: "Blink speed" }) as HTMLInputElement;
     fireEvent.change(speed, { target: { value: "0" } });

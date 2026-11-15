@@ -159,18 +159,34 @@ export function morphFrame(src: Float32Array, w: number, h: number, s: MorphSett
   }
 }
 
-// Results per frame object and settings; frames are immutable once decoded.
+/** An ordered pipeline of steps: the output of step k is the input of step k + 1. Empty = off. */
+export type MorphStack = MorphSettings[];
+
+export const EMPTY_MORPH_STACK: MorphStack = [];
+export const MAX_MORPH_STEPS = 6;
+/** What "Add step" appends. */
+export const NEW_MORPH_STEP: MorphSettings = { op: "erode", shape: "rect", size: 3, iterations: 1 };
+
+/** One frame through every step in order. An empty stack returns the input array. */
+export function morphStack(src: Float32Array, w: number, h: number, stack: MorphStack): Float32Array {
+  return stack.reduce((a, s) => morphFrame(a, w, h, s), src);
+}
+
+const stepKey = (s: MorphSettings) => `${s.op}|${s.shape}|${s.size}|${s.iterations}`;
+
+// Results per frame object and stack; frames are immutable once decoded.
 const cache = new WeakMap<Float32Array, Map<string, Float32Array>>();
 
-/** Same operation on every frame; cached per (frame, settings). Off returns the input array. */
-export function morphFrames(frames: Float32Array[], w: number, h: number, s: MorphSettings): Float32Array[] {
-  if (isMorphOff(s)) return frames;
-  const key = `${s.op}|${s.shape}|${s.size}|${s.iterations}|${w}x${h}`;
+/** Same stack on every frame; cached per (frame, whole ordered stack). An empty stack returns the input array. */
+export function morphFrames(frames: Float32Array[], w: number, h: number, stack: MorphStack): Float32Array[] {
+  const steps = stack.filter((s) => !isMorphOff(s));
+  if (!steps.length) return frames;
+  const key = `${steps.map(stepKey).join(">")}|${w}x${h}`;
   return frames.map((f) => {
     let m = cache.get(f);
     if (!m) cache.set(f, (m = new Map()));
     let r = m.get(key);
-    if (!r) m.set(key, (r = morphFrame(f, w, h, s)));
+    if (!r) m.set(key, (r = morphStack(f, w, h, steps)));
     return r;
   });
 }

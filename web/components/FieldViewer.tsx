@@ -15,7 +15,7 @@
 //   overlay?: "none" | "colorByTime" Color by time replaces the single frame
 //   overlayFrames?: number[]         array indices for Color by time (default: first 7)
 //   brightness?: number              black point in S/N (default field.stretch.black_sigma)
-//   morphology?: MorphSettings       erosion, dilation, opening ... on the frames before the stretch (default Off)
+//   morphology?: MorphSettings[]     ordered steps (first to last): erosion, dilation, opening ... on the frames before the stretch (default Off)
 //   curve?: Curve                    tone curve after the stretch (default identity)
 //   scale?: number                   integer upscale (default: fits 640 x 560)
 //   colors?: RGB[]                   time colours per frame (default timeColors(n, vision))
@@ -31,7 +31,7 @@ import { colorByTime, makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB, Vision } from "@/lib/types";
 import { pixelToSky } from "@/lib/wcs";
 import { timeColors } from "@/lib/palettes";
-import { DEFAULT_MORPH, type MorphSettings, morphFrames } from "@/lib/morphology";
+import { EMPTY_MORPH_STACK, type MorphStack, morphFrames } from "@/lib/morphology";
 import { applyCurve, type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
 import styles from "./FieldViewer.module.css";
 import { asteroidsInFrame, type KnownOverlay } from "./overlay";
@@ -52,8 +52,8 @@ export interface FieldViewerProps {
   overlay?: ViewerOverlay;
   overlayFrames?: number[];
   brightness?: number;
-  /** Morphology applied to the frames before the stretch (default Off). */
-  morphology?: MorphSettings;
+  /** Morphology steps applied in order to the frames before the stretch (default none = Off). */
+  morphology?: MorphStack;
   /** Tone curve applied after the stretch (default: identity, the plain asinh look). */
   curve?: Curve;
   scale?: number;
@@ -127,7 +127,7 @@ export default function FieldViewer(props: FieldViewerProps) {
 
   const points = useMemo(() => stretchPoints(field, black), [field, black]);
   // Morphology runs on the S/N frames before the stretch; the tone curve on the 0..1 gray after it.
-  const morphology = props.morphology ?? DEFAULT_MORPH;
+  const morphology = props.morphology ?? EMPTY_MORPH_STACK;
   const curve = props.curve ?? DEFAULT_CURVE;
   const shownData = useMemo(() => morphFrames(frames, W, H, morphology), [frames, W, H, morphology]);
   const baseGrays = useMemo(() => {

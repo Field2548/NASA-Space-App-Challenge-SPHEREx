@@ -75,16 +75,82 @@ describe("Timeline loop range and speed", () => {
     const margins = screen.getAllByRole("option").map((o) => (o as HTMLElement).style.marginLeft);
     expect(margins).toEqual(["0px", "8px", "8px", "8px"]);
   });
-  it("loop range sliders report ordered 0-based ranges and keep one frame at least", () => {
+  it("draws the loop edges as handles on the strip, not range inputs", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[1, 2]} onLoopRangeChange={() => {}} />);
+    expect(screen.queryByRole("slider", { name: "Loop start frame" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Loop end frame" })).toBeNull();
+    expect(screen.getByText("Loop frames 2 to 3")).toBeTruthy();
+    const s = screen.getByRole("slider", { name: "Loop start" });
+    const e = screen.getByRole("slider", { name: "Loop end" });
+    expect(s.getAttribute("aria-valuenow")).toBe("2");
+    expect(s.getAttribute("aria-valuemin")).toBe("1");
+    expect(s.getAttribute("aria-valuemax")).toBe("4");
+    expect(s.getAttribute("aria-valuetext")).toBe("frame 2 of 4");
+    expect(e.getAttribute("aria-valuenow")).toBe("3");
+    expect(e.getAttribute("aria-valuetext")).toBe("frame 3 of 4");
+  });
+  it("arrow keys, Home and End move a handle and never cross", () => {
     const onRange = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[1, 2]} onLoopRangeChange={onRange} />);
-    expect(screen.getByText("Loop frames 2 to 3")).toBeTruthy();
-    fireEvent.change(screen.getByRole("slider", { name: "Loop end frame" }), { target: { value: "4" } });
+    const s = screen.getByRole("slider", { name: "Loop start" });
+    const e = screen.getByRole("slider", { name: "Loop end" });
+    fireEvent.keyDown(e, { key: "ArrowRight" });
     expect(onRange).toHaveBeenLastCalledWith([1, 3]);
-    fireEvent.change(screen.getByRole("slider", { name: "Loop start frame" }), { target: { value: "1" } });
+    fireEvent.keyDown(s, { key: "Home" });
     expect(onRange).toHaveBeenLastCalledWith([0, 2]);
-    fireEvent.change(screen.getByRole("slider", { name: "Loop start frame" }), { target: { value: "4" } });
-    expect(onRange).toHaveBeenLastCalledWith([3, 3]); // start passes the end: the end follows
+    fireEvent.keyDown(s, { key: "ArrowLeft" });
+    expect(onRange).toHaveBeenLastCalledWith([0, 2]);
+    onRange.mockClear();
+    fireEvent.keyDown(s, { key: "End" }); // stops at the end handle
+    expect(onRange).toHaveBeenLastCalledWith([2, 2]);
+    onRange.mockClear();
+    fireEvent.keyDown(e, { key: "Home" }); // stops at the start handle
+    expect(onRange).toHaveBeenLastCalledWith([1, 1]);
+    onRange.mockClear();
+    fireEvent.keyDown(e, { key: "ArrowLeft" });
+    fireEvent.keyDown(s, { key: "ArrowRight" });
+    expect(onRange).toHaveBeenCalledTimes(2);
+    expect(onRange).toHaveBeenNthCalledWith(1, [1, 1]);
+    expect(onRange).toHaveBeenNthCalledWith(2, [2, 2]);
+  });
+  it("a one-frame loop keeps its handles from crossing", () => {
+    const onRange = vi.fn();
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[2, 2]} onLoopRangeChange={onRange} />);
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Loop end" }), { key: "ArrowLeft" });
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Loop start" }), { key: "ArrowRight" });
+    expect(onRange).not.toHaveBeenCalled();
+  });
+  it("dragging a handle along the strip snaps to clip boundaries", () => {
+    const onRange = vi.fn();
+    const onIndex = vi.fn();
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={onIndex} loopRange={[1, 2]} onLoopRangeChange={onRange} />);
+    const list = screen.getByRole("listbox", { name: "Frames" });
+    vi.spyOn(list, "getBoundingClientRect").mockReturnValue({ left: 100, top: 0, right: 600, bottom: 90, width: 500, height: 90, x: 100, y: 0, toJSON() {} });
+    // clip k centre = 100 + 2 + 120k + 56
+    const e = screen.getByRole("slider", { name: "Loop end" });
+    fireEvent.pointerDown(e, { pointerId: 1, clientX: 400 });
+    fireEvent.pointerMove(e, { pointerId: 1, clientX: 100 + 2 + 360 + 56 }); // over clip 3
+    expect(onRange).toHaveBeenLastCalledWith([1, 3]);
+    fireEvent.pointerUp(e, { pointerId: 1 });
+    onRange.mockClear();
+    fireEvent.pointerMove(e, { pointerId: 1, clientX: 100 }); // released: no move
+    expect(onRange).not.toHaveBeenCalled();
+    const s = screen.getByRole("slider", { name: "Loop start" });
+    fireEvent.pointerDown(s, { pointerId: 1, clientX: 300 });
+    fireEvent.pointerMove(s, { pointerId: 1, clientX: 100 + 2 + 56 }); // over clip 0
+    expect(onRange).toHaveBeenLastCalledWith([0, 2]);
+    fireEvent.pointerMove(s, { pointerId: 1, clientX: 100 + 2 + 360 + 56 }); // past the end: stops at it
+    expect(onRange).toHaveBeenLastCalledWith([2, 2]);
+    expect(onIndex).not.toHaveBeenCalled(); // handles do not scrub
+  });
+  it("dims clips outside the loop and still selects a frame by pointer", () => {
+    const onIndex = vi.fn();
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={onIndex} loopRange={[1, 2]} onLoopRangeChange={() => {}} />);
+    const dim = screen.getAllByRole("option").map((o) => o.getAttribute("data-dimmed"));
+    expect(dim).toEqual(["true", null, null, "true"]);
+    vi.spyOn(screen.getByRole("listbox", { name: "Frames" }), "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, right: 500, bottom: 90, width: 500, height: 90, x: 0, y: 0, toJSON() {} });
+    fireEvent.pointerDown(screen.getAllByRole("option")[3], { pointerId: 1, clientX: 2 + 360 + 56 }); // selection is by position on the strip
+    expect(onIndex).toHaveBeenCalledWith(3);
   });
   it("speed slider steps through the rates, with a readable value", () => {
     const onFps = vi.fn();
@@ -99,7 +165,8 @@ describe("Timeline loop range and speed", () => {
   it("hides the loop and speed controls without their callbacks", () => {
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
     expect(screen.queryByRole("slider", { name: "Blink speed" })).toBeNull();
-    expect(screen.queryByRole("slider", { name: "Loop end frame" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Loop end" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Loop start" })).toBeNull();
   });
 });
 

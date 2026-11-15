@@ -28,15 +28,18 @@ describe("ToneCurveEditor", () => {
     // neighbour above is 0.75: clamped
     expect(Math.max(...onChange.mock.calls.slice(2).map((c) => c[0][2]))).toBeLessThanOrEqual(0.75);
   });
-  it("preset buttons set the curve; Reset restores the default", () => {
+  it("offers exactly Linear, Log and asinh; asinh is the default curve", () => {
     const onChange = vi.fn();
     render(<ToneCurveEditor value={presetCurve("log")} onChange={onChange} />);
-    for (const [name, key] of [["Linear", "linear"], ["asinh", "asinh"], ["Log", "log"], ["Gamma", "gamma"]] as const) {
+    const names = screen.getAllByRole("button").map((b) => b.textContent).filter((t) => t && !t.startsWith("About") && t !== "i");
+    expect(names).toEqual(["Linear", "Log", "asinh"]);
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gamma" })).toBeNull();
+    for (const [name, key] of [["Linear", "linear"], ["Log", "log"], ["asinh", "asinh"]] as const) {
       fireEvent.click(screen.getByRole("button", { name }));
       expect(onChange).toHaveBeenLastCalledWith(presetCurve(key));
     }
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    expect(onChange).toHaveBeenLastCalledWith(DEFAULT_CURVE);
+    expect(presetCurve("asinh")).toEqual(DEFAULT_CURVE);
   });
   it("keeps detail in the (i) popup with before/after example images", () => {
     render(<ToneCurveEditor value={DEFAULT_CURVE} onChange={() => {}} />);
