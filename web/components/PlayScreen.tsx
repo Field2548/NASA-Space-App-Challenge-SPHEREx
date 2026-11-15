@@ -32,7 +32,8 @@ import BrandMark from "./BrandMark";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
 import { cueSolved } from "@/lib/music";
-import { loadVision } from "@/lib/settings";
+import { loadSafeColors, loadVision } from "@/lib/settings";
+import { stackColors } from "@/lib/palettes";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
 import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
@@ -294,7 +295,15 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
   const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
   const statusId = useId();
   const defaultOnion = useMemo(() => clampOnion([0, ONION_MAX - 1], frames.length), [frames.length]);
-  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length));
+  // Settings: colour-blind-safe colours cap Stack at ONION_MAX frames; off, Stack can mix every frame.
+  const [safeColors] = useState(loadSafeColors);
+  const onionMax = safeColors ? ONION_MAX : Math.max(2, frames.length);
+  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length, onionMax));
+  const stackRange = clampOnion(onionRange, shownFrames.length, onionMax);
+  const colors = useMemo(
+    () => stackColors(shownFrames.length, [stackRange[0], stackRange[1]], vision, safeColors),
+    [shownFrames.length, stackRange[0], stackRange[1], vision, safeColors], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const [loopRange, setLoopRange] = useState<[number, number] | null>(null); // null: all frames
   const [fps, setFps] = useState<number>(MAX_BLINK_FPS);
   const viewCb = useRef(onViewChange);
@@ -554,13 +563,14 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               field={field}
               frames={shownFrames}
               vision={vision}
+              colors={colors}
               frameIndex={blink.index}
               marks={marks}
               onMark={placeMark}
               mode={mode}
               onInspect={inspectAt}
               overlay={overlay}
-              overlayFrames={onionRangeFrames(onionRange)}
+              overlayFrames={onionRangeFrames(stackRange)}
               shift={shift}
               known={knownData}
               crosshair={pointer ? null : cursor}
@@ -650,6 +660,8 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
           frames={shownFrames}
           thumbsFromFrames={shownFrames !== frames}
           vision={vision}
+          colors={colors}
+          onionMax={onionMax}
           index={blink.index}
           onIndexChange={(i) => {
             blink.setIndex(i);

@@ -16,7 +16,7 @@ export interface GuestFind {
 
 export interface GuestData {
   tutorial: { v: number; level: number; step: number; done: number[] };
-  settings: { vision: Vision; reducedMotion?: boolean; music?: boolean; musicVolume?: number; uiSounds?: boolean };
+  settings: { vision: Vision; safeColors?: boolean; reducedMotion?: boolean; music?: boolean; musicVolume?: number; uiSounds?: boolean };
   finds: GuestFind[];
   name?: string;
 }

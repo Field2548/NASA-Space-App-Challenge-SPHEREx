@@ -16,9 +16,10 @@
 //   playing?: boolean; onTogglePlay?(): void            blink control (from useBlink)
 //   reducedMotion?: boolean                             auto-play is off; Play is disabled and says why
 //   controlsSlot?: ReactNode                            extra controls at the end of the toolbar
-//   onionRange?: [a, b]; onOnionRangeChange?(r)         inclusive array indices for Stack (2..7 frames);
+//   onionRange?: [a, b]; onOnionRangeChange?(r)         inclusive array indices for Stack (2..onionMax frames);
 //                                                          FieldViewer overlayFrames = onionRangeFrames(range)
 //   onionActive?: boolean                               show the Color lane (default true when onionRange is given)
+//   onionMax?: number                                   most frames Stack mixes (default ONION_MAX = 7)
 //   loopRange?: [a, b]; onLoopRangeChange?(r)           inclusive array indices the blink plays (default all);
 //                                                          the Blink lane shows when the callback is given;
 //                                                          clips outside the range are dimmed
@@ -62,6 +63,7 @@ export interface TimelineProps {
   onionRange?: [number, number];
   onOnionRangeChange?(r: [number, number]): void;
   onionActive?: boolean;
+  onionMax?: number;
   loopRange?: [number, number];
   onLoopRangeChange?(r: [number, number]): void;
   fps?: number;
@@ -89,8 +91,8 @@ export function onionRangeFrames(r: [number, number]): number[] {
   return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
 }
 
-/** Clamp a range into 0..n-1, ordered, 2 frames at least when n >= 2, ONION_MAX at most. */
-export function clampOnion(r: [number, number], n: number): [number, number] {
+/** Clamp a range into 0..n-1, ordered, 2 frames at least when n >= 2, max frames at most (default ONION_MAX). */
+export function clampOnion(r: [number, number], n: number, max: number = ONION_MAX): [number, number] {
   if (n <= 0) return [0, 0];
   let a = Math.min(n - 1, Math.max(0, Math.round(Math.min(r[0], r[1]))));
   let b = Math.min(n - 1, Math.max(0, Math.round(Math.max(r[0], r[1]))));
@@ -98,7 +100,7 @@ export function clampOnion(r: [number, number], n: number): [number, number] {
     if (b < n - 1) b += 1;
     else a -= 1;
   }
-  if (b - a > ONION_MAX - 1) b = a + ONION_MAX - 1;
+  if (b - a > max - 1) b = a + max - 1;
   return [a, b];
 }
 
@@ -290,7 +292,8 @@ export default function Timeline(props: TimelineProps) {
   const left = useMemo(() => Array.from({ length: n }, (_, k) => k * STEP), [n]);
   const total = n > 0 ? left[n - 1] + CLIP_W + 4 : 0;
   const margin = (k: number) => (k === 0 ? 0 : left[k] - left[k - 1] - CLIP_W);
-  const onion = props.onionRange && props.onionActive !== false ? clampOnion(props.onionRange, n) : null;
+  const onionMax = props.onionMax ?? ONION_MAX;
+  const onion = props.onionRange && props.onionActive !== false ? clampOnion(props.onionRange, n, onionMax) : null;
   const fps = props.fps ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1];
   const loop: [number, number] | null = n > 0 ? [Math.min(n - 1, Math.max(0, props.loopRange?.[0] ?? 0)), Math.min(n - 1, Math.max(0, props.loopRange?.[1] ?? n - 1))] : null;
   const frameMax = Math.max(n, props.frameMax ?? n);
@@ -508,13 +511,13 @@ export default function Timeline(props: TimelineProps) {
         {onion && onOnionRangeChange && n > 1 && (
           <RangeLane
             name="Color"
-            hint={`Drag the ends to choose which frames Stack mixes (2 to ${ONION_MAX}).`}
+            hint={`Drag the ends to choose which frames Stack mixes (2 to ${Math.min(onionMax, n)}).`}
             range={onion}
             n={n}
             left={left}
             total={total}
             minSpan={2}
-            maxSpan={ONION_MAX}
+            maxSpan={onionMax}
             tone="color"
             onChange={onOnionRangeChange}
             startName="Stack start frame"

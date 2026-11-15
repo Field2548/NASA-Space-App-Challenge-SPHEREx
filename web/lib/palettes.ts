@@ -43,6 +43,18 @@ export function timeColors(n: number, vision: Vision): RGB[] {
   return (vision === "tritan" ? TRITAN : OKABE_ITO).slice(0, n).map((c) => [...c] as RGB);
 }
 
+const OUTSIDE: RGB = [128, 128, 128];
+
+/** Per-frame Stack colours for n frames. Up to 7 frames, or when not safe: timeColors(n) (a hue ramp
+ * past 7). Safe with more than 7 frames: the colour-blind-safe set laid over the Stack range [a, b]
+ * (at most 7 frames) in order, grey outside it. */
+export function stackColors(n: number, range: [number, number], vision: Vision, safe: boolean): RGB[] {
+  if (!safe || n <= 7) return timeColors(n, vision);
+  const [a, b] = range;
+  const set = timeColors(Math.min(7, b - a + 1), vision);
+  return Array.from({ length: n }, (_, i) => (i >= a && i <= b && set[i - a] ? [...set[i - a]] : [...OUTSIDE]) as RGB);
+}
+
 // ---- colour vision deficiency simulation (Machado, Oliveira, Fernandes 2009, severity 1.0)
 
 type M3 = [number, number, number, number, number, number, number, number, number];

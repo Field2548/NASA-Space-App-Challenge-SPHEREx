@@ -14,3 +14,12 @@ export function loadVision(): Vision {
 export function saveVision(vision: Vision): void {
   saveGuest({ settings: { vision } });
 }
+
+/** Colour-blind-safe Stack colours (Okabe-Ito, Stack limited to 7 frames); on unless turned off. */
+export function loadSafeColors(): boolean {
+  return loadGuest().settings.safeColors !== false;
+}
+
+export function saveSafeColors(safeColors: boolean): void {
+  saveGuest({ settings: { safeColors } });
+}
