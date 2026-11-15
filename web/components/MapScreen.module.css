@@ -71,3 +71,8 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* BackLink keeps a bottom margin for pages where it sits above content; in this bar it must centre. */
+.top > a {
+  margin-bottom: 0;
+}

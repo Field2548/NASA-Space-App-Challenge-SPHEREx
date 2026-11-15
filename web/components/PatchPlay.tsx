@@ -7,6 +7,7 @@
 // correct answer: Inspect asks by sky position in round mode, and the known overlay stays empty.
 
 import Link from "next/link";
+import backStyles from "./BackLink.module.css";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { paintStill, planStill, stillTilePath } from "@/lib/hipsStill";
@@ -112,7 +113,9 @@ function Actions() {
       <button type="button" className="btn-primary" onClick={() => router.push(`/play?patch=${randomPatch().id}`)}>
         Try a random patch
       </button>
-      <Link href="/map">Back to the map</Link>
+      <Link href="/map" className={backStyles.back} aria-label="Back to the map">
+        ← Back
+      </Link>
     </div>
   );
 }

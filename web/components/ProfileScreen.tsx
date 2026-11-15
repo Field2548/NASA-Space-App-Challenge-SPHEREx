@@ -238,6 +238,8 @@ export default function ProfileScreen() {
             </div>
           </dl>
 
+          <div className={styles.layout}>
+          <div>
           {strip && strip.items.length > 0 && (
             <section aria-labelledby="profile-ach" className={styles.section}>
               <div className={styles.sectionHead}>
@@ -293,6 +295,7 @@ export default function ProfileScreen() {
               </ul>
             </section>
           )}
+          </div>
 
           <section aria-labelledby="profile-recent" className={styles.section}>
             <h2 id="profile-recent">Recent activity</h2>
@@ -310,6 +313,7 @@ export default function ProfileScreen() {
               </ul>
             )}
           </section>
+          </div>
         </>
       )}
       {open && (
