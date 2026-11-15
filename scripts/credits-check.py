@@ -128,6 +128,7 @@ GROUPS = [
     ("data", "Data and services"),
     ("lib", "Software libraries"),
     ("font", "Fonts and icons"),
+    ("music", "Music"),
     ("paper", "Papers and methods"),
     ("idea", "Ideas from other teams"),
 ]
@@ -220,6 +221,8 @@ def classify(row) -> str:
         return "paper"
     if any(idea_key(p[0]) in key for p in IDEAS):
         return "idea"
+    if "pixabay" in row["name"].lower():
+        return "music"
     if FONT_WORDS.search(row["name"]):
         return "font"
     if SERVICE_WORDS.search(row["license"] + " " + row["name"]):

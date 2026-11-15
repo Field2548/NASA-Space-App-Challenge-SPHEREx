@@ -85,8 +85,8 @@ We read these projects for ideas; all code here is our own.
 
 | Name | Author | Link | License | Used for | Checked |
 | --- | --- | --- | --- | --- | --- |
-| Cinematic Space Background (Pixabay 263169) | Delosound | https://pixabay.com/music/ (track id 263169; file name from the download) | Pixabay Content License (free use, no attribution required) | web/public/music/space-ambient.mp3, map and menus | 2026-11-15 |
 | Cinematic Cello (Pixabay 115667) | Lexin_Music | https://pixabay.com/music/ (track id 115667; file name from the download) | Pixabay Content License (free use, no attribution required) | web/public/music/play-cello.mp3, game rounds | 2026-11-15 |
+| Cinematic Space Background (Pixabay 263169) | Delosound | https://pixabay.com/music/ (track id 263169; file name from the download) | Pixabay Content License (free use, no attribution required) | web/public/music/space-ambient.mp3, map and menus | 2026-11-15 |
 | Deep Cinematic Ballad 42 sec (Pixabay 178307) | Grand_Project | https://pixabay.com/music/ (track id 178307; file name from the download) | Pixabay Content License (free use, no attribution required) | web/public/music/solved-ballad.mp3, solved spot | 2026-11-15 |
 
 ## Papers and methods

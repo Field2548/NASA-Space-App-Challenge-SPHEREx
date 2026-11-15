@@ -81,3 +81,19 @@ def test_movers_move_by_the_catalog_proper_motion(slug, lo, hi):
 @pytest.mark.parametrize("slug", ["rw-aur", "r-dra", "taurus-ice"])
 def test_variables_do_not_move(slug):
     assert _answer(slug)["objects"][0]["total_motion_px"] < 0.05
+
+
+def test_spectrum_tiles_are_linear_and_do_not_clip_a_bright_star():
+    """The web decodes spectrum tiles as value * scale + offset (section 8). A band with a star
+    thousands of times the noise still fits in 16 bits without clipping."""
+    from spectrum_tiles import quantize_linear
+    rng = np.random.default_rng(1)
+    plane = rng.normal(0, 0.05, (40, 40))
+    plane[20, 20] = 2000.0
+    plane[3, 3] = np.nan
+    q, scale, offset = quantize_linear(plane, 0.05)
+    assert q[3, 3] == 65535 and q[np.isfinite(plane)].max() <= 65534
+    back = q * scale + offset
+    ok = np.isfinite(plane)
+    assert np.abs(back[ok] - plane[ok]).max() <= scale / 2 * 1.01
+    assert abs(back[20, 20] - 2000.0) <= scale
