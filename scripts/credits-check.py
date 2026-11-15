@@ -6,9 +6,9 @@ Usage:
     scripts/credits-check.py --check    validate and compare, never write (CI mode)
     scripts/credits-check.py --root DIR run against another checkout (used by the tests)
 
-Nobody edits CREDITS.md by hand. Every agent appends rows to docs/credits/<agent>.csv
+Nobody edits CREDITS.md by hand. Add rows to docs/credits/*.csv
 (columns: name, author, link, license, used_for, date_checked) and this script merges them
-(docs/plans/00-COORDINATION.md section 2). Standard library only.
+Standard library only.
 """
 from __future__ import annotations
 
@@ -244,7 +244,7 @@ def run_checks(root: Path, rows, problems):
     deps = production_dependencies(root, problems)
     for dep in deps:
         if not dep_has_row(dep, rows):
-            problems.append(f"production dependency {dep}: no credit row (add one to docs/credits/<agent>.csv)")
+            problems.append(f"production dependency {dep}: no credit row (add one to docs/credits/*.csv)")
 
     services = 0
     for label, regex, cond in REQUIRED:

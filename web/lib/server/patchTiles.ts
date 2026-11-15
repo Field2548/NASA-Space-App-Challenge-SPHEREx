@@ -1,4 +1,4 @@
-// GET /api/patch-tiles: community patches as HEALPix tiles (owner: SERVER). Server only.
+// GET /api/patch-tiles: community patches as HEALPix tiles. Server only.
 //   ?tileOrder=k&tile=ipix&order=m          density: [[ipix, solves, reports]] per cell at order m
 //   ?tileOrder=k&tile=ipix&mode=patches     footprints: the patches inside the tile (k >= 6)
 // Anonymous: no user ids, no names. No database (or a failing one): { offline: true } and nothing else.

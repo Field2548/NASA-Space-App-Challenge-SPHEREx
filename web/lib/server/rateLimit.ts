@@ -1,4 +1,4 @@
-// Light, best-effort rate limit (owner: SERVER). Counts per address in memory, so on Vercel
+// Light, best-effort rate limit. Counts per address in memory, so on Vercel
 // each serverless instance counts on its own. It slows a runaway loop; it is not a
 // security control. Contract: docs/contracts/api.md section 1.
 

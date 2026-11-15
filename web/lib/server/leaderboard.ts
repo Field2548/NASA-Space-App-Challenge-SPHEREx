@@ -1,4 +1,4 @@
-// GET /api/leaderboard: the board logic (owner: SERVER). Server only.
+// GET /api/leaderboard: the board logic. Server only.
 // Contract: docs/contracts/api.md section 7. Database: supabase/migrations/20261118000000_leaderboard_v2.sql.
 //
 // Boards: period (all time or the last 7 days) x region (global or one country). The default board

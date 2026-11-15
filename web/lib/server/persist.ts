@@ -1,4 +1,4 @@
-// Saving a /api/check answer to the database (owner: SERVER). Server only.
+// Saving a /api/check answer to the database. Server only.
 // Contract: docs/contracts/api.md sections 3, 4 and 8. The write itself is the record_find()
 // RPC (supabase/migrations/20261115000000_init.sql), called with the service role.
 // No database, or a database that fails, is never an error for the player: the answer is

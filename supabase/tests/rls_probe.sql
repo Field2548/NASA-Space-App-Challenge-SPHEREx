@@ -1,4 +1,4 @@
--- Row-level security probes for supabase/migrations/20261115000000_init.sql (PLAN-3):
+-- Row-level security probes for supabase/migrations/20261115000000_init.sql:
 --   anon cannot insert into finds and cannot read emails; authenticated cannot write finds or
 --   visits, cannot call record_find, and cannot read other users' rows.
 --
