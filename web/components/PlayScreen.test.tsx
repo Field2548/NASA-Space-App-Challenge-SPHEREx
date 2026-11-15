@@ -220,24 +220,36 @@ async function loadGame(props: Partial<Parameters<typeof PlayScreen>[0]> = {}, o
 }
 
 describe("PlayScreen wiring", () => {
-  it("Color by time stops a playing blink", async () => {
+  it("Stack stops a playing blink", async () => {
     await loadGame();
     fireEvent.click(screen.getByRole("button", { name: "Play blink" }));
     expect(screen.getByRole("button", { name: "Pause blink" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stack" }));
     expect(screen.getByRole("button", { name: "Play blink" })).toBeTruthy();
   });
 
-  it("wires the Color by time range into the Timeline (only while Color by time is on), with no Real time spacing", async () => {
+  it("Shift is opt-in beside Stack: turns Stack on, shows the motion pad, and goes away with Stack", async () => {
     await loadGame();
-    expect(screen.queryByRole("slider", { name: "Color by time end frame" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
-    const end = screen.getByRole("slider", { name: "Color by time end frame" });
+    expect(screen.queryByTestId("motion-pad")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Shift" }));
+    expect(screen.getByRole("button", { name: "Stack" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("slider", { name: "Shift motion" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Shift motion" }), { key: "ArrowRight" });
+    expect(screen.getByText(/^Shift \d+\.\d px\/day$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Stack" }));
+    expect(screen.queryByTestId("motion-pad")).toBeNull();
+  });
+
+  it("wires the Stack range into the Timeline (only while Stack is on), with no Real time spacing", async () => {
+    await loadGame();
+    expect(screen.queryByRole("slider", { name: "Stack end frame" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Stack" }));
+    const end = screen.getByRole("slider", { name: "Stack end frame" });
     expect(end.getAttribute("aria-valuenow")).toBe("3"); // all 3 frames
     expect(screen.getByRole("group", { name: "Color frames 1–3" })).toBeTruthy();
-    expect(screen.getByText("Color by time: 3 frames")).toBeTruthy();
+    expect(screen.getByText("Stack: 3 frames")).toBeTruthy();
     fireEvent.keyDown(end, { key: "ArrowLeft" });
-    expect(screen.getByText("Color by time: 2 frames")).toBeTruthy();
+    expect(screen.getByText("Stack: 2 frames")).toBeTruthy();
     expect(screen.getByRole("group", { name: "Color frames 1–2" })).toBeTruthy();
     expect(screen.queryByText(/Real time spacing/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Blink order|ping-pong/i })).toBeNull();
@@ -351,11 +363,11 @@ const ALLOWED_AT_LEVEL_0 = ["Zoom in", "Zoom out", "Previous frame", "Play blink
 describe("PlayScreen tools", () => {
   it("shows every built tool by default; Known asteroids is there but locked during a round", async () => {
     await loadGame();
-    for (const name of [/Inspect off/, "Color by time", "Submit", "1 frame per second"]) {
+    for (const name of [/Inspect off/, "Stack", "Submit", "1 frame per second"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     expect(screen.getByRole("slider", { name: "Blink end frame" })).toBeTruthy();
-    expect(screen.queryByRole("slider", { name: "Color by time end frame" })).toBeNull(); // until Color by time is on
+    expect(screen.queryByRole("slider", { name: "Stack end frame" })).toBeNull(); // until Stack is on
     expect(screen.queryByRole("combobox", { name: "Colour vision" })).toBeNull(); // moved to /settings
     expect((screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -528,7 +540,7 @@ describe("PlayScreen tools (more)", () => {
     const canvas = await loadGame({ tools: new Set(), onEvent });
     expect(screen.getByRole("button", { name: /Play blink/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next frame" })).toBeTruthy();
-    for (const name of [/Inspect/, "Color by time", "Known asteroids", "Submit", "Clear marks", /frames? per second/]) {
+    for (const name of [/Inspect/, "Stack", "Known asteroids", "Submit", "Clear marks", /frames? per second/]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
     expect(screen.queryByRole("slider", { name: "Blink end frame" })).toBeNull();
@@ -679,7 +691,7 @@ describe("PlayScreen round mode", () => {
   it("bumps the scoreboard on every verdict", async () => {
     const wrong: CheckResponse = { ...known, verdict: { kind: "candidate", points: 0, message: "No." }, unlocked: false, reveal: undefined };
     const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(wrong), { status: 200 })) as unknown as typeof fetch });
-    expect(screen.getByRole("button", { name: /Scoreboard/ })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Scope" })).toBeTruthy();
     await vi.waitFor(() => expect(boardCalls().length).toBeGreaterThan(0));
     expect(boardCalls()[0]).toContain("scope=spot");
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
@@ -711,7 +723,7 @@ describe("PlayScreen round mode", () => {
   it("the tutorial shows no scoreboard", async () => {
     await loadGame({ showTitle: true, objectName: "433 Eros" });
     expect(screen.getByRole("complementary", { name: "Scoreboard panel" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Scope" })).toBeNull();
   });
 
   it("after a verdict a result sheet offers NEXT STAGE; the old Next spot row and the mark prompt are gone", async () => {

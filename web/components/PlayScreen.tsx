@@ -32,7 +32,8 @@ import BrandMark from "./BrandMark";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
 import { cueSolved } from "@/lib/music";
-import { loadVision } from "@/lib/settings";
+import { loadSafeColors, loadVision } from "@/lib/settings";
+import { stackColors } from "@/lib/palettes";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
 import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
@@ -47,6 +48,7 @@ import InspectPanel from "./InspectPanel";
 import PanelResizer, { usePanelWidths } from "./PanelResizer";
 import { InspectPopup } from "./InspectPopup";
 import MorphologyControl from "./MorphologyControl";
+import MotionPad, { type Motion } from "./MotionPad";
 import PatchPlay, { type PickedHooks } from "./PatchPlay";
 import PlayTimeTracker from "./PlayTimeTracker";
 import type { Patch } from "@/lib/patch";
@@ -273,6 +275,8 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
   const [revealName, setRevealName] = useState<string | null>(null);
   const [revealTitle, setRevealTitle] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
+  // Shift (opt-in, with Stack): null = off, else the motion the stacked frames follow.
+  const [shift, setShift] = useState<Motion | null>(null);
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
   const [morph, setMorph] = useState<MorphStack>(EMPTY_MORPH_STACK);
@@ -286,13 +290,20 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
   const [apRadius, setApRadius] = useState(RADIUS_DEFAULT);
   const [verdicts, setVerdicts] = useState(0); // Scoreboard.refreshKey: bumps on every verdict
   const viewerRef = useRef<HTMLDivElement>(null);
-  const [scoreOpen, setScoreOpen] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
   const statusId = useId();
   const defaultOnion = useMemo(() => clampOnion([0, ONION_MAX - 1], frames.length), [frames.length]);
-  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length));
+  // Settings: colour-blind-safe colours cap Stack at ONION_MAX frames; off, Stack can mix every frame.
+  const [safeColors] = useState(loadSafeColors);
+  const onionMax = safeColors ? ONION_MAX : Math.max(2, frames.length);
+  const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length, onionMax));
+  const stackRange = clampOnion(onionRange, shownFrames.length, onionMax);
+  const colors = useMemo(
+    () => stackColors(shownFrames.length, [stackRange[0], stackRange[1]], vision, safeColors),
+    [shownFrames.length, stackRange[0], stackRange[1], vision, safeColors], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const [loopRange, setLoopRange] = useState<[number, number] | null>(null); // null: all frames
   const [fps, setFps] = useState<number>(MAX_BLINK_FPS);
   const viewCb = useRef(onViewChange);
@@ -414,12 +425,12 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
 
   return (
     <div
-      className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}
+      className={`${styles.body} ${!tools.has("mark") ? styles.noRight : ""}`}
       style={{ "--left-w": `${panelW.left}px`, "--right-w": `${panelW.right}px` } as CSSProperties}
     >
       <PlayTimeTracker />
       <PanelResizer side="left" width={panelW.left} onChange={(w) => setPanelW("left", w)} className={styles.resizer} />
-      {tools.has("mark") && scoreOpen && (
+      {tools.has("mark") && (
         <PanelResizer side="right" width={panelW.right} onChange={(w) => setPanelW("right", w)} className={styles.resizer} />
       )}
       <aside className={styles.left}>
@@ -448,6 +459,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               onClick={() => {
                 // Turning it on stops the blink: the colour composite is one still picture of all frames.
                 if (overlay !== "colorByTime") pause();
+                else setShift(null);
                 setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"));
                 emit("color-by-time-toggled", marks);
               }}
@@ -455,8 +467,26 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               className={styles.wide}
               data-tutorial-target="color-by-time"
             >
-              Color by time
+              Stack
             </button>
+            {(
+              <button
+                type="button"
+                aria-pressed={shift !== null}
+                onClick={() => {
+                  if (shift !== null) return setShift(null);
+                  pause();
+                  setOverlay("colorByTime");
+                  setShift({ vx: 0, vy: 0 });
+                }}
+                title="Move the frames back along a motion before stacking: a mover with that motion becomes one dot, stars become trails."
+                className={styles.wide}
+                style={{ marginTop: 6 }}
+              >
+                Shift
+              </button>
+            )}
+            {shift !== null && <MotionPad value={shift} onChange={setShift} />}
           </section>
         )}
         {tools.has("wavelength") && field.has?.exposures === true && (
@@ -533,13 +563,15 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               field={field}
               frames={shownFrames}
               vision={vision}
+              colors={colors}
               frameIndex={blink.index}
               marks={marks}
               onMark={placeMark}
               mode={mode}
               onInspect={inspectAt}
               overlay={overlay}
-              overlayFrames={onionRangeFrames(onionRange)}
+              overlayFrames={onionRangeFrames(stackRange)}
+              shift={shift}
               known={knownData}
               crosshair={pointer ? null : cursor}
               brightness={black}
@@ -607,25 +639,18 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
 
       {tools.has("mark") && (
         <aside className={styles.right} aria-label="Scoreboard panel">
-          <button type="button" className={styles.collapse} aria-expanded={scoreOpen} onClick={() => setScoreOpen((o) => !o)}>
-            {scoreOpen ? "click to minimize" : "▸"}
-          </button>
-          {scoreOpen && (
-            <>
-              <section className="panel" data-part="PNL-07 // ANSWER" data-tutorial-target="answer-panel">
-                <p className={styles.small}>
-                  {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
-                </p>
-                {markHint && <p className={styles.small}>{markHint}</p>}
-                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} submitter={picked?.submit} />
-                <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
-                  Clear marks
-                </button>
-              </section>
-              {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
-              {!showTitle && !picked && <Scoreboard slug={spot} refreshKey={verdicts} />}
-            </>
-          )}
+          <section className="panel" data-part="PNL-07 // ANSWER" data-tutorial-target="answer-panel">
+            <p className={styles.small}>
+              {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
+            </p>
+            {markHint && <p className={styles.small}>{markHint}</p>}
+            <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} submitter={picked?.submit} />
+            <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
+              Clear marks
+            </button>
+          </section>
+          {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
+          {!showTitle && !picked && <Scoreboard slug={spot} refreshKey={verdicts} />}
         </aside>
       )}
 
@@ -635,6 +660,8 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
           frames={shownFrames}
           thumbsFromFrames={shownFrames !== frames}
           vision={vision}
+          colors={colors}
+          onionMax={onionMax}
           index={blink.index}
           onIndexChange={(i) => {
             blink.setIndex(i);

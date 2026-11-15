@@ -8,9 +8,9 @@ export const ABOUT_SECTIONS: AboutSection[] = [
     heading: "How it works",
     paragraphs: [
       "SPHEREx takes pictures of the same patch of sky many times. Each picture is built from a short burst of exposures taken a few minutes apart.",
-      "Color by time stacks several moments on top of each other and gives each one its own colour. Things that stay still add up to white. Things that move leave a coloured trail, so a moving asteroid shows up as a row of coloured dots.",
+      "Stack puts several moments on top of each other and gives each one its own colour. Things that stay still add up to white. Things that move leave a coloured trail, so a moving asteroid shows up as a row of coloured dots.",
       "Show only changes removes everything that stayed the same, so only the moving parts remain.",
-      "For objects that are too faint to see in one picture, shift and stack helps. The computer tries many possible motions, shifts the pictures back along each one, and adds them up. For the right motion, a faint mover's light adds up while the background noise does not.",
+      "For objects that are too faint to see in one picture, shift and stack helps. The computer tries many possible motions, shifts the pictures back along each one, and adds them up. For the right motion, a faint mover's light adds up while the background noise does not. Press Shift beside Stack to try it by hand: drag the motion pad, and a mover with that motion turns into one white dot while the stars turn into trails.",
     ],
   },
   {
@@ -25,7 +25,7 @@ export const ABOUT_SECTIONS: AboutSection[] = [
   {
     heading: "What we found, honestly",
     paragraphs: [
-      "Asteroid (433) Eros is bright and easy to see. Its dots show clearly with Color by time.",
+      "Asteroid (433) Eros is bright and easy to see. Its dots show clearly with Stack.",
       "Makemake is a faint dwarf planet. We found it blind with shift and stack at 7.9 sigma, which beats a noise bar of 6.4 sigma. Its position matched JPL's prediction.",
       "Eris is much fainter. We found it blind at 6.9 sigma, against a noise bar of 5.9 sigma. That margin is small, only about 1 sigma. We report it as a narrow result, not a sure one.",
       "In an empty control field, where no moving objects are expected, nothing rose above the noise bar at 8.4 sigma. That is the result we wanted from a control field.",

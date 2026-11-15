@@ -109,7 +109,27 @@ export function colorByTimeRgb(grays: Float32Array[], colors: RGB[], gain = 2): 
   return out;
 }
 
-/** Color by time (onion_dark): additive mix on black, weights sum to white. RGBA bytes. */
+/** Frame moved by whole pixels: out(x, y) = g(x + dx, y + dy), 0 outside the grid. */
+export function shiftGray(g: Float32Array, w: number, h: number, dx: number, dy: number): Float32Array {
+  if (dx === 0 && dy === 0) return g;
+  const out = new Float32Array(g.length);
+  for (let y = 0; y < h; y++) {
+    const sy = y + dy;
+    if (sy < 0 || sy >= h) continue;
+    for (let x = 0; x < w; x++) {
+      const sx = x + dx;
+      if (sx >= 0 && sx < w) out[y * w + x] = g[sy * w + sx];
+    }
+  }
+  return out;
+}
+
+/** Whole-pixel offsets that follow a mover at v (px/day) from the reference time (shift-and-stack). */
+export function shiftOffsets(mjds: number[], refMjd: number, v: { vx: number; vy: number }): [number, number][] {
+  return mjds.map((m) => [Math.round(v.vx * (m - refMjd)), Math.round(v.vy * (m - refMjd))]);
+}
+
+/** Stack (onion_dark): additive mix on black, weights sum to white. RGBA bytes. */
 export function colorByTime(grays: Float32Array[], colors: RGB[], gain = 2): Uint8ClampedArray {
   return toRgba(colorByTimeRgb(grays, colors, gain));
 }

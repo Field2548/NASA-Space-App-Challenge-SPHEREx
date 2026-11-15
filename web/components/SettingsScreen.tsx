@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { DEFAULT_MUSIC_VOLUME, type MusicSettings, loadMusic, saveMusic } from "@/lib/music";
-import { loadVision, saveVision } from "@/lib/settings";
+import { loadSafeColors, loadVision, saveSafeColors, saveVision } from "@/lib/settings";
 import { loadUiSounds, saveUiSounds } from "@/lib/uiSound";
 import type { Vision } from "@/lib/types";
 import BackLink from "./BackLink";
@@ -13,11 +13,13 @@ import VisionPicker from "./VisionPicker";
 export default function SettingsScreen() {
   // Server and first client render show the defaults; the saved values are read after mount.
   const [vision, setVision] = useState<Vision>("normal");
+  const [safeColors, setSafeColors] = useState(true);
   const [music, setMusic] = useState<MusicSettings>({ on: true, volume: DEFAULT_MUSIC_VOLUME });
   const [sounds, setSounds] = useState(true);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage exists only on the client
     setVision(loadVision());
+    setSafeColors(loadSafeColors());
     setMusic(loadMusic());
     setSounds(loadUiSounds());
   }, []);
@@ -39,6 +41,18 @@ export default function SettingsScreen() {
           }}
         />
         <p>Changes the colours of your marks in the game so the order of frames stays easy to read.</p>
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={safeColors}
+            onChange={(e) => {
+              setSafeColors(e.target.checked);
+              saveSafeColors(e.target.checked);
+            }}
+          />
+          Colour-blind-safe Stack colours (Okabe-Ito, Stack mixes up to 7 frames)
+        </label>
+        <p>Turn it off to let Stack mix every frame; past 7 frames the colours run along a rainbow.</p>
       </section>
       <section className="panel" data-part="SET-02 // MUSIC">
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
