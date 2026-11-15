@@ -1,7 +1,7 @@
 "use client";
 // Timeline (BP 8.8): one toolbar (Previous / Play / Next, the current frame, Frames shown, Speed), the frame
 // clips with thumbnails, time-coloured borders and "marked" badges, and one labelled range lane per job under
-// the clips: "Blink" (the frames the blink plays) and, while Color by time is on, "Color" (the frames mixed
+// the clips: "Blink" (the frames the blink plays) and, while Stack is on, "Color" (the frames mixed
 // into the colour picture). Each lane is a two-thumb range aligned to the clips.
 // Keyboard: focus the frames track, then Left/Right step (wrapping round the ends), Home/End jump, Space
 // plays or pauses. A range thumb moves with Left/Right/Home/End.
@@ -16,7 +16,7 @@
 //   playing?: boolean; onTogglePlay?(): void            blink control (from useBlink)
 //   reducedMotion?: boolean                             auto-play is off; Play is disabled and says why
 //   controlsSlot?: ReactNode                            extra controls at the end of the toolbar
-//   onionRange?: [a, b]; onOnionRangeChange?(r)         inclusive array indices for Color by time (2..7 frames);
+//   onionRange?: [a, b]; onOnionRangeChange?(r)         inclusive array indices for Stack (2..7 frames);
 //                                                          FieldViewer overlayFrames = onionRangeFrames(range)
 //   onionActive?: boolean                               show the Color lane (default true when onionRange is given)
 //   loopRange?: [a, b]; onLoopRangeChange?(r)           inclusive array indices the blink plays (default all);
@@ -508,7 +508,7 @@ export default function Timeline(props: TimelineProps) {
         {onion && onOnionRangeChange && n > 1 && (
           <RangeLane
             name="Color"
-            hint={`Drag the ends to choose which frames Color by time mixes (2 to ${ONION_MAX}).`}
+            hint={`Drag the ends to choose which frames Stack mixes (2 to ${ONION_MAX}).`}
             range={onion}
             n={n}
             left={left}
@@ -517,8 +517,8 @@ export default function Timeline(props: TimelineProps) {
             maxSpan={ONION_MAX}
             tone="color"
             onChange={onOnionRangeChange}
-            startName="Color by time start frame"
-            endName="Color by time end frame"
+            startName="Stack start frame"
+            endName="Stack end frame"
           />
         )}
       </div>

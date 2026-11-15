@@ -12,8 +12,9 @@
 //   onMark(m: Mark): void            click in "mark" mode; x, y are integer pixels, tDays from frames[0].mjd
 //   mode: "mark" | "inspect"         shown in the cursor and the status line
 //   onInspect?(x, y): void           click in "inspect" mode
-//   overlay?: "none" | "colorByTime" Color by time replaces the single frame
-//   overlayFrames?: number[]         array indices for Color by time (default: first 7)
+//   overlay?: "none" | "colorByTime" Stack (colour by time) replaces the single frame
+//   overlayFrames?: number[]         array indices for Stack (default: first 7)
+//   shift?: {vx, vy} | null          Shift: px/day motion the stacked frames are moved back along
 //   brightness?: number              black point in S/N (default field.stretch.black_sigma)
 //   morphology?: MorphSettings[]     ordered steps (first to last): erosion, dilation, opening ... on the frames before the stretch (default Off)
 //   curve?: Curve                    tone curve after the stretch (default identity)
@@ -27,7 +28,7 @@
 
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
-import { colorByTime, makeSharedStretch, toImageData } from "@/lib/imaging";
+import { colorByTime, makeSharedStretch, shiftGray, shiftOffsets, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB, Vision } from "@/lib/types";
 import { pixelToSky } from "@/lib/wcs";
 import { timeColors } from "@/lib/palettes";
@@ -68,6 +69,8 @@ export interface FieldViewerProps {
   known?: KnownOverlay | null;
   /** Spectrum circle and its background ring (native pixels), drawn so the player sees what is measured. */
   aperture?: { x: number; y: number; r: number; rIn: number; rOut: number } | null;
+  /** Shift (with Stack on): move each stacked frame back along this motion (px/day), relative to the shown frame. */
+  shift?: { vx: number; vy: number } | null;
 }
 
 /** Largest integer scale that fits the box, at least 1. */
@@ -136,14 +139,24 @@ export default function FieldViewer(props: FieldViewerProps) {
     const st = makeSharedStretch(shownData, points.base);
     return shownData.map((f) => applyCurve(st(f), curve));
   }, [shownData, points, curve]);
+  const shift = overlay === "colorByTime" ? props.shift ?? null : null;
+  const refMjd = meta?.mjd ?? 0;
+  // Whole-pixel offset per frame index (Shift), relative to the shown frame so its marks stay put.
+  const offsets = useMemo(() => {
+    if (!shift) return null;
+    return shiftOffsets(field.frames.map((f) => f.mjd), refMjd, shift);
+  }, [shift, field.frames, refMjd]);
   const overlayRgba = useMemo(() => {
     if (overlay !== "colorByTime" || overlayFrames.length === 0) return null;
     const st = makeSharedStretch(shownData, points.overlay);
     return colorByTime(
-      overlayFrames.map((i) => applyCurve(st(shownData[i]), curve)),
+      overlayFrames.map((i) => {
+        const g = applyCurve(st(shownData[i]), curve);
+        return offsets ? shiftGray(g, W, H, offsets[i][0], offsets[i][1]) : g;
+      }),
       overlayFrames.map((i) => colors[i]),
     );
-  }, [overlay, overlayFrames, shownData, points, colors, curve]);
+  }, [overlay, overlayFrames, shownData, points, colors, curve, offsets, W, H]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -198,7 +211,7 @@ export default function FieldViewer(props: FieldViewerProps) {
   }
 
   const frameNo = (i: number) => field.frames.findIndex((f) => f.i === i);
-  const label = `Frame ${k + 1} of ${n}, ${meta ? formatUtc(meta.utc) : ""}${overlay === "colorByTime" ? ", Color by time" : ""}`;
+  const label = `Frame ${k + 1} of ${n}, ${meta ? formatUtc(meta.utc) : ""}${overlay === "colorByTime" ? (shift ? ", Stack with Shift" : ", Stack") : ""}`;
 
   return (
     <div className={styles.root} data-mode={mode}>
@@ -217,7 +230,8 @@ export default function FieldViewer(props: FieldViewerProps) {
           <span>no frames</span>
         )}
         {field.data.precision === "png8" && <span className={styles.badge}>preview quality</span>}
-        {overlay === "colorByTime" && <span>Color by time: {overlayFrames.length} frames</span>}
+        {overlay === "colorByTime" && <span>Stack: {overlayFrames.length} frames</span>}
+        {shift && <span>Shift {Math.hypot(shift.vx, shift.vy).toFixed(1)} px/day</span>}
       </div>
 
       <div className={styles.stage}>
@@ -239,8 +253,10 @@ export default function FieldViewer(props: FieldViewerProps) {
           <svg className={styles.marks} width={W * scale} height={H * scale} aria-hidden="true">
             {marks.map((m) => {
               const j = frameNo(m.frame);
-              const cx = (m.x + 0.5) * scale;
-              const cy = (m.y + 0.5) * scale;
+              // Under Shift a mark sits where its frame was moved to (frame pixel minus the offset).
+              const off = offsets && j >= 0 ? offsets[j] : [0, 0];
+              const cx = (m.x - off[0] + 0.5) * scale;
+              const cy = (m.y - off[1] + 0.5) * scale;
               const r = Math.max(4, scale * 1.5);
               const current = overlay === "colorByTime" || j === k;
               const c = j >= 0 && colors[j] ? rgbCss(colors[j]) : "var(--cyan)";

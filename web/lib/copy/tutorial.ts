@@ -94,13 +94,13 @@ export const TUTORIAL: TutorialLevel[] = [
     steps: [
       {
         id: "l1-color",
-        text: "Press Color by time. Each picture gets its own color and they are stacked into one. Still things turn white. A mover leaves a trail of colored dots.",
+        text: "Press Stack. Each picture gets its own color and they are stacked into one. Still things turn white. A mover leaves a trail of colored dots.",
         target: "color-by-time",
         doneWhen: "color-by-time-toggled",
       },
       {
         id: "l1-color-range",
-        text: "The Color bar chooses which pictures are mixed (2 or more). Drag its ends to try other sets. Then press Color by time again to go back to single pictures.",
+        text: "The Color bar chooses which pictures are mixed (2 or more). Drag its ends to try other sets. Then press Stack again to go back to single pictures.",
         target: "color-range",
         doneWhen: "color-by-time-toggled",
       },

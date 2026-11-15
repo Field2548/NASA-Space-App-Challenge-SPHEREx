@@ -8,8 +8,26 @@ import {
   onlyChanges,
   paperModeRgb,
   sharedWhite,
+  shiftGray,
+  shiftOffsets,
 } from "./imaging";
 import type { RGB } from "./types";
+
+describe("Shift (shift-and-stack)", () => {
+  it("lines a mover up on one pixel and leaves edges black", () => {
+    // 7 x 1 strip; a mover at x = 1 + 2 * t over t = 0, 1, 2 days.
+    const frames = [0, 1, 2].map((t) => {
+      const g = new Float32Array(7);
+      g[1 + 2 * t] = 1;
+      return g;
+    });
+    const offs = shiftOffsets([10, 11, 12], 10, { vx: 2, vy: 0 });
+    expect(offs).toEqual([[0, 0], [2, 0], [4, 0]]);
+    const shifted = frames.map((g, i) => shiftGray(g, 7, 1, offs[i][0], offs[i][1]));
+    for (const g of shifted) expect(Array.from(g)).toEqual([0, 1, 0, 0, 0, 0, 0]);
+    expect(Array.from(shiftGray(Float32Array.from([1, 2, 3]), 3, 1, -1, 0))).toEqual([0, 1, 2]);
+  });
+});
 import ref from "./testdata/imaging_ref.json";
 
 // Reference values come from motion_frames.py itself (testdata/gen_imaging_ref.py).
