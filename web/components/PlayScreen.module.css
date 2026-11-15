@@ -29,11 +29,6 @@
   color: var(--cyan);
 }
 
-.auth button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .body {
   display: grid;
   grid-template-columns: 220px 1fr 240px;

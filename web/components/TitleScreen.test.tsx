@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_NAME } from "@/lib/brand";
 import TitleScreen, { starfield } from "./TitleScreen";
@@ -15,27 +15,18 @@ vi.mock("next/link", () => ({
 afterEach(cleanup);
 
 describe("TitleScreen", () => {
-  it("has one h1 with the project name and the three buttons", () => {
+  it("has one h1 with the project name, two main buttons and Settings and Leaderboard", () => {
     render(<TitleScreen />);
     const h1s = screen.getAllByRole("heading", { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0].textContent).toBe(PROJECT_NAME);
-    expect(screen.getByRole("link", { name: "Start training" }).getAttribute("href")).toBe("/tutorial");
-    expect(screen.queryByRole("link", { name: "Skip to game" })).toBeNull(); // removed; Stages is the way in
-    expect(screen.getByRole("link", { name: "Stages" }).getAttribute("href")).toBe("/stages");
+    expect(screen.getByRole("link", { name: "Game stages" }).getAttribute("href")).toBe("/stages");
     expect(screen.getByRole("link", { name: "Explore the sky" }).getAttribute("href")).toBe("/map");
-    const login = screen.getByRole("button", { name: "Log in" }) as HTMLButtonElement;
-    expect(login.disabled).toBe(false);
-  });
-
-  it("Log in opens the sign-in dialog", () => {
-    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
-      this.setAttribute("open", "");
-    };
-    render(<TitleScreen />);
-    expect(document.querySelector("dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
-    expect(document.querySelector("dialog")?.open).toBe(true);
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+    expect(screen.getByRole("link", { name: "Leaderboard" }).getAttribute("href")).toBe("/leaderboard");
+    expect(screen.queryByRole("link", { name: "Start training" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Log in" })).toBeNull(); // the account control is in the layout
+    expect(screen.getAllByRole("link")).toHaveLength(4);
   });
 
   it("draws a deterministic ASCII starfield hidden from screen readers", () => {

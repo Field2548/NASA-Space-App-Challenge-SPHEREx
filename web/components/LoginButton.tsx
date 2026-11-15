@@ -8,7 +8,7 @@ import { loadGuest, saveGuest } from "@/lib/guest";
 import { getSupabaseBrowser } from "@/lib/supabase";
 import { AuthDialog } from "./AuthDialog";
 
-async function sessionName(): Promise<string | null> {
+export async function sessionName(): Promise<string | null> {
   const sb = getSupabaseBrowser();
   if (!sb) return null;
   try {
