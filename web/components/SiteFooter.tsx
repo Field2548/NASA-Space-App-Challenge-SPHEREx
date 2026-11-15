@@ -16,6 +16,10 @@ export default function SiteFooter() {
       <Link href="/about">About</Link>
       <Link href="/credits">Credits</Link>
       <StatusBadge />
+      <a href="https://github.com/Field2548/NASA-Space-App-Challenge-SPHEREx/tree/web" rel="noreferrer">
+        Source code: GPL-3.0
+      </a>
+      <Link href="/licence">Licence</Link>
     </footer>
   );
 }

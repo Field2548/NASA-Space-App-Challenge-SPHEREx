@@ -2,10 +2,10 @@
 // headings, paragraphs, bullet lists, block quotes, pipe tables, and inline bold, code, links and
 // bare URLs. Server component; the page reads the file at build time.
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import styles from "./InfoPage.module.css";
 
-export const CREDITS_URL = "https://github.com/Field2548/NASA-Space-App-Challenge-SPHEREx/blob/main/CREDITS.md";
+export const CREDITS_URL = "https://github.com/Field2548/NASA-Space-App-Challenge-SPHEREx/blob/web/CREDITS.md";
 const REPO_BLOB = "https://github.com/Field2548/NASA-Space-App-Challenge-SPHEREx/blob/main/";
 
 export type Block =
@@ -96,7 +96,7 @@ export function inline(text: string): ReactNode[] {
 }
 
 /** Blocks to HTML. The first heading is the page's one h1; every later one is an h2 or h3. */
-export function CreditsBlocks({ blocks }: { blocks: Block[] }) {
+export function CreditsBlocks({ blocks, after }: { blocks: Block[]; after?: ReactNode }) {
   const firstH1 = blocks.findIndex((b) => b.kind === "heading" && b.level === 1);
   return (
     <>
@@ -104,7 +104,12 @@ export function CreditsBlocks({ blocks }: { blocks: Block[] }) {
         if (b.kind === "heading") {
           const level = b.level === 1 && i !== firstH1 ? 2 : b.level;
           const H = `h${level}` as "h1" | "h2" | "h3";
-          return <H key={i}>{inline(b.text)}</H>;
+          return (
+            <Fragment key={i}>
+              <H>{inline(b.text)}</H>
+              {i === firstH1 ? after : null}
+            </Fragment>
+          );
         }
         if (b.kind === "paragraph") return <p key={i}>{inline(b.text)}</p>;
         if (b.kind === "quote") return <blockquote key={i}>{inline(b.text)}</blockquote>;
@@ -146,7 +151,7 @@ export function CreditsBlocks({ blocks }: { blocks: Block[] }) {
 }
 
 /** The credits page: the parsed file, or a short message with a GitHub link when it is missing. */
-export default function CreditsPage({ markdown }: { markdown: string | null }) {
+export default function CreditsPage({ markdown, intro }: { markdown: string | null; intro?: ReactNode }) {
   const blocks = markdown ? parseMarkdown(markdown) : [];
   const hasH1 = blocks.some((b) => b.kind === "heading" && b.level === 1);
   return (
@@ -154,11 +159,13 @@ export default function CreditsPage({ markdown }: { markdown: string | null }) {
       {markdown && blocks.length > 0 ? (
         <>
           {!hasH1 && <h1>Credits</h1>}
-          <CreditsBlocks blocks={blocks} />
+          {!hasH1 && intro}
+          <CreditsBlocks blocks={blocks} after={hasH1 ? intro : undefined} />
         </>
       ) : (
         <>
           <h1>Credits</h1>
+          {intro}
           <p>
             The credits list is not available here. Read it on <a href={CREDITS_URL}>GitHub</a>.
           </p>

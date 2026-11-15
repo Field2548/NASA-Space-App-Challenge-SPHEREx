@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       "./public/fields/*/field.json",
       "./public/leaderboard-snapshot.json",
     ],
+    "/credits": ["./content/**"],
+    "/licence": ["./content/**"],
   },
 };
 
