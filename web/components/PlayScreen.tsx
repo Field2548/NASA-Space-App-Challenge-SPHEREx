@@ -25,7 +25,7 @@
 // Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools?; initialView?; onViewChange?; knownLocal? }
 
 import Link from "next/link";
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
@@ -38,6 +38,7 @@ import BrightnessSlider from "./BrightnessSlider";
 import FrameContext from "./FrameContext";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import InspectPanel from "./InspectPanel";
+import PanelResizer, { usePanelWidths } from "./PanelResizer";
 import { InspectPopup } from "./InspectPopup";
 import MorphologyControl from "./MorphologyControl";
 import PatchPlay, { type PickedHooks } from "./PatchPlay";
@@ -390,9 +391,17 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   }, [toggleInspect, pause]);
 
   const png8 = field.data.precision === "png8";
+  const [panelW, setPanelW] = usePanelWidths();
 
   return (
-    <div className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}>
+    <div
+      className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}
+      style={{ "--left-w": `${panelW.left}px`, "--right-w": `${panelW.right}px` } as CSSProperties}
+    >
+      <PanelResizer side="left" width={panelW.left} onChange={(w) => setPanelW("left", w)} className={styles.resizer} />
+      {tools.has("mark") && scoreOpen && (
+        <PanelResizer side="right" width={panelW.right} onChange={(w) => setPanelW("right", w)} className={styles.resizer} />
+      )}
       <aside className={styles.left}>
         {canInspect && (
           <section className="panel" data-part="Inspect">
