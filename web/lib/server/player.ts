@@ -108,6 +108,22 @@ function isMissingFunction(error: { code?: string; message?: string }): boolean 
   );
 }
 
+/**
+ * The all-time rank as the global board shows it. The board inserts the bot above every human whose
+ * score is lower than the bot's (mergeBot), so such a player is one place further down than the
+ * database rank. Same rule as mergeBot: +1 when the bot's total is strictly greater than the points.
+ * With no rank, or when the bot's score cannot be worked out, the database rank is returned as is.
+ */
+async function displayedRankAll(rank: number | null, points: number, root: string): Promise<number | null> {
+  if (rank === null) return null;
+  try {
+    const bot = await botScore(undefined, root);
+    return bot.score > points ? rank + 1 : rank;
+  } catch {
+    return rank;
+  }
+}
+
 /** The answer for one display name. Throws ApiFail (400, 404, 503) as the contract says. */
 export async function answerPlayer(
   request: Request,
@@ -153,6 +169,7 @@ export async function answerPlayer(
 
   const solved = Array.isArray(row.spots_solved) ? row.spots_solved.filter((s): s is string => typeof s === "string") : [];
   const progress = progressFrom(await readySpots(root), solved);
+  const points = num(row.points);
   const classifications = num(row.classifications);
   const correct = num(row.correct);
   return {
@@ -162,9 +179,9 @@ export async function answerPlayer(
     country: typeof row.country === "string" ? row.country : null,
     member_since: isoOrNull(row.member_since),
     last_active: isoOrNull(row.last_active),
-    points: num(row.points),
+    points,
     points_week: num(row.points_week),
-    rank_all: numOrNull(row.rank_all),
+    rank_all: await displayedRankAll(numOrNull(row.rank_all), points, root),
     rank_week: numOrNull(row.rank_week),
     classifications,
     correct,

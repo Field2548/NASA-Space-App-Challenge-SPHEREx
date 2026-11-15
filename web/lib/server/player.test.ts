@@ -23,6 +23,7 @@ vi.mock("@/lib/server/db", async (original) => ({
 }));
 
 import { GET } from "@/app/api/player/route";
+import * as botModule from "@/lib/server/bot";
 import { BOT_NAME, botScore } from "@/lib/server/bot";
 import { progressFrom } from "@/lib/server/player";
 import { resetRateLimit } from "@/lib/server/rateLimit";
@@ -158,6 +159,37 @@ describe("GET /api/player", () => {
     let last = 200;
     for (let i = 0; i < 61; i++) last = (await GET(get("/api/player?name=nova"))).status;
     expect(last).toBe(429);
+  });
+});
+
+describe("rank_all counts the bot row like the all-time board", () => {
+  const rankFor = async (points: number) => {
+    state.reply = { data: [{ ...STATS, points, rank_all: 3 }], error: null };
+    return (await (await GET(get("/api/player?name=nova"))).json()).rank_all;
+  };
+
+  it("adds 1 when the bot has strictly more points, and nothing when equal or fewer", async () => {
+    const bot = (await botScore()).score;
+    expect(bot).toBeGreaterThan(0);
+    expect(await rankFor(bot - 1)).toBe(4);
+    expect(await rankFor(bot)).toBe(3);
+    expect(await rankFor(bot + 1)).toBe(3);
+  });
+
+  it("leaves a null rank null and rank_week alone", async () => {
+    state.reply = { data: [{ ...STATS, points: 0, rank_all: null, rank_week: 2 }], error: null };
+    const body = await (await GET(get("/api/player?name=nova"))).json();
+    expect(body.rank_all).toBeNull();
+    expect(body.rank_week).toBe(2);
+  });
+
+  it("leaves the rank unchanged when the bot is unavailable", async () => {
+    const spy = vi.spyOn(botModule, "botScore").mockRejectedValue(new Error("no answer keys"));
+    try {
+      expect(await rankFor(0)).toBe(3);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
