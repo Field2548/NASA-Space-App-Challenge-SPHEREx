@@ -15,6 +15,7 @@
 --   probe_c  TH  hektor known 50, 10 days ago only.
 --   probe_d  --  eros nothing_correct 20 (no country).
 --   probe_e  --  profile, no finds.
+--   probe_f  --  eros wrong answer 0 points (a zero-point player who is still listed on the boards).
 
 begin;
 
@@ -33,7 +34,8 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('0000000b-0000-4000-8000-00000000000b', 'v2-b@example.invalid', '{"display_name": "probe_b"}'),
   ('0000000c-0000-4000-8000-00000000000c', 'v2-c@example.invalid', '{"display_name": "probe_c"}'),
   ('0000000d-0000-4000-8000-00000000000d', 'v2-d@example.invalid', '{"display_name": "probe_d"}'),
-  ('0000000e-0000-4000-8000-00000000000e', 'v2-e@example.invalid', '{"display_name": "probe_e"}');
+  ('0000000e-0000-4000-8000-00000000000e', 'v2-e@example.invalid', '{"display_name": "probe_e"}'),
+  ('0000000f-0000-4000-8000-00000000000f', 'v2-f@example.invalid', '{"display_name": "probe_f"}');
 
 update public.profiles set country = 'TH' where display_name in ('probe_a', 'probe_c');
 update public.profiles set country = 'US' where display_name = 'probe_b';
@@ -50,6 +52,8 @@ select * from public.record_find('0000000b-0000-4000-8000-00000000000b', 'hektor
 select * from public.record_find('0000000c-0000-4000-8000-00000000000c', 'hektor', 1, 1, 1, 1, 1, 1, 1, 'known', 'x', 'object:h2', 50, 0, false);
 select * from public.record_find('0000000d-0000-4000-8000-00000000000d', 'eros', 1, 1, 1, null, null, null, null, 'nothing_correct', null, 'nothing', 20, 0, false);
 
+select * from public.record_find('0000000f-0000-4000-8000-00000000000f', 'eros', 1, 1, 1, 1, 1, 1, 1, 'nothing_wrong', null, null, 0, 0, false);
+
 -- Move some rows into the past (the probe runs as the owner, which may update finds).
 update public.finds set created_at = now() - interval '10 days'
   where spot_slug = 'eris' or user_id = '0000000c-0000-4000-8000-00000000000c';
@@ -58,10 +62,10 @@ insert into public.patch_solves (patch_id, user_id, ra, dec, created_at) values
   ('p11-1', '0000000a-0000-4000-8000-00000000000a', 1, 1, now()),
   ('p11-2', '0000000a-0000-4000-8000-00000000000a', 1, 1, now() - interval '3 days');
 
-select pg_temp.expect('fixture: the 5 profiles exist with countries',
+select pg_temp.expect('fixture: the 6 profiles exist with countries',
   (select string_agg(display_name || ':' || coalesce(country, '-'), ',' order by display_name)
      from public.profiles where display_name like 'probe\_%'),
-  'probe_a:TH,probe_b:US,probe_c:TH,probe_d:-,probe_e:-');
+  'probe_a:TH,probe_b:US,probe_c:TH,probe_d:-,probe_e:-,probe_f:-');
 
 -- ---------------------------------------------------------------- country column
 
@@ -82,17 +86,17 @@ end $$;
 
 -- ---------------------------------------------------------------- boards
 
--- All time, all stages: A 550, B 100, C 50, D 20.
+-- All time, all stages: A 550, B 100, C 50, D 20, F 0 (a wrong answer: listed, with accuracy 0).
 select pg_temp.expect('leaderboard_v2 all time, global',
   (select string_agg(display_name || ':' || rank || ':' || score || ':' || accuracy || ':' || finds, ' ' order by rank)
      from public.leaderboard_v2()),
-  'probe_a:1:550:0.750:4 probe_b:2:100:0.500:2 probe_c:3:50:1.000:1 probe_d:4:20:1.000:1');
+  'probe_a:1:550:0.750:4 probe_b:2:100:0.500:2 probe_c:3:50:1.000:1 probe_d:4:20:1.000:1 probe_f:5:0:0.000:1');
 
 -- The last 7 days: C (10 days ago) and A's old find drop out.
 select pg_temp.expect('leaderboard_v2 weekly window',
   (select string_agg(display_name || ':' || rank || ':' || score || ':' || accuracy || ':' || finds, ' ' order by rank)
      from public.leaderboard_v2(null, now() - interval '7 days')),
-  'probe_a:1:250:0.667:3 probe_b:2:100:0.500:2 probe_d:3:20:1.000:1');
+  'probe_a:1:250:0.667:3 probe_b:2:100:0.500:2 probe_d:3:20:1.000:1 probe_f:4:0:0.000:1');
 
 select pg_temp.expect('leaderboard_v2 local TH, all time (ranks restart inside the country)',
   (select string_agg(display_name || ':' || rank || ':' || score, ' ' order by rank)
@@ -107,7 +111,7 @@ select pg_temp.expect('leaderboard_v2 local, lower-case code and weekly window',
 select pg_temp.expect('leaderboard_v2 for one stage (finds = counted submissions there)',
   (select string_agg(display_name || ':' || score || ':' || finds, ' ' order by rank)
      from public.leaderboard_v2('eros')),
-  'probe_a:150:2 probe_b:100:1 probe_d:20:1');
+  'probe_a:150:2 probe_b:100:1 probe_d:20:1 probe_f:0:1');
 
 select pg_temp.expect('leaderboard_v2 for a country with nobody is empty',
   (select count(*)::text from public.leaderboard_v2(null, null, 'FR')), '0');
@@ -132,7 +136,7 @@ select pg_temp.expect('leaderboard_countries for one stage',
 -- The old function is untouched and still ranks the same all-time board.
 select pg_temp.expect('the old leaderboard() still answers',
   (select string_agg(display_name || ':' || rank || ':' || score, ' ' order by rank) from public.leaderboard()),
-  'probe_a:1:550 probe_b:2:100 probe_c:3:50 probe_d:4:20');
+  'probe_a:1:550 probe_b:2:100 probe_c:3:50 probe_d:4:20 probe_f:5:0');
 
 -- The helper that carries user ids is not callable by players.
 do $$
@@ -150,25 +154,39 @@ begin
      or not has_function_privilege('authenticated', 'public.set_my_country(text)', 'execute') then
     raise exception 'FAIL: set_my_country must be callable by authenticated only';
   end if;
-  raise notice 'ok: grants (ranking helper closed; reads open; set_my_country authenticated only)';
+  if has_function_privilege('anon', 'public.player_spots(text)', 'execute')
+     or has_function_privilege('authenticated', 'public.player_spots(text)', 'execute')
+     or has_function_privilege('public', 'public.player_spots(text)', 'execute')
+     or not has_function_privilege('service_role', 'public.player_spots(text)', 'execute') then
+    raise exception 'FAIL: player_spots must be callable by service_role only';
+  end if;
+  raise notice 'ok: grants (ranking helper closed; reads open; set_my_country authenticated only; player_spots service_role only)';
 end $$;
 
 -- ---------------------------------------------------------------- player_stats
 
 select pg_temp.expect('player_stats for probe_a (case-insensitive name)',
   (select concat_ws(' ', display_name, is_me, country, points, points_week, rank_all, rank_week,
-                    classifications, correct, first_finds, patches_solved, active_days, spots_solved)
+                    classifications, correct, first_finds, patches_solved, active_days)
      from public.player_stats('PROBE_A')),
-  'probe_a f TH 550 250 1 1 4 3 3 2 3 {eris,eros,hektor}');
+  'probe_a f TH 550 250 1 1 4 3 3 2 3');
 
-select pg_temp.expect('player_stats for probe_a: member_since and last_active are set, last_active is now',
-  (select (member_since is not null and last_active = now())::text from public.player_stats('probe_a')), 'true');
+-- Dates are day-level: midnight UTC, never the exact moment.
+select pg_temp.expect('player_stats dates are truncated to the UTC day',
+  (select (member_since = date_trunc('day', member_since) and last_active = date_trunc('day', now() at time zone 'UTC') at time zone 'UTC'
+           and extract(timezone from member_since) = 0)::text
+     from public.player_stats('probe_a')), 'true');
+select pg_temp.expect('player_stats: last_active is the UTC day of the newest find or patch solve',
+  (select (last_active = date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')::text from public.player_stats('probe_a')), 'true');
+select pg_temp.expect('player_stats: last_active for a player who played 10 days ago',
+  (select (last_active = date_trunc('day', (now() - interval '10 days') at time zone 'UTC') at time zone 'UTC')::text
+     from public.player_stats('probe_c')), 'true');
 
 select pg_temp.expect('player_stats for probe_b',
   (select concat_ws(' ', country, points, points_week, rank_all, rank_week, classifications, correct,
-                    first_finds, patches_solved, active_days, spots_solved)
+                    first_finds, patches_solved, active_days)
      from public.player_stats('probe_b')),
-  'US 100 100 2 2 2 1 0 0 1 {eros}');
+  'US 100 100 2 2 2 1 0 0 1');
 
 -- C played only 10 days ago: a rank for all time, none for the week.
 select pg_temp.expect('player_stats for probe_c: no weekly rank without weekly points',
@@ -178,10 +196,18 @@ select pg_temp.expect('player_stats for probe_c: no weekly rank without weekly p
 
 select pg_temp.expect('player_stats for a player with no finds',
   (select concat_ws(' ', points, coalesce(rank_all::text, 'null'), coalesce(rank_week::text, 'null'),
-                    classifications, correct, patches_solved, active_days, coalesce(last_active::text, 'null'),
-                    spots_solved)
+                    classifications, correct, patches_solved, active_days, coalesce(last_active::text, 'null'))
      from public.player_stats('probe_e')),
-  '0 null null 0 0 0 0 null {}');
+  '0 null null 0 0 0 0 null');
+
+-- A zero-point player is on both boards (any find in the period), so their ranks equal the boards' ranks.
+select pg_temp.expect('player_stats for probe_f (zero points): ranks equal the boards, not null',
+  (select concat_ws(' ', points, points_week, rank_all, rank_week) from public.player_stats('probe_f')),
+  '0 0 5 4');
+select pg_temp.expect('probe_f is listed with those ranks on leaderboard_v2',
+  (select (select l.rank from public.leaderboard_v2(null, null, null, 200) l where l.display_name = 'probe_f')::text
+          || ' ' || (select l.rank from public.leaderboard_v2(null, now() - interval '7 days', null, 200) l where l.display_name = 'probe_f')::text),
+  '5 4');
 
 select pg_temp.expect('player_stats for an unknown name returns nothing',
   (select count(*)::text from public.player_stats('nobody_here')), '0');
@@ -204,6 +230,15 @@ begin
   raise notice 'ok: player_stats ranks equal leaderboard_v2 ranks for every probe player';
 end $$;
 
+-- player_stats is public, so it must not say which stages a player solved.
+select pg_temp.expect('player_stats has no column with spot slugs',
+  (select count(*)::text from pg_proc p, unnest(p.proargnames) a
+     where p.proname = 'player_stats' and p.pronamespace = 'public'::regnamespace and a ~ '(spot|slug|stage)'), '0');
+select pg_temp.expect('player_spots lists the solved slugs (owner call)',
+  (select array_to_string(public.player_spots('PROBE_A'), ',')), 'eris,eros,hektor');
+select pg_temp.expect('player_spots: none for a player with nothing, and for an unknown name',
+  (select array_length(public.player_spots('probe_e'), 1) is null and array_length(public.player_spots('nobody_here'), 1) is null)::text, 'true');
+
 -- ---------------------------------------------------------------- roles: guests, callers, set_my_country
 
 do $$
@@ -213,7 +248,7 @@ begin
   -- A guest (anon) can read every public function and sees nobody as "me".
   set local role anon;
   select string_agg(display_name, ',' order by rank) into r from public.leaderboard_v2();
-  if r is distinct from 'probe_a,probe_b,probe_c,probe_d' then raise exception 'FAIL: anon leaderboard_v2: %', r; end if;
+  if r is distinct from 'probe_a,probe_b,probe_c,probe_d,probe_f' then raise exception 'FAIL: anon leaderboard_v2: %', r; end if;
   if exists (select 1 from public.leaderboard_v2() where is_me) then raise exception 'FAIL: a guest has a "me" row'; end if;
   if (select count(*) from public.leaderboard_countries()) <> 2 then raise exception 'FAIL: anon leaderboard_countries'; end if;
   if (select is_me from public.player_stats('probe_a')) then raise exception 'FAIL: a guest is "me" in player_stats'; end if;
@@ -225,6 +260,11 @@ begin
   begin
     perform * from public.leaderboard_ranked(null, null, null);
     raise exception 'FAIL: anon called leaderboard_ranked';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.player_spots('probe_a');
+    raise exception 'FAIL: anon called player_spots';
   exception when insufficient_privilege then null;
   end;
   begin
@@ -244,6 +284,12 @@ begin
   set local role authenticated;
   perform set_config('request.jwt.claim.sub', '0000000b-0000-4000-8000-00000000000b', true);
   perform set_config('request.jwt.claims', '{"sub": "0000000b-0000-4000-8000-00000000000b", "role": "authenticated"}', true);
+
+  begin
+    perform public.player_spots('probe_a');
+    raise exception 'FAIL: authenticated called player_spots';
+  exception when insufficient_privilege then null;
+  end;
 
   select string_agg(display_name || ':' || is_me, ',' order by rank) into r from public.leaderboard_v2(null, null, null, 1);
   if r is distinct from 'probe_a:false,probe_b:true' then raise exception 'FAIL: limit 1 plus my own row: %', r; end if;
@@ -288,6 +334,16 @@ begin
     raise exception 'FAIL: set_my_country changed a row for a caller with no user id';
   end if;
   raise notice 'ok: set_my_country sets only the caller''s own row, rejects bad codes and does nothing without a user';
+end $$;
+
+do $$
+begin
+  set local role service_role;
+  if array_to_string(public.player_spots('probe_b'), ',') is distinct from 'eros' then
+    raise exception 'FAIL: service_role cannot read player_spots';
+  end if;
+  reset role;
+  raise notice 'ok: service_role can call player_spots';
 end $$;
 
 -- The board for the new country now shows B (local boards follow the profile country).

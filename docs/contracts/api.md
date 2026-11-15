@@ -267,7 +267,7 @@ Inspect answers in full by default, in a round too (lock back with `INSPECT_LOCK
 - Top 50 rows. `accuracy` is 0 to 1, or `null` with no counted submissions. `me` is absent for guests.
 - Accuracy counts only `counted` rows: a repeat of a find the player already has, a practice answer, and quick-look marks do not move it. Every wrong answer counts.
 - The bot row is scored from the bot's candidates that match known objects, and is always labelled as a bot.
-- **1.4 (spoiler fix):** with `scope=spot`, the bot row is present only when the caller's signed unlock cookie covers that spot (section 2); otherwise `rows` holds the humans only. Reason: the bot's score on one spot says whether something moves there (0 on the control field). `scope=all` always has it. Every response is `Cache-Control: private, no-store`. Display names `bot` and `Shift-and-stack bot` (any case) are reserved; the database refuses them.
+- **1.4 (spoiler fix):** with `scope=spot`, the bot row is present only when the caller's signed unlock cookie covers that spot (section 2); otherwise `rows` holds the humans only. Reason: the bot's score on one spot says whether something moves there. `scope=all` always has it. Every response is `Cache-Control: private, no-store`. Display names `bot` and `Shift-and-stack bot` (any case) are reserved; the database refuses them.
 - The route calls the `leaderboard` RPC **with the caller's token** (anon key client plus the caller's `Authorization` header), never with the service role: the function uses `auth.uid()` for `is_me` and `me`.
 - `source` is `db`, or `snapshot` when Supabase is missing or down: the route then serves `web/public/leaderboard-snapshot.json` (same shape) with status 200.
 
@@ -288,7 +288,10 @@ Extra query parameters, all optional: `period=all|week` (default `all`; `week` =
 - `countries`: present only with `region=local`: every country with at least one ranked player in the chosen period and scope, with the player count, sorted by `players` descending then `code`.
 - `finds` (rows and `me`): counted submissions in the chosen period and scope. May be absent (old function, snapshot); the bot row has `finds: null`.
 - The bot row appears only on the global all-time board (with the same unlock rule as before for `scope=spot`), never on a weekly or local board. Weekly and local boards keep the database's ranks (equal scores share a rank).
-- Local = players whose profile country equals `country`. A logged-in caller's detected country is saved (best effort, after the response, never affecting it) with `set_my_country` and the caller's token.
+- Local = players whose profile country equals `country`. A logged-in caller's detected country is saved (best effort, after the response, never affecting it) with `set_my_country` and the caller's token, only on `region=local` requests (and after a saved answer, `POST /api/check` / `/api/complete`); global boards write nothing.
+- The country is taken from the host's IP-country header, but a logged-in player can also set their own country through `set_my_country`, so local boards are a convenience, not proof of location.
+- The default board (`period=all&region=global`): when `leaderboard_v2` fails with any database error other than a timeout, the route tries the old `leaderboard` function before the snapshot; a timeout goes straight to the snapshot (the worst case stays one 5 s wait).
+- Migration `20261117000000_leaderboard_v2.sql` adds an index on `finds(created_at)` without `concurrently` (fine at the current table size, the table is small).
 
 ## 7a. `GET /api/player?name=<display name>`
 
@@ -296,7 +299,7 @@ One player's public numbers by exact display name (case-insensitive; names are u
 
 ```json
 { "name": "nova", "is_bot": false, "is_me": false, "country": "TH",
-  "member_since": "2026-11-15T03:10:00.000Z", "last_active": "2026-11-15T09:28:00.000Z",
+  "member_since": "2026-11-15T00:00:00.000Z", "last_active": "2026-11-15T00:00:00.000Z",
   "points": 1850, "points_week": 600, "rank_all": 1, "rank_week": 2,
   "classifications": 14, "correct": 11, "accuracy": 0.786,
   "stages_completed": 6, "stages_total": 11,
@@ -307,8 +310,9 @@ One player's public numbers by exact display name (case-insensitive; names are u
 
 - `classifications`: counted submissions on spots (quick look excluded); `correct`: those with a correct verdict; `accuracy` = correct / classifications, `null` with none.
 - `stages_completed`: distinct ready spots with a correct answer. `stages_total` and the `by_difficulty` totals come from `web/public/fields/index.json`; a difficulty with no stages is omitted. No stage names or slugs are returned.
+- The solved slugs are not in the public `player_stats` database function (the anon key is public, so anyone could call it): the route reads them with `player_spots(name)`, which only `service_role` may execute, through the server's service client. **Without the service key** (or if that call fails) the player is still answered, but `stages_completed`, `stages_total` and `by_difficulty` are **absent**; clients must treat them as optional.
 - `first_finds`: finds where the player was the first finder. `patches_solved`: rows in `patch_solves`. `active_days`: distinct UTC dates with any find or patch solve.
-- `rank_all` / `rank_week`: rank among players on the global all-stages board (all time / last 7 days), computed by the same function as `leaderboard_v2`; `null` with no points in the period. `rank_all` counts the bot row the way the global all-time board shows it (+1 when the bot's total is strictly greater than the player's points); `rank_week` has no bot. `member_since`, `last_active`: ISO strings or `null`.
+- `rank_all` / `rank_week`: rank among players on the global all-stages board (all time / last 7 days), computed by the same function as `leaderboard_v2`; the same number the player has on that board whenever they appear on it (any find in the period, so a zero-point player listed on the board has a rank too), and `null` only when the player has no find in the period. `rank_all` counts the bot row the way the global all-time board shows it (+1 when the bot's total is strictly greater than the player's points); `rank_week` has no bot. `member_since`, `last_active`: ISO strings at **day level** (truncated to 00:00 UTC of the day, never the exact time) or `null`.
 - The bot (`name` equal to `Shift-and-stack bot`, any case): `{ "name", "is_bot": true, "is_me": false, "points", "about" }` only, with no per-stage data (it would show which stage has nothing moving).
 - Errors: `400 bad_request` (missing, empty or over 40 characters), `404 not_found` (no such player), `503 db_unavailable` ("Player stats are not available right now."; no database, or the v2 functions are not installed or fail).
 

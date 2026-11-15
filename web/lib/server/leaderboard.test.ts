@@ -8,7 +8,7 @@ type Reply = { data: unknown; error: { code?: string; message: string } | null }
 const state = vi.hoisted(() => ({
   configured: true,
   calls: [] as { name: string; args: Record<string, unknown> }[],
-  replies: {} as Record<string, Reply | (() => Promise<Reply>)>,
+  replies: {} as Record<string, Reply | ((signal: AbortSignal) => Promise<Reply>)>,
 }));
 
 vi.mock("@/lib/server/db", async (original) => ({
@@ -19,10 +19,10 @@ vi.mock("@/lib/server/db", async (original) => ({
           rpc: (name: string, args: Record<string, unknown>) => {
             state.calls.push({ name, args });
             return {
-              abortSignal: async (): Promise<Reply> => {
+              abortSignal: async (signal: AbortSignal): Promise<Reply> => {
                 const r = state.replies[name];
                 if (!r) return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${name}` } };
-                return typeof r === "function" ? r() : r;
+                return typeof r === "function" ? r(signal) : r;
               },
             };
           },
@@ -215,13 +215,44 @@ describe("when the new database functions are not installed", () => {
 });
 
 describe("a database error that is not a missing function", () => {
-  it("serves the snapshot for the default board and no_database for the others", async () => {
+  beforeEach(() => {
     state.replies.leaderboard_v2 = { data: null, error: { code: "XX000", message: "boom" } };
+  });
+
+  it("tries the old leaderboard function for the default board, and answers no_database for the others", async () => {
     const def = await (await GET(get("/api/leaderboard"))).json();
-    expect(def).toMatchObject({ source: "snapshot", available: true });
-    expect(def.rows).toHaveLength(1);
+    expect(rpcNames()).toEqual(["leaderboard_v2", "leaderboard"]);
+    expect(def).toMatchObject({ source: "db", available: true });
+    expect(def.rows.map((r: { name: string }) => r.name)).toEqual(["nova", BOT_NAME, "kt"]);
+    state.calls = [];
     const week = await (await GET(get("/api/leaderboard?period=week"))).json();
     expect(week).toMatchObject({ available: false, reason: "no_database", rows: [] });
+    expect(rpcNames()).toEqual(["leaderboard_v2"]);
+  });
+
+  it("serves the snapshot when the old function fails too", async () => {
+    state.replies.leaderboard = { data: null, error: { code: "XX000", message: "boom again" } };
+    const def = await (await GET(get("/api/leaderboard"))).json();
+    expect(rpcNames()).toEqual(["leaderboard_v2", "leaderboard"]);
+    expect(def).toMatchObject({ source: "snapshot", available: true });
+    expect(def.rows).toHaveLength(1);
+  });
+});
+
+describe("a timeout on the new function", () => {
+  it("goes straight to the snapshot for the default board (the old function is not tried)", async () => {
+    vi.useFakeTimers();
+    try {
+      state.replies.leaderboard_v2 = (signal) =>
+        new Promise<Reply>((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+      const pending = GET(get("/api/leaderboard"));
+      await vi.advanceTimersByTimeAsync(5000);
+      const def = await (await pending).json();
+      expect(rpcNames()).toEqual(["leaderboard_v2"]);
+      expect(def).toMatchObject({ source: "snapshot", available: true });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -255,20 +286,38 @@ describe("the bot row", () => {
     expect(isBot(await (await GET(get("/api/leaderboard?region=local&country=TH"))).json())).toBe(false);
     expect(isBot(await (await GET(get("/api/leaderboard?period=week&region=local&country=TH"))).json())).toBe(false);
   });
+
+  it("is absent from weekly and local boards for a caller who has unlocked the spot", async () => {
+    const isBot = (b: { rows: { is_bot: boolean }[] }) => b.rows.some((r) => r.is_bot);
+    const cookie = `${UNLOCK_COOKIE}=${encodeUnlocked(["eris"])}`;
+    const q = "scope=spot&slug=eris";
+    expect(isBot(await (await GET(get(`/api/leaderboard?${q}`, { cookie }))).json())).toBe(true);
+    expect(isBot(await (await GET(get(`/api/leaderboard?${q}&period=week`, { cookie }))).json())).toBe(false);
+    expect(isBot(await (await GET(get(`/api/leaderboard?${q}&region=local&country=TH`, { cookie }))).json())).toBe(false);
+    expect(isBot(await (await GET(get(`/api/leaderboard?${q}&period=week&region=local&country=TH`, { cookie }))).json())).toBe(false);
+  });
 });
 
 describe("saving the caller's country", () => {
   const country = (calls = state.calls) => calls.filter((c) => c.name === "set_my_country");
 
-  it("is sent for a logged-in caller with a detected country, with only the two letters", async () => {
-    await GET(get("/api/leaderboard", { authorization: "Bearer tok", "x-vercel-ip-country": "th" }));
+  it("is sent for a logged-in caller on a local board, with only the two letters", async () => {
+    await GET(get("/api/leaderboard?region=local", { authorization: "Bearer tok", "x-vercel-ip-country": "th" }));
     expect(country()).toEqual([{ name: "set_my_country", args: { p_country: "TH" } }]);
   });
 
-  it("is not sent for a guest, or without a detected country", async () => {
-    await GET(get("/api/leaderboard", { "x-vercel-ip-country": "TH" }));
-    await GET(get("/api/leaderboard", { authorization: "Bearer tok" }));
-    await GET(get("/api/leaderboard", { authorization: "Bearer tok", "x-vercel-ip-country": "XX" }));
+  it("is not sent for the global boards, all time or weekly", async () => {
+    const headers = { authorization: "Bearer tok", "x-vercel-ip-country": "TH" };
+    await GET(get("/api/leaderboard", headers));
+    await GET(get("/api/leaderboard?period=week", headers));
+    await GET(get("/api/leaderboard?scope=spot&slug=eros", headers));
+    expect(country()).toHaveLength(0);
+  });
+
+  it("is not sent for a guest, or without a detected country, even on a local board", async () => {
+    await GET(get("/api/leaderboard?region=local&country=TH", { "x-vercel-ip-country": "TH" }));
+    await GET(get("/api/leaderboard?region=local&country=TH", { authorization: "Bearer tok" }));
+    await GET(get("/api/leaderboard?region=local&country=TH", { authorization: "Bearer tok", "x-vercel-ip-country": "XX" }));
     expect(country()).toHaveLength(0);
   });
 
@@ -279,11 +328,12 @@ describe("saving the caller's country", () => {
 
   it("a failure (error result, or a throw) changes nothing in the response", async () => {
     const headers = { authorization: "Bearer tok", "x-vercel-ip-country": "TH" };
-    const clean = await (await GET(get("/api/leaderboard?period=week", headers))).json();
+    const url = "/api/leaderboard?period=week&region=local";
+    const clean = await (await GET(get(url, headers))).json();
     state.replies.set_my_country = { data: null, error: { code: "PGRST202", message: "not installed" } };
-    const failing = await (await GET(get("/api/leaderboard?period=week", headers))).json();
+    const failing = await (await GET(get(url, headers))).json();
     state.replies.set_my_country = () => Promise.reject(new Error("network down"));
-    const throwing = await GET(get("/api/leaderboard?period=week", headers));
+    const throwing = await GET(get(url, headers));
     expect(throwing.status).toBe(200);
     const strip = (b: { updated_at: string }) => ({ ...b, updated_at: "" });
     expect(strip(failing)).toEqual(strip(clean));

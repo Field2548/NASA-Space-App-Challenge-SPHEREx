@@ -2,13 +2,15 @@
 // Contract: docs/contracts/api.md section 7a. Database: player_stats() in
 // supabase/migrations/20261117000000_leaderboard_v2.sql, which never returns a user id or an email.
 //
-// The database knows which spots a player solved; this file maps them to stages and difficulties
-// with public/fields/index.json (the same list readySlugs reads), so a stage's name never leaves
-// the server: the response only says how many stages of each difficulty are done.
+// The database knows which spots a player solved, but only player_spots() says so and only the service
+// role may call it (player_stats is callable with the public anon key, so it carries no slugs). This
+// file maps the slugs to stages and difficulties with public/fields/index.json (the same list
+// readySlugs reads), so a stage's name never leaves the server: the response only says how many
+// stages of each difficulty are done. Without the service key the stage fields are left out.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { anonClient } from "@/lib/server/db";
+import { anonClient, serviceClient } from "@/lib/server/db";
 import { BOT_NAME, botScore } from "@/lib/server/bot";
 import { ApiFail } from "@/lib/server/http";
 
@@ -21,7 +23,7 @@ const BOT_ABOUT =
 const UNAVAILABLE = "Player stats are not available right now.";
 
 /** Order the difficulties are listed in. Others (if the index ever has them) follow, alphabetically. */
-const DIFFICULTY_ORDER = ["easy", "medium", "hard", "expert", "boss", "tool", "control"];
+const DIFFICULTY_ORDER = ["easy", "medium", "hard", "expert", "boss", "tool"];
 
 export type Progress = { done: number; total: number };
 
@@ -39,9 +41,10 @@ export type PlayerAnswer = {
   classifications: number;
   correct: number;
   accuracy: number | null;
-  stages_completed: number;
-  stages_total: number;
-  by_difficulty: Record<string, Progress>;
+  /** The three stage fields are absent when the server has no service key (or the call failed). */
+  stages_completed?: number;
+  stages_total?: number;
+  by_difficulty?: Record<string, Progress>;
   first_finds: number;
   patches_solved: number;
   active_days: number;
@@ -124,6 +127,26 @@ async function displayedRankAll(rank: number | null, points: number, root: strin
   }
 }
 
+/** The slugs of the stages a player solved, read with the service client; null when that is not possible. */
+async function solvedSpots(name: string): Promise<string[] | null> {
+  const sb = serviceClient();
+  if (!sb) return null;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  try {
+    const res = await sb.rpc("player_spots", { p_name: name }).abortSignal(ctl.signal);
+    if (res.error || !Array.isArray(res.data)) {
+      if (res.error) console.error("[player] player_spots failed:", res.error.message);
+      return null;
+    }
+    return res.data.filter((s: unknown): s is string => typeof s === "string");
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The answer for one display name. Throws ApiFail (400, 404, 503) as the contract says. */
 export async function answerPlayer(
   request: Request,
@@ -167,8 +190,9 @@ export async function answerPlayer(
     throw new ApiFail("not_found", `No player called "${name}".`);
   }
 
-  const solved = Array.isArray(row.spots_solved) ? row.spots_solved.filter((s): s is string => typeof s === "string") : [];
-  const progress = progressFrom(await readySpots(root), solved);
+  // Stage progress needs the service key; without it (or if the call fails) the player is still answered.
+  const solved = await solvedSpots(row.display_name);
+  const progress = solved === null ? {} : progressFrom(await readySpots(root), solved);
   const points = num(row.points);
   const classifications = num(row.classifications);
   const correct = num(row.correct);

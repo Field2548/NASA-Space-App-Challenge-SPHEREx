@@ -7,6 +7,9 @@ const state = vi.hoisted(() => ({
   configured: true,
   calls: [] as { name: string; args: Record<string, unknown> }[],
   reply: null as Reply | null,
+  serviceConfigured: true,
+  serviceCalls: [] as { name: string; args: Record<string, unknown> }[],
+  spotsReply: null as Reply | null,
 }));
 
 vi.mock("@/lib/server/db", async (original) => ({
@@ -17,6 +20,15 @@ vi.mock("@/lib/server/db", async (original) => ({
           rpc: (name: string, args: Record<string, unknown>) => {
             state.calls.push({ name, args });
             return { abortSignal: async (): Promise<Reply> => state.reply as Reply };
+          },
+        }
+      : null,
+  serviceClient: () =>
+    state.serviceConfigured
+      ? {
+          rpc: (name: string, args: Record<string, unknown>) => {
+            state.serviceCalls.push({ name, args });
+            return { abortSignal: async (): Promise<Reply> => state.spotsReply as Reply };
           },
         }
       : null,
@@ -46,15 +58,19 @@ const STATS = {
   first_finds: 2,
   patches_solved: 5,
   active_days: 2,
-  // eros (easy), hektor (medium), makemake (hard), two tools, and a slug that is not a ready spot.
-  spots_solved: ["eros", "hektor", "makemake", "barnard", "rw-aur", "old-stage"],
 };
+
+// eros (easy), hektor (medium), makemake (hard), two tools, and a slug that is not a ready spot.
+const SPOTS = ["eros", "hektor", "makemake", "barnard", "rw-aur", "old-stage"];
 
 beforeEach(() => {
   resetRateLimit();
   state.configured = true;
   state.calls = [];
   state.reply = { data: [STATS], error: null };
+  state.serviceConfigured = true;
+  state.serviceCalls = [];
+  state.spotsReply = { data: SPOTS, error: null };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -64,6 +80,8 @@ describe("GET /api/player", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toContain("no-store");
     expect(state.calls).toEqual([{ name: "player_stats", args: { p_name: "Nova" } }]);
+    // The slugs come from the service-role client only, by the stored display name.
+    expect(state.serviceCalls).toEqual([{ name: "player_spots", args: { p_name: "nova" } }]);
     expect(await res.json()).toEqual({
       name: "nova",
       is_bot: false,
@@ -95,11 +113,38 @@ describe("GET /api/player", () => {
 
   it("has null accuracy, ranks and dates for a player with nothing yet", async () => {
     state.reply = {
-      data: [{ ...STATS, classifications: 0, correct: 0, rank_all: null, rank_week: null, last_active: null, country: null, spots_solved: [], points: 0, points_week: 0 }],
+      data: [{ ...STATS, classifications: 0, correct: 0, rank_all: null, rank_week: null, last_active: null, country: null, points: 0, points_week: 0 }],
       error: null,
     };
+    state.spotsReply = { data: [], error: null };
     const body = await (await GET(get("/api/player?name=nova"))).json();
     expect(body).toMatchObject({ accuracy: null, rank_all: null, rank_week: null, last_active: null, country: null, stages_completed: 0, stages_total: 11 });
+  });
+
+  it("leaves the stage fields out, and still answers, without the service key or when its call fails", async () => {
+    const check = async () => {
+      const res = await GET(get("/api/player?name=nova"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({ name: "nova", points: 1850, rank_all: 1, classifications: 14 });
+      for (const key of ["stages_completed", "stages_total", "by_difficulty"]) expect(body, key).not.toHaveProperty(key);
+    };
+    state.serviceConfigured = false;
+    await check();
+    state.serviceConfigured = true;
+    state.spotsReply = { data: null, error: { code: "42501", message: "permission denied" } };
+    await check();
+    state.spotsReply = { data: "not a list", error: null };
+    await check();
+  });
+
+  it("never asks the public player_stats for stages, and never returns slugs", async () => {
+    // Even if a (stale) database still sent spots_solved, it is not used or passed on.
+    state.reply = { data: [{ ...STATS, spots_solved: ["eros"] }], error: null };
+    state.spotsReply = { data: [], error: null };
+    const body = await (await GET(get("/api/player?name=nova"))).json();
+    expect(body.stages_completed).toBe(0);
+    expect(JSON.stringify(body)).not.toMatch(/spots_solved|eros|hektor/);
   });
 
   it("answers for the bot with points and a description only, no per-stage keys", async () => {
@@ -110,6 +155,7 @@ describe("GET /api/player", () => {
     expect(body).toMatchObject({ name: BOT_NAME, is_bot: true, is_me: false, points: (await botScore()).score });
     expect(body.about).toMatch(/shifts and stacks every frame/);
     expect(state.calls).toHaveLength(0);
+    expect(state.serviceCalls).toHaveLength(0);
   });
 
   it("is 404 for an unknown name", async () => {
@@ -200,6 +246,11 @@ describe("progressFrom", () => {
     { slug: "c", difficulty: "tool" },
     { slug: "d", difficulty: "weird" },
   ];
+  it("orders the fixed difficulties first and any other alphabetically after them", () => {
+    const keys = Object.keys(progressFrom([...spots, { slug: "e", difficulty: "control" }], []).by_difficulty);
+    expect(keys).toEqual(["easy", "tool", "control", "weird"]);
+  });
+
   it("counts distinct ready spots per difficulty and ignores other slugs", () => {
     expect(progressFrom(spots, ["a", "a", "c", "zzz"])).toEqual({
       stages_completed: 2,

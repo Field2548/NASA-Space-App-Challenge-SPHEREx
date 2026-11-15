@@ -17,7 +17,12 @@
 --   leaderboard_v2(...)       like leaderboard() plus a time window (p_since), a country filter and a
 --                             `finds` count. Top p_limit rows plus the caller's own row.
 --   leaderboard_countries()   countries that have ranked players in a window, with player counts.
---   player_stats(name)        one player's public numbers by display name. Never returns a user id.
+--   player_stats(name)        one player's public numbers by display name. Never returns a user id,
+--                             and never which stages the player solved. Dates are day-level (UTC).
+--   player_spots(name)        the spot slugs a player solved. service_role ONLY (the web server turns
+--                             them into per-difficulty counts; the slugs never reach a browser).
+-- The index on finds(created_at) below is created without `concurrently` (the table is small at
+-- the moment, so the brief write lock is fine; use a separate concurrent build if it ever grows).
 -- Everything public is stable, security definer, search_path = '' and returns names and numbers only.
 
 -- ---------------------------------------------------------------- country on profiles
@@ -130,23 +135,26 @@ as $$
 $$;
 
 -- One player's public numbers, found by exact display name (case-insensitive; names are unique).
--- Zero rows for an unknown name. Mapping spots to stages and difficulties is done by the web app,
--- which knows the list of ready spots: spots_solved holds every spot slug (never 'quicklook') with
--- a counted correct answer.
+-- Zero rows for an unknown name. Which stages were solved is NOT here: the anon key is public, so
+-- anyone could call this function directly. See player_spots() (service_role only).
+--   member_since / last_active  truncated to the UTC day (no exact activity times are public).
 --   points / points_week     sum of points, all time / last 7 days.
 --   rank_all / rank_week     rank on the global all-stages board for those periods, exactly as
---                            leaderboard_v2() gives it; null when the player has no points in the period.
+--                            leaderboard_v2() gives it whenever the player is on that board (any find
+--                            in the period, even a zero-point one); null only with no find in the period.
 --   classifications, correct counted submissions on spots (quick look excluded) and how many were correct.
 --   first_finds              rows where this player was the first finder.
 --   patches_solved           rows in patch_solves.
 --   active_days              distinct UTC dates with any find or patch solve.
 -- No user id is returned. Call with the caller's token so is_me works.
+-- An earlier draft of this function also returned spots_solved; a changed result type cannot be
+-- replaced in place, so drop it first (the grants below are re-applied on every run).
+drop function if exists public.player_stats(text);
 create or replace function public.player_stats(p_name text)
 returns table (
   display_name text, is_me boolean, country text, member_since timestamptz, last_active timestamptz,
   points bigint, points_week bigint, rank_all bigint, rank_week bigint,
-  classifications bigint, correct bigint, first_finds bigint, patches_solved bigint, active_days bigint,
-  spots_solved text[]
+  classifications bigint, correct bigint, first_finds bigint, patches_solved bigint, active_days bigint
 )
 language sql
 stable
@@ -156,16 +164,16 @@ as $$
   select p.display_name,
          coalesce(p.id = (select auth.uid()), false),
          p.country,
-         p.created_at,
-         greatest(
+         pg_catalog.date_trunc('day', p.created_at at time zone 'UTC') at time zone 'UTC',
+         pg_catalog.date_trunc('day', greatest(
            (select max(f.created_at) from public.finds f where f.user_id = p.id),
-           (select max(s.created_at) from public.patch_solves s where s.user_id = p.id)),
+           (select max(s.created_at) from public.patch_solves s where s.user_id = p.id)) at time zone 'UTC') at time zone 'UTC',
          (select coalesce(sum(f.points), 0)::bigint from public.finds f where f.user_id = p.id),
          (select coalesce(sum(f.points), 0)::bigint from public.finds f
             where f.user_id = p.id and f.created_at >= now() - interval '7 days'),
-         (select r.rank from public.leaderboard_ranked(null, null, null) r where r.user_id = p.id and r.score > 0),
+         (select r.rank from public.leaderboard_ranked(null, null, null) r where r.user_id = p.id),
          (select r.rank from public.leaderboard_ranked(null, now() - interval '7 days', null) r
-            where r.user_id = p.id and r.score > 0),
+            where r.user_id = p.id),
          (select count(*) from public.finds f
             where f.user_id = p.id and f.counted and f.spot_slug <> 'quicklook'),
          (select count(*) from public.finds f
@@ -176,13 +184,29 @@ as $$
          (select count(distinct d.day)
             from (select (f.created_at at time zone 'UTC')::date as day from public.finds f where f.user_id = p.id
                   union
-                  select (s.created_at at time zone 'UTC')::date from public.patch_solves s where s.user_id = p.id) d),
-         coalesce((select array_agg(distinct f.spot_slug order by f.spot_slug) from public.finds f
-            where f.user_id = p.id and f.counted and f.spot_slug <> 'quicklook'
-              and f.verdict in ('known', 'bot_match', 'nothing_correct')), '{}'::text[])
+                  select (s.created_at at time zone 'UTC')::date from public.patch_solves s where s.user_id = p.id) d)
   from public.profiles p
   where pg_catalog.lower(p.display_name) = pg_catalog.lower(pg_catalog.btrim(p_name))
   limit 1;
+$$;
+
+-- The spot slugs (never 'quicklook') a player has a counted correct answer on, by exact display
+-- name (case-insensitive). Empty for an unknown name or a player with none. Kept out of
+-- player_stats on purpose: this one is callable by service_role only, so only the web server sees
+-- the slugs and publishes counts per difficulty.
+create or replace function public.player_spots(p_name text)
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(distinct f.spot_slug order by f.spot_slug), '{}'::text[])
+  from public.profiles p
+  join public.finds f on f.user_id = p.id
+  where pg_catalog.lower(p.display_name) = pg_catalog.lower(pg_catalog.btrim(p_name))
+    and f.counted and f.spot_slug <> 'quicklook'
+    and f.verdict in ('known', 'bot_match', 'nothing_correct');
 $$;
 
 -- ---------------------------------------------------------------- who may call what
@@ -192,7 +216,8 @@ revoke execute on function
   public.leaderboard_ranked(text, timestamptz, text),
   public.leaderboard_v2(text, timestamptz, text, int),
   public.leaderboard_countries(text, timestamptz),
-  public.player_stats(text)
+  public.player_stats(text),
+  public.player_spots(text)
 from public, anon, authenticated, service_role;
 
 -- A guest has no profile to change, so set_my_country is for logged-in players only.
@@ -206,3 +231,6 @@ to anon, authenticated, service_role;
 
 -- leaderboard_ranked returns user ids: no grant to anyone but its owner (the other functions here
 -- run as the owner, so they can still call it).
+
+-- player_spots lists solved stages by name: service_role only (the web server's own client).
+grant execute on function public.player_spots(text) to service_role;

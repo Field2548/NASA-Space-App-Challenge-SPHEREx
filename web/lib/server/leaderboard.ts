@@ -118,7 +118,7 @@ type DbRow = {
   is_me: boolean;
 };
 
-type Call = { ok: true; data: unknown[] } | { ok: false; missing: boolean };
+type Call = { ok: true; data: unknown[] } | { ok: false; missing: boolean; timedOut: boolean };
 
 /** A function that is not installed: PostgREST says PGRST202, Postgres says 42883 "does not exist". */
 function isMissingFunction(error: { code?: string; message?: string }): boolean {
@@ -139,11 +139,11 @@ async function call(
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
     const { data, error } = await sb.rpc(fn, args).abortSignal(ctl.signal);
-    if (error) return { ok: false, missing: isMissingFunction(error) };
-    if (!Array.isArray(data)) return { ok: false, missing: false };
+    if (error) return { ok: false, missing: isMissingFunction(error), timedOut: ctl.signal.aborted };
+    if (!Array.isArray(data)) return { ok: false, missing: false, timedOut: false };
     return { ok: true, data };
   } catch {
-    return { ok: false, missing: false };
+    return { ok: false, missing: false, timedOut: ctl.signal.aborted };
   } finally {
     clearTimeout(timer);
   }
@@ -206,8 +206,9 @@ export async function answerBoard(request: Request, q: BoardQuery): Promise<Boar
   }
 
   const detected = detectCountry(request);
-  // The caller's country is saved on their profile whenever we see it, so they show up on local boards.
-  rememberCountry(request);
+  // A caller who opens a local board has their detected country saved on their profile, so they show
+  // up there. Other boards do not write (the page asks for two boards per click).
+  if (q.region === "local") rememberCountry(request);
 
   const isDefault = q.period === "all" && q.region === "global";
   const country = q.region === "local" ? (q.country ? q.country.toUpperCase() : detected) : null;
@@ -221,10 +222,10 @@ export async function answerBoard(request: Request, q: BoardQuery): Promise<Boar
     available: true,
   };
 
-  // The bot's score on one spot tells whether something moves there (0 on the control field), so a
+  // The bot's score on one spot tells whether something moves there, so a
   // per-spot board shows the bot only to a caller whose signed unlock cookie covers that spot.
-  // The bot plays all time and everywhere: it is never on a weekly or a local board.
-  const showBot = isDefault && (slug === null || slug === "fixture" || isUnlocked(request, slug));
+  // Only the default board merges the bot (weekly and local boards return before it is used).
+  const showBot = (slug === null || slug === "fixture" || isUnlocked(request, slug));
 
   const sb = anonClient(request);
   const unavailable = (reason: Reason, countries?: Board["countries"]): Board => ({
@@ -261,12 +262,10 @@ export async function answerBoard(request: Request, q: BoardQuery): Promise<Boar
   ]);
 
   if (!v2.ok) {
-    if (v2.missing) {
-      // The new functions are not installed yet: the default board keeps working on the old function.
-      if (isDefault) return oldBoard(sb, base, slug, showBot);
-      return unavailable("not_installed");
-    }
-    return isDefault ? snapshotBoard(base, showBot) : unavailable("no_database");
+    // The default board never goes unavailable: any database error except a timeout tries the old
+    // `leaderboard` function (a timeout goes straight to the snapshot, so the wait stays one 5 s).
+    if (isDefault) return v2.timedOut ? snapshotBoard(base, showBot) : oldBoard(sb, base, slug, showBot);
+    return v2.missing ? unavailable("not_installed") : unavailable("no_database");
   }
 
   const all = normalise(v2.data as DbRow[]);
@@ -329,7 +328,7 @@ async function defaultBoard(
   };
 }
 
-/** The new functions are missing: answer the default board from the old `leaderboard` function, as before. */
+/** v2 failed (not a timeout): answer the default board from the old `leaderboard` function, else the snapshot. */
 async function oldBoard(
   sb: NonNullable<ReturnType<typeof anonClient>>,
   base: Omit<Board, "rows" | "updated_at" | "source">,
