@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { FieldSummary } from "@/lib/types";
 import {
@@ -137,8 +138,20 @@ describe("heat scale", () => {
 
 describe("difficulty styles", () => {
   it("gives every difficulty a distinct glyph and a word, not just a colour", () => {
-    const glyphs = Object.values(DIFFICULTY_STYLE).map((s) => s.glyph);
+    // "control" deliberately looks like "medium", so it is left out of the distinctness check.
+    const { control: _control, ...visible } = DIFFICULTY_STYLE;
+    void _control;
+    const glyphs = Object.values(visible).map((s) => s.glyph);
     expect(new Set(glyphs).size).toBe(glyphs.length);
     for (const s of Object.values(DIFFICULTY_STYLE)) expect(s.word.length).toBeGreaterThan(0);
+  });
+});
+
+describe("control fields stay hidden on the map", () => {
+  it("no ready spot is marked control and no label says so", () => {
+    const index = JSON.parse(readFileSync("public/fields/index.json", "utf8")) as { difficulty: string }[];
+    expect(index.some((f) => f.difficulty === "control")).toBe(false);
+    for (const style of Object.values(DIFFICULTY_STYLE)) expect(style.word.toLowerCase()).not.toContain("control");
+    expect(DIFFICULTY_STYLE.control).toEqual(DIFFICULTY_STYLE.medium);
   });
 });

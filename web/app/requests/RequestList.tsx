@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatRequestPosition, formatRequestTime } from "@/lib/requestRow";
 
-type Req = { id: number; ra: number; dec: number; fov: number; status: string; created_at: string };
+// Database numerics can arrive as strings or null, so the position fields are not trusted as numbers.
+type Req = { id: number; ra: unknown; dec: unknown; fov: unknown; status: string; created_at: string };
 type Queue = { requests: Req[]; source?: string };
 
 const STATUS: Record<string, string> = {
@@ -21,8 +23,9 @@ export function RequestList() {
     (async () => {
       try {
         const res = await fetch("/api/request-spot", { signal: ctl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const body = (await res.json()) as Queue;
-        if (!Array.isArray(body.requests)) throw new Error("bad shape");
+        if (!body || !Array.isArray(body.requests)) throw new Error("bad shape");
         setQueue(body);
       } catch {
         if (!ctl.signal.aborted) setFailed(true);
@@ -62,7 +65,7 @@ export function RequestList() {
             >
               <span style={{ color: "var(--text-dim)" }}>#{i + 1}</span>
               <span>
-                RA {r.ra.toFixed(3)}°, Dec {r.dec.toFixed(3)}°, field of view {r.fov}°
+                {formatRequestPosition(r)}
               </span>
               <span style={{ textAlign: "right" }}>
                 <span style={{ color: r.status === "failed" ? "var(--magenta)" : "var(--cyan)" }}>
@@ -70,7 +73,7 @@ export function RequestList() {
                 </span>
                 <br />
                 <time dateTime={r.created_at} style={{ color: "var(--text-dim)" }}>
-                  {new Date(r.created_at).toLocaleString()}
+                  {formatRequestTime(r.created_at)}
                 </time>
               </span>
             </li>

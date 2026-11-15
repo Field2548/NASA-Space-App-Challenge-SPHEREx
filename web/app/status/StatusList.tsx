@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { statusLabel } from "@/lib/statusLabel";
 
 type Status = "green" | "amber" | "red";
@@ -36,12 +36,20 @@ export function StatusList() {
     }
   }, []);
 
-  useEffect(() => {
+  // The check in flight; a newer check or unmount aborts it so a late answer cannot overwrite a fresh one.
+  const current = useRef<AbortController | null>(null);
+  const start = useCallback(() => {
+    current.current?.abort();
     const ctl = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch on mount; state is set after the await
-    void load(ctl.signal);
-    return () => ctl.abort();
+    current.current = ctl;
+    return load(ctl.signal);
   }, [load]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch on mount; state is set after the await
+    void start();
+    return () => current.current?.abort();
+  }, [start]);
 
   return (
     <section aria-labelledby="status-heading">
@@ -108,7 +116,7 @@ export function StatusList() {
         type="button"
         onClick={() => {
           setBusy(true);
-          void load();
+          void start();
         }}
         disabled={busy}
         style={{
