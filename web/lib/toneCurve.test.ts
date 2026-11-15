@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCurve, bezierAt, curveAt, DEFAULT_CURVE, handleOf, isDefaultCurve, presetCurve } from "./toneCurve";
+import { applyCurve, bezierAt, CURVE_PRESETS, curveAt, DEFAULT_CURVE, handleOf, isDefaultCurve, presetCurve, presetOf } from "./toneCurve";
 
 const monotone = (f: (x: number) => number) => {
   let prev = -1;
@@ -40,9 +40,8 @@ describe("tone curve", () => {
       expect(bezierAt(bb, 1)).toBeCloseTo(1, 9);
     }
   });
-  it("is monotone in 0..1 for any bend and preset; sign of bend sets brighter or darker", () => {
-    for (const preset of ["linear", "log", "asinh"] as const)
-      for (const bend of [-1, -0.5, 0, 0.5, 1]) monotone((x) => curveAt({ preset, bend }, x));
+  it("is monotone in 0..1 for any bend; sign of bend sets brighter or darker", () => {
+    for (const bend of [-1, -0.5, 0, 0.44, 0.54, 0.5, 1]) monotone((x) => curveAt({ bend }, x));
     expect(bezierAt(0.5, 0.3)).toBeGreaterThan(0.3);
     expect(bezierAt(-0.5, 0.3)).toBeLessThan(0.3);
   });
@@ -53,5 +52,14 @@ describe("tone curve", () => {
     expect(out[0]).toBeCloseTo(0, 6);
     expect(out[2]).toBeCloseTo(1, 6);
     expect(out[1]).toBeGreaterThan(0.5);
+  });
+  it("each stop is a bend of the one curve, close to its target shape", () => {
+    const pts = Array.from({ length: 201 }, (_, i) => i / 200);
+    const rms = (f: (y: number) => number, c: ReturnType<typeof presetCurve>) =>
+      Math.sqrt(pts.reduce((s, y) => s + (curveAt(c, y) - f(y)) ** 2, 0) / pts.length);
+    expect(rms((y) => Math.log10(1 + 9 * y), presetCurve("log"))).toBeLessThan(0.02);
+    expect(rms((y) => Math.sinh(y * Math.asinh(5)) / 5, presetCurve("linear"))).toBeLessThan(0.01);
+    for (const p of CURVE_PRESETS) expect(presetOf(presetCurve(p))).toBe(p);
+    expect(presetOf({ bend: 0.2 })).toBeNull();
   });
 });

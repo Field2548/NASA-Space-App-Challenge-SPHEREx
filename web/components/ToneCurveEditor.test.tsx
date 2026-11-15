@@ -22,29 +22,34 @@ describe("ToneCurveEditor", () => {
     const { rerender } = render(<ToneCurveEditor value={DEFAULT_CURVE} onChange={onChange} />);
     const handle = () => screen.getByRole("slider", { name: "Curve bend" });
     fireEvent.keyDown(handle(), { key: "ArrowUp" });
-    expect(onChange.mock.calls[0][0]).toEqual({ preset: "asinh", bend: 0.05 });
+    expect(onChange.mock.calls[0][0]).toEqual({ bend: 0.05 });
     fireEvent.keyDown(handle(), { key: "ArrowDown", shiftKey: true });
     expect(onChange.mock.calls[1][0].bend).toBeCloseTo(-0.2, 9);
-    rerender(<ToneCurveEditor value={{ preset: "asinh", bend: 0.95 }} onChange={onChange} />);
+    rerender(<ToneCurveEditor value={{ bend: 0.95 }} onChange={onChange} />);
     fireEvent.keyDown(handle(), { key: "ArrowUp", shiftKey: true });
-    expect(onChange).toHaveBeenLastCalledWith({ preset: "asinh", bend: 1 });
+    expect(onChange).toHaveBeenLastCalledWith({ bend: 1 });
   });
-  it("the stretch slider stops at Linear, Log and asinh and keeps the bend", () => {
-    const onChange = vi.fn();
-    render(<ToneCurveEditor value={{ preset: "asinh", bend: 0.3 }} onChange={onChange} />);
-    const stretch = screen.getByRole("slider", { name: "Stretch" });
-    for (const [v, key] of [["0", "linear"], ["1", "log"], ["2", "asinh"]] as const) {
-      fireEvent.change(stretch, { target: { value: v } });
-      if (key !== "asinh") expect(onChange).toHaveBeenLastCalledWith({ preset: key, bend: 0.3 });
+  it("the stretch slider sets the curve itself: each stop replaces any custom bend", () => {
+    // Start from a custom bend whose nearest stop is a different one, so each move is a real change.
+    for (const [v, key, start] of [["0", "linear", 0.9], ["1", "log", -0.9], ["2", "asinh", 0.9]] as const) {
+      const onChange = vi.fn();
+      render(<ToneCurveEditor value={{ bend: start }} onChange={onChange} />);
+      fireEvent.change(screen.getByRole("slider", { name: "Stretch" }), { target: { value: v } });
+      expect(onChange).toHaveBeenLastCalledWith(presetCurve(key));
+      cleanup();
     }
-    expect(screen.queryByRole("button", { name: "Linear" })).toBeNull();
     expect(presetCurve("asinh")).toEqual(DEFAULT_CURVE);
   });
-  it("Straighten resets the bend only", () => {
-    const onChange = vi.fn();
-    render(<ToneCurveEditor value={{ preset: "log", bend: -0.4 }} onChange={onChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "Straighten" }));
-    expect(onChange).toHaveBeenLastCalledWith({ preset: "log", bend: 0 });
+  it("the curve shows its stop, or Custom after the handle moves off; no Straighten button", () => {
+    const { rerender } = render(<ToneCurveEditor value={presetCurve("log")} onChange={() => {}} />);
+    const stretch = () => screen.getByRole("slider", { name: "Stretch" }) as HTMLInputElement;
+    expect(stretch().value).toBe("1");
+    expect(stretch().getAttribute("aria-valuetext")).toBe("Log");
+    expect(screen.getByRole("slider", { name: "Curve bend" }).getAttribute("aria-valuenow")).toBe("54");
+    rerender(<ToneCurveEditor value={{ bend: 0.6 }} onChange={() => {}} />);
+    expect(stretch().getAttribute("aria-valuetext")).toBe("Custom");
+    expect(stretch().value).toBe("1"); // nearest stop
+    expect(screen.queryByRole("button", { name: "Straighten" })).toBeNull();
   });
   it("keeps detail in the (i) popup with before/after example images", () => {
     render(<ToneCurveEditor value={DEFAULT_CURVE} onChange={() => {}} />);
