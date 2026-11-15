@@ -1,4 +1,4 @@
-// Overlays for the Explore view (owner: DATA). Server only. Contract: field-schema.md section 11.
+// Overlays for the Explore view. Server only. Contract: field-schema.md section 11.
 //
 // Two layers can be drawn on top of a spot's picture once the player may see answers:
 //   - amber diamonds: known asteroids and comets (from the catalog's `asteroids`), one mark per

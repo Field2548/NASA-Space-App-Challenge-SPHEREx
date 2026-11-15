@@ -1,4 +1,4 @@
-// The "Shift-and-stack bot" scoreboard row (owner: SERVER). Server only: reads answer keys.
+// The "Shift-and-stack bot" scoreboard row. Server only: reads answer keys.
 // Contract: docs/contracts/api.md section 7; BP 8.11.
 // A bot candidate counts when it is above the noise bar and its path passes within the shared
 // bot radius of a known object in at least 2 frames (botCandidateObject, the rule /api/check uses).

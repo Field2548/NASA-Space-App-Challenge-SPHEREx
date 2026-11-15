@@ -15,6 +15,17 @@ Planet X would have.
 ![Eros onion skin](data/motion_13.2004_14.38_2025-07-09/summary.png)
 *Asteroid (433) Eros on 9 July 2025: one coloured dot per moment (blue → sky blue → green), inside the circles where JPL says Eros was. Stars that didn't move are white.*
 
+## Screenshots
+
+![Title screen of Onion Sky](docs/images/home.png)
+*The title screen. Start the game stages, explore the sky, or check the leaderboard.*
+
+![Sky map with community patches](docs/images/map.png)
+*The sky map. Pick any patch of the whole sky to search. Green glows show where other players have already looked.*
+
+![Game page showing ten frames of one sky patch](docs/images/game.png)
+*The game. Blink through the frames, colour them by time or stack them, then mark the mover and submit.*
+
 ## Play: how the web game works
 
 **Onion Sky** ([onion-sky.vercel.app](https://onion-sky.vercel.app), code in [`web/`](web/)) shows
@@ -222,7 +233,7 @@ python pipeline/catalog_facts.py --all     # names and facts of known objects ne
 We used Claude Code (Anthropic's coding assistant) to help write the code in this repo.
 
 - The Python tools and the science behind them were written by the team with Claude Code. The repo history shows this: many commit messages carry a `Co-Authored-By: Claude` line.
-- The website was built by three Claude Code agent sessions, called DATA, GAME and SERVER. They worked on separate branches and talked to each other only through GitHub issues and pull requests, following the plans in `docs/plans/`.
+- The website was built with Claude Code sessions working on separate branches and delivering through pull requests.
 - People kept the jobs that need a person: accounts, secrets, approvals, and the final submission.
 - Every outside dataset, library, font and icon is credited in `CREDITS.md`.
 - No AI-generated images or video are used. Every picture on the site is real SPHEREx data, or is drawn in code (CSS and SVG).

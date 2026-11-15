@@ -1,4 +1,4 @@
-// Service health checks for GET /api/health and the /status page (owner: SERVER). Server only.
+// Service health checks for GET /api/health and the /status page. Server only.
 // Contract: docs/contracts/api.md section 10. Every probe is cheap and read-only.
 
 import { unlockConfigured } from "@/lib/server/unlock";

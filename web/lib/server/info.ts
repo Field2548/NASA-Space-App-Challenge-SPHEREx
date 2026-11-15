@@ -1,4 +1,4 @@
-// GET /api/info: catalog facts for the Inspect popup (owner: SERVER). Server only.
+// GET /api/info: catalog facts for the Inspect popup. Server only.
 // Contract: docs/contracts/api.md sections 2 and 6. Build prompt: section 8.16 (radii, lock).
 //
 // The server decides the mode (api.md section 2). A position inside a ready spot is answered in

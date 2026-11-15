@@ -1,4 +1,4 @@
-// The spoiler lock, enforced by the server (owner: SERVER).
+// The spoiler lock, enforced by the server.
 // Contract: docs/contracts/api.md section 2. BP section 3: "The server enforces this."
 //
 // After a player's first CORRECT submission on a spot, /api/check adds that spot to a signed

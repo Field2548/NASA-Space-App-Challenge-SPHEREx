@@ -1,4 +1,4 @@
-// Name to coordinates through CDS Sesame (owner: SERVER). Server only.
+// Name to coordinates through CDS Sesame. Server only.
 // Contract: docs/contracts/api.md section 5. Results are cached in memory for 1 day.
 
 import { ApiFail } from "@/lib/server/http";

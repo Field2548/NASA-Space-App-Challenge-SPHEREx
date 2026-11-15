@@ -1,4 +1,4 @@
-// The POST /api/check request schema and response body (owner: SERVER). Server only.
+// The POST /api/check request schema and response body. Server only.
 // Lives here, not in app/api/check/route.ts, because Next.js route files may only export HTTP handlers.
 // Contract: docs/contracts/api.md section 3.
 

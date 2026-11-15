@@ -1,4 +1,4 @@
-// Supabase clients for route handlers (owner: SERVER). Server only.
+// Supabase clients for route handlers. Server only.
 // No database is a normal state: every function here returns null instead of throwing.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
