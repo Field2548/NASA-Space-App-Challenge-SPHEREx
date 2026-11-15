@@ -118,7 +118,7 @@ Never import this from client code and never copy it under `public/`.
 | `noise_bar_sigma` | the field's noise bar for the bot search (stacked S/N). `null` if no bot search was run. Never report a bot match without it. |
 | `objects[].positions` | one entry per frame, in the top-down grid (section 1). `in_grid` is false when the object is outside the picture in that frame (Eros leaves after frame 3; `x, y` are then outside `0..W-1`). Optional `snr`: measured S/N there (max of the 3 x 3 pixels), absent when out of the grid, `null` when there is no data. Optional `change_snr`: the same 3 x 3 maximum taken in the frame minus the median of the other frames (`motion_frames.residuals`), so stars cancel. Use `change_snr`, not `snr`, to say whether the object itself is seen in a frame: `snr` also counts a background star that happens to lie under the path. |
 | `objects[].v*_px_per_day` | straight-line fit to the positions of all frames, top-down (positive `vy` = moving down = south). A summary only: score against `positions`, because fast objects do not move in a straight line. |
-| `reveal` | the real title, kind and difficulty of the spot (for the control spot: `control`). Public files never carry these (issue #10). The server sends them only after a correct answer |
+| `reveal` | the real title, kind and difficulty of the spot (for the control spot: `control`). Public files never carry these (issue #10). The server sends it as `spot_reveal` once the spot is unlocked for that player (`unlocked` or `practice` is `true`), never on a wrong answer to a locked spot (`docs/contracts/api.md` sections 2 and 3) |
 | `bot.candidates` | from `candidates.csv`, already converted: `y = H - 1 - y_csv`, `vy = -vy_csv`. `x, y` is the position at `t_ref_mjd` (the mean of the frame times); position in frame `i` is `x + vx * (mjd_i - t_ref_mjd)`, same for y. |
 | `bot.candidates[].status` | `known`: the candidate is the known object (within 3 px of it in at least 3 frames); `object_id` says which. `alias`: a wrong track that passes within 3 px of the known object in only one or two frames and borrows its light there (`near_object_frames` lists them); never score or announce it as a find. `unconfirmed`: matches no known object; above the noise bar it is an honest candidate, not a confirmed object. `above_noise_bar` is unchanged by this: it states what the search measured |
 
@@ -155,6 +155,8 @@ Never import this from client code and never copy it under `public/`.
 3. Per pixel: with 3 or more planes, a 3-sigma-clipped mean (centre = median, spread = 1.4826 x median absolute deviation, repeat until nothing more is clipped); with 1 or 2 planes, the plain mean ignoring NaN (show the "fewer than 3" notice: cosmic rays are not removed).
 4. Divide the result by its own noise (sigma-clipped standard deviation, 2.5 sigma, 5 rounds).
 5. Blank every pixel that is NaN in any of the frames shown, then use one shared stretch.
+
+Noise guard: a plane whose given noise is not a finite positive number is skipped (not used, not counted in `planesUsed`), and if the rebuilt frame's own noise is not a finite positive number the frame is returned undivided, so a constant plane never gives Infinity or NaN-filled output.
 
 With all exposures of a frame selected, this reproduces `frames.u16` to a median of about 0.03 sigma (tested in `pipeline/tests`).
 
@@ -201,4 +203,34 @@ Draft shape. It becomes final when DATA closes the `contract` issue for it (befo
 - 3 static stars at `(8, 8)`, `(24, 10)`, `(12, 25)` with peak S/N 40, 25, 15.
 - 1 mover with peak S/N 20 at `(10, 16)` in frame 1, moving `+2 px` in x per frame: `(12, 16)`, `(14, 16)`, `(16, 16)`.
 - One pixel `(31, 31)` is no data (65535) in every frame, to exercise the NaN path.
+- Its answer key has a `reveal` block like the real spots: `{"title": "Fixture mover", "kind": "fixture", "difficulty": "easy"}` (the public fixture files do not carry it).
 - Its answer key has one bot candidate on the mover (`status: "known"`, `noise_bar_sigma` 6.0), so "matches the bot" paths can be tested.
+
+## 11. Routes owned by DATA: /api/overlay
+
+`GET /api/overlay?spot=<slug>&mode=round|explore` (written form of issue #14). Draws two layers over a spot's picture in Explore: amber diamonds for known asteroids and comets, teal rings for catalog stars. Source: `web/data/catalog/<slug>.json` (section 9). Code: `web/lib/overlays.ts`, `web/app/api/overlay/route.ts`.
+
+**Request.** `spot` is a slug (`^[a-z0-9-]{1,40}$`). A missing or unknown `mode` is `round`. The server decides: it answers as explore only when `mode=explore` AND the caller's unlock cookie covers the spot (`isUnlocked`), exactly like `/api/info`. The body depends on the cookie, so the response is `Cache-Control: private, no-store`. Rate limit: 60 per minute.
+
+**Explore and unlocked:**
+
+```json
+{
+  "locked": false,
+  "asteroids": [ { "name": "(2015 HT246)", "positions": [ { "frame": 1, "x": 111.46, "y": 107.71, "vmag": 22.7 } ] } ],
+  "stars": [ { "name": "Gaia DR3 2590311523446772736", "source": "gaia", "x": 10.2, "y": 40.1,
+               "pm_arcsec_yr": 0.01, "g_mag": 15.2, "xy": [[10.2, 40.1], [10.2, 40.1]] } ]
+}
+```
+
+**Round or locked:** `{ "locked": true, "asteroids": [], "stars": [] }` and nothing else: no names, ids, counts or positions.
+
+**Key rules.**
+
+- Frames count from 1; pixels are 0-based, x right, y down. `vmag` may be `null`; `g_mag` may be `null`.
+- `stars[].x, y` is the star's position in frame 1 (the first entry of `xy`); `xy` has one `[x, y]` per frame.
+- `stars[].name` is the catalog `name` when it is a non-empty string, otherwise the catalog `id`.
+- `pm_arcsec_yr` = `hypot(pmra, pmdec) / 1000` (the catalog is in mas/yr), rounded to 4 decimals; `null` when `pmra` or `pmdec` is missing.
+- Only objects inside the picture are sent. "Inside" means `-0.5 <= x <= W - 0.5` and `-0.5 <= y <= H - 0.5`, with `[W, H]` = `size` in `web/public/fields/<slug>/field.json`. A star is dropped when it is outside in EVERY frame; asteroid positions outside are dropped, and a body with no position left is dropped.
+
+**Errors** (api.md section 1 shape): unknown slug, or a spot with no catalog file (for example `fixture`): `404 not_found`. Invalid query (bad or missing `spot`): `400 bad_request`.

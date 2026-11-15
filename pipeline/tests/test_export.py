@@ -379,7 +379,8 @@ def test_fixture_is_unchanged_by_the_neutral_titles():
     with open(os.path.join(FIELDS, "fixture", "field.json"), encoding="utf-8") as f:
         assert json.load(f)["kind"] == "fixture"
     with open(os.path.join(ANSWERS, "fixture.json"), encoding="utf-8") as f:
-        assert "reveal" not in json.load(f)
+        assert json.load(f)["reveal"] == {"title": "Fixture mover", "kind": "fixture",
+                                          "difficulty": "easy"}
 
 
 # ------------------------------------------------------------------ bot candidate status

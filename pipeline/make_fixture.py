@@ -100,6 +100,7 @@ def main():
     candidate.update(candidate_status(candidate, np.asarray(mjds, dtype=float), t_ref, [obj]))
     answer = {
         "slug": "fixture", "nothing_moves": False, "noise_bar_sigma": 6.0, "t_ref_mjd": t_ref,
+        "reveal": {"title": "Fixture mover", "kind": "fixture", "difficulty": "easy"},
         "objects": [obj],
         "bot": {"source": "synthetic", "candidates": [candidate]},
     }
