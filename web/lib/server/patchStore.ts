@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { patchFromId } from "@/lib/patch";
 import type { PatchSummary, SkyPoint } from "@/lib/patchSolves";
 import { serviceClient } from "@/lib/server/db";
+import type { CrowdRow } from "@/lib/server/patchCrowd";
 
 export interface SolveRow {
   patch_id: string;
@@ -28,6 +29,8 @@ export interface PatchStore {
   hasSolve(patchId: string, userId: string): Promise<boolean>;
   saveSolve(row: SolveRow): Promise<boolean>;
   saveReport(row: ReportRow): Promise<boolean>;
+  /** Signed-in players' reports on a patch, newest first (for crowd agreement); null on a database error. */
+  reportsFor(patchId: string): Promise<CrowdRow[] | null>;
   /** Patches whose centre lies within `r` degrees of (ra, dec). */
   near(ra: number, dec: number, r: number): Promise<PatchSummary[] | null>;
 }
@@ -110,6 +113,20 @@ export function supabaseStore(sb: SupabaseClient): PatchStore {
       } catch (e) {
         console.error("[patches] report not saved:", e);
         return false;
+      }
+    },
+    async reportsFor(patchId) {
+      try {
+        const { data, error } = await sb
+          .from("patch_reports")
+          .select("user_id, marks, created_at")
+          .eq("patch_id", patchId)
+          .not("user_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(500);
+        return error ? null : ((data ?? []) as CrowdRow[]);
+      } catch {
+        return null;
       }
     },
     async near(ra, dec, r) {

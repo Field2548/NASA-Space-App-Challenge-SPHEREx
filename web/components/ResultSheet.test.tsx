@@ -107,3 +107,29 @@ describe("ResultSheet", () => {
 function d() {
   return screen.getByRole("dialog");
 }
+
+describe("ResultSheet crowd agreement on a patch", () => {
+  const withCrowd = (crowd: { others: number; agree: number; first: boolean }) =>
+    ({ ...wrong, crowd, patch: { id: "p11-1", ra: 0, dec: 0 }, solve_saved: false }) as unknown as CheckResponse;
+  const text = () => screen.getByTestId("crowd").textContent;
+
+  it("first reporter", () => {
+    show(withCrowd({ others: 0, agree: 0, first: true }), "p11-1");
+    expect(screen.getByRole("heading", { name: "◆ POSSIBLE NEW MOVER" })).toBeTruthy();
+    expect(screen.getByRole("status")).toBe(screen.getByTestId("crowd"));
+    expect(text()).toContain("first to report a mover in this patch");
+  });
+  it("some agree", () => {
+    show(withCrowd({ others: 4, agree: 3, first: false }), "p11-1");
+    expect(text()).toContain("3 of 4 other players marked the same track as you (75%).");
+    expect(text()).toContain("no official answer");
+  });
+  it("none agree", () => {
+    show(withCrowd({ others: 2, agree: 0, first: false }), "p11-1");
+    expect(text()).toContain("2 other players reported here, but none marked the same track.");
+  });
+  it("no crowd on an ordinary wrong answer", () => {
+    show(wrong, "easy-1");
+    expect(screen.queryByTestId("crowd")).toBeNull();
+  });
+});
