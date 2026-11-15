@@ -17,9 +17,9 @@ const FAINTEST = dots(STARS.filter((s) => s.mag >= 4.5));
 
 export default function TitleSky() {
   const r = FIELD_RADIUS;
-  // The static sky is one SVG, painted once. The few twinkling bright stars are HTML glyphs on top,
-  // swaying with it: an opacity animation on an HTML element runs on the compositor, while one on
-  // an SVG <text> repaints the whole rotated sky every frame (measured: 50-67 ms frames).
+  // The static sky is one SVG; the few twinkling bright stars are HTML glyphs on top, swaying with
+  // it. Measured in Chromium: a twinkle on SVG <text> inside the rotated sky kept frames at 50 ms
+  // even when stepped, the same twinkle on HTML glyphs held 16.7 ms.
   return (
     <div
       className={styles.sky}
