@@ -270,15 +270,15 @@ describe("bot candidates on the real spots", () => {
     expect(direct.matched?.find_key).toBe(viaBot.matched?.find_key); // one find, so the database scores it once
     expect(viaBot.reveal).toEqual(direct.reveal);
   });
-  it.runIf(have("eris"))("eris: the bot's rank-2 candidate (6.24σ vs 5.9σ, no known object) is a bot match worth 0 points", async () => {
-    const { key, field } = await spot("eris");
+  it.runIf(have("hektor"))("hektor: the bot's rank-2 candidate (6.8σ vs 6.4σ, no known object) is a bot match worth 0 points", async () => {
+    const { key, field } = await spot("hektor");
     const c = key.bot.candidates.find((b) => b.rank === 2)!;
     expect(botCandidateObject(key, field, c)).toBeNull();
     const r = scoreSubmission(key, field, { answer: "track", marks: onBotPath(key, field, 2, [1, 5]) });
     expect(r.verdict).toEqual({
       kind: "bot_match",
       points: 0,
-      message: "Matches the bot: 6.2σ against a 5.9σ noise bar. Not a confirmed object, so no points.",
+      message: "Matches the bot: 6.8σ against a 6.4σ noise bar. Not a confirmed object, so no points.",
     });
     expect(r.matched?.find_key).toBe("bot:2");
   });
