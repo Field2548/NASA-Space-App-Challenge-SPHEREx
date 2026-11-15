@@ -165,6 +165,8 @@ async function probeMirror(url: string, signal?: AbortSignal): Promise<string> {
  * The MocServer lookup runs at the same time as the probes of the known mirrors, so a dead CDS
  * costs one timeout, not several in a row.
  */
+const IRSA_GRACE_MS = 1000;
+
 async function probeMirrors(): Promise<string | null> {
   const known = KNOWN_MIRRORS.map((url) => probeMirror(url));
   const extra = mirrorsFromMocServer().then((urls) => {
@@ -179,8 +181,13 @@ async function probeMirrors(): Promise<string | null> {
     typeof window === "undefined"
       ? Promise.resolve(null)
       : probeMirror(`${window.location.origin}${LOCAL_HIPS}`).catch(() => null);
+  // CDS stays first choice, but once IRSA has answered a dead CDS mirror may only cost
+  // IRSA_GRACE_MS more, not its whole probe timeout (it was ~6 s before the first tile).
+  const irsaAfterGrace = irsa.then((u) =>
+    u === null ? Promise.reject(new Error("irsa down")) : new Promise<string>((r) => setTimeout(() => r(u), IRSA_GRACE_MS)),
+  );
   try {
-    return await Promise.any([...known, extra]);
+    return await Promise.any([...known, extra, irsaAfterGrace]);
   } catch {
     return (await irsa) ?? (await local);
   }

@@ -21,6 +21,7 @@ import { Minus, Plus, RotateCw, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
 import { FIELDS_BASE } from "@/lib/fields";
+import { edgeUrl } from "@/lib/hipsProxy";
 import type { Difficulty, FieldSummary } from "@/lib/types";
 import {
   findHipsUrl,
@@ -46,7 +47,8 @@ export interface SkyMapProps {
   onPlay: (slug: string) => void;
   target?: { ra: number; dec: number; fov?: number } | null;
   onPointer?: (p: { ra: number; dec: number } | null) => void;
-  onClickSky?: (p: { ra: number; dec: number }) => void;
+  /** fov: the map's field of view (degrees) at the click. */
+  onClickSky?: (p: { ra: number; dec: number; fov?: number }) => void;
   overlay?: { cells: { corners: [number, number][]; value: number }[]; max: number; label: string } | null;
   className?: string;
 }
@@ -58,6 +60,11 @@ const GALACTIC_CENTER: [number, number] = [266.40499, -28.93617];
 const DEFAULT_FLY_FOV = 1.5;
 const FLY_SECONDS = 1.6;
 const NO_POINTER = "RA --h--m--.--s  Dec ---°--′--.-″";
+
+/** HEALPix order 0 has 12 tiles: the whole sky at its coarsest. */
+const FIRST_TILES = 12;
+/** Hide the loading bar after this long even if tiles are still coming. */
+const TILE_WAIT_MS = 12000;
 
 const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard", "expert", "boss", "control"];
 
@@ -174,7 +181,8 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         const irsa = url === IRSA_HIPS;
         setFromIrsa(irsa);
         const survey = lib.HiPS(irsa ? IRSA_HIPS_ID : HIPS_ID, {
-          url,
+          // Tiles go through the site's edge cache (app/api/hips); the probe above used the source.
+          url: edgeUrl(url, window.location.origin),
           name: irsa ? IRSA_HIPS_NAME : HIPS_NAME,
           errorCallback: () => fail(`The SPHEREx sky picture from ${irsa ? "IRSA" : "CDS (Strasbourg)"} stopped answering.`),
         });
@@ -243,7 +251,15 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           }
           if (e.isDragging) return;
           setSelected(null);
-          if (Number.isFinite(e.ra) && Number.isFinite(e.dec)) cbRef.current.onClickSky?.({ ra: e.ra, dec: e.dec });
+          if (Number.isFinite(e.ra) && Number.isFinite(e.dec)) {
+            let f: number | undefined;
+            try {
+              f = a.getFov()[0];
+            } catch {
+              f = undefined;
+            }
+            cbRef.current.onClickSky?.({ ra: e.ra, dec: e.dec, fov: f });
+          }
         });
         a.on("zoomChanged", (f: number) => {
           if (!cancelled && Number.isFinite(f)) setFov(f);
@@ -383,6 +399,43 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     };
   }, [mapState, overlay]);
 
+  // Loading bar: count HiPS tiles as the browser finishes them (Aladin has no tile event).
+  // Keyed by attempt, so a retry starts from zero without a reset inside the effect.
+  const [tiles, setTiles] = useState({ attempt: -1, seen: 0, timedOut: false });
+  const tilesSeen = tiles.attempt === attempt ? tiles.seen : 0;
+  const tilesTimedOut = tiles.attempt === attempt && tiles.timedOut;
+  useEffect(() => {
+    if (mapState !== "ready") return;
+    const setTilesSeen = (seen: number) => setTiles((t) => ({ attempt, seen, timedOut: t.attempt === attempt && t.timedOut }));
+    const setTilesTimedOut = (timedOut: boolean) =>
+      setTiles((t) => ({ attempt, seen: t.attempt === attempt ? t.seen : 0, timedOut }));
+    if (typeof PerformanceObserver === "undefined") {
+      const t0 = setTimeout(() => setTilesTimedOut(true), 0);
+      return () => clearTimeout(t0);
+    }
+    let seen = 0;
+    const obs = new PerformanceObserver((list) => {
+      // responseStatus (where the browser has it) leaves out missing tiles.
+      const n = list
+        .getEntries()
+        .filter((e) => /Npix\d+/.test(e.name) && ((e as { responseStatus?: number }).responseStatus ?? 200) < 400).length;
+      if (n) {
+        seen += n;
+        setTilesSeen(seen);
+      }
+    });
+    try {
+      obs.observe({ type: "resource", buffered: true });
+    } catch {
+      setTilesTimedOut(true);
+    }
+    const t = setTimeout(() => setTilesTimedOut(true), TILE_WAIT_MS);
+    return () => {
+      obs.disconnect();
+      clearTimeout(t);
+    };
+  }, [mapState, attempt]);
+
   // Focus Play when a card opens and give focus back to whatever opened it when it closes.
   const cardOpen = selected !== null;
   useEffect(() => {
@@ -406,6 +459,18 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
 
   const ready = mapState === "ready";
   const failed = mapState === "failed";
+  const progress = ready
+    ? tilesSeen >= FIRST_TILES || tilesTimedOut
+      ? 1
+      : 0.5 + (0.5 * tilesSeen) / FIRST_TILES
+    : programReady
+      ? 0.35
+      : 0.1;
+  const loadingText = ready
+    ? `Drawing the sky: ${Math.min(tilesSeen, FIRST_TILES)} of ${FIRST_TILES} tiles. A coarse sky shows first, sharper tiles follow as you zoom.`
+    : programReady
+      ? "Finding the SPHEREx sky picture (IRSA or CDS)…"
+      : "Loading the sky map program…";
 
   return (
     <div
@@ -428,16 +493,43 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         <div ref={mapRef} onPointerLeave={leave} style={{ position: "absolute", inset: 0 }} />
       </section>
 
-      {mapState === "loading" && (
+      {!failed && progress < 1 && (
         <div
           role="status"
-          style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--text-dim)" }}
+          aria-live="polite"
+          style={{
+            position: "absolute",
+            left: "50%",
+            transform: "translateX(-50%)",
+            ...(ready ? { bottom: 16 } : { top: "45%" }),
+            width: "min(420px, 80%)",
+            padding: "10px 14px",
+            borderRadius: 14,
+            background: "color-mix(in srgb, var(--bg-0) 80%, transparent)",
+            color: "var(--text-dim)",
+            fontFamily: "var(--font-body-stack)",
+            fontSize: 13,
+            pointerEvents: "none",
+          }}
         >
-          <span>
-            {programReady
-              ? "[########--] waiting for CDS (Strasbourg), the source of the SPHEREx sky picture…"
-              : "[###-------] loading the sky map program…"}
-          </span>
+          <div>{loadingText}</div>
+          <div
+            role="progressbar"
+            aria-label="Sky map loading"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress * 100)}
+            style={{ marginTop: 6, height: 6, borderRadius: 999, background: "rgba(255,255,255,.12)", overflow: "hidden" }}
+          >
+            <div
+              style={{
+                width: `${Math.round(progress * 100)}%`,
+                height: "100%",
+                background: "var(--accent)",
+                transition: "width 300ms ease-out",
+              }}
+            />
+          </div>
         </div>
       )}
 
