@@ -48,8 +48,9 @@ describe("SubmitBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     const v = await screen.findByTestId("verdict");
     expect(v.getAttribute("data-kind")).toBe("known");
-    expect(v.textContent).toContain("Confirmed: 433 Eros (A898 PA), asteroid.");
+    expect(v.textContent).toContain("FOUND IT");
     expect(v.textContent).toContain("+150");
+    expect(v.textContent).not.toContain("Confirmed:");
     expect(v.textContent).toContain("3.20″/h");
     expect(v.textContent).toContain("frame 1 at x 51.2, y 63.9");
     const body = JSON.parse((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
@@ -113,7 +114,7 @@ describe("SubmitBar", () => {
     const fetcher = json(res);
     render(<SubmitBar spot="cygnus" marks={[]} fetcher={fetcher as unknown as typeof fetch} />);
     fireEvent.click(screen.getByRole("button", { name: "Nothing moved here" }));
-    expect((await screen.findByTestId("verdict")).textContent).toContain("Right: nothing moves here.");
+    expect((await screen.findByTestId("verdict")).textContent).toContain("CORRECT");
     const body = JSON.parse((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body).toEqual({ spot: "cygnus", answer: "nothing" });
     expect(loadGuest().finds[0]).toMatchObject({ spot: "cygnus", kind: "nothing_correct" });
@@ -157,11 +158,21 @@ describe("SubmitBar", () => {
     expect(loadGuestSubmissions()).toEqual([]);
   });
 
+  it("Escape closes the sheet and leaves a Show result button", async () => {
+    render(<SubmitBar spot="eros" marks={two} fetcher={json(known) as unknown as typeof fetch} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("verdict")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show result" }));
+    expect(screen.getByTestId("verdict")).toBeTruthy();
+  });
+
   it("does not record a guest find for a persisted or non-scoring verdict", async () => {
     const fetcher = json({ ...known, verdict: { kind: "static", points: 0, message: "That one didn't move; it's a star." } });
     render(<SubmitBar spot="eros" marks={two} fetcher={fetcher as unknown as typeof fetch} />);
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect((await screen.findByTestId("verdict")).textContent).toContain("NOT MOVING");
+    expect((await screen.findByTestId("verdict")).textContent).toContain("NOT QUITE");
     expect(loadGuest().finds).toEqual([]);
   });
 });

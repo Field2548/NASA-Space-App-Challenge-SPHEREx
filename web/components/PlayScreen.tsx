@@ -28,7 +28,7 @@ import Link from "next/link";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
-import { loadField, loadFieldIndex, loadFrames } from "@/lib/fields";
+import { loadField, loadFrames } from "@/lib/fields";
 import { loadVision } from "@/lib/settings";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
@@ -265,24 +265,6 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     viewCb.current?.({ frames: isDefault ? null : onionRange, vision });
   }, [onionRange, defaultOnion, vision]);
   const [verdictIn, setVerdictIn] = useState(false);
-  // The spot after this one in public/fields/index.json order (wrapping), fetched after the first verdict.
-  const [nextSlug, setNextSlug] = useState<string | null>(null);
-  const hasVerdict = verdicts > 0;
-  useEffect(() => {
-    if (!hasVerdict || showTitle) return;
-    let live = true;
-    loadFieldIndex()
-      .then((list) => {
-        const slugs = list.map((s) => s.slug);
-        const at = slugs.indexOf(spot);
-        const next = slugs.length > 1 ? slugs[(at + 1) % slugs.length] : null;
-        if (live) setNextSlug(next && next !== spot ? next : null);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [hasVerdict, showTitle, spot]);
   // undefined: not fetched yet; null: unavailable. Fetched once, only after the spot is unlocked.
   const [fetchedKnown, setFetchedKnown] = useState<KnownOverlay | null | undefined>(undefined);
   const knownUnlocked = showTitle || verdictIn;
@@ -569,21 +551,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             <>
               <section className="panel" data-part="Answer">
                 <p className={styles.small}>
-                  {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames. Mark the mover in at least 2 frames.
+                  {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
                 </p>
                 {markHint && <p className={styles.small}>{markHint}</p>}
-                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} onResult={onResult} />
+                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} />
                 <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
                   Clear marks
                 </button>
-                {/* After any verdict a round can move on (the tutorial's coach leads instead). */}
-                {!showTitle && verdicts > 0 && (
-                  <p className={styles.small}>
-                    {nextSlug && <Link href={`/play?spot=${encodeURIComponent(nextSlug)}`}>Next spot →</Link>}
-                    {nextSlug && " · "}
-                    <Link href="/map">Sky map</Link>
-                  </p>
-                )}
               </section>
               {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
               {!showTitle && <Scoreboard slug={spot} refreshKey={verdicts} />}
