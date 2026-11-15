@@ -225,4 +225,63 @@ begin
   raise notice 'ok: display names are checked, and a player can only edit their own';
 end $$;
 
+-- ---------------------------------------------------------------- repeats, row cap, request queue
+
+do $$
+declare
+  a constant uuid := '0000000a-0000-4000-8000-00000000000a';
+  r record;
+  n int;
+begin
+  -- Two candidates on one spot by one player: the second is a repeat, not counted.
+  perform * from public.record_find(a, 'repeat-spot', 10, 10, 42, 1, 2, 3, 4, 'candidate', null, null, 0, 0, false);
+  select * into r from public.record_find(a, 'repeat-spot', 10, 10, 42, 1, 2, 3, 4, 'candidate', null, null, 0, 0, false);
+  if r.counted or not r.already_found then
+    raise exception 'FAIL: a repeated candidate was counted';
+  end if;
+  select count(*) into n from public.finds where user_id = a and spot_slug = 'repeat-spot' and counted;
+  if n <> 1 then raise exception 'FAIL: expected 1 counted candidate row, found %', n; end if;
+
+  -- The 51st row from one player on one spot is not inserted.
+  for i in 1..60 loop
+    perform * from public.record_find(a, 'cap-spot', 10, 10, 42, null, null, null, null, 'nothing_wrong', null, null, 0, 0, false);
+  end loop;
+  select count(*) into n from public.finds where user_id = a and spot_slug = 'cap-spot';
+  if n <> 50 then raise exception 'FAIL: expected 50 rows after the cap, found %', n; end if;
+  select * into r from public.record_find(a, 'cap-spot', 10, 10, 42, null, null, null, null, 'nothing_wrong', null, null, 0, 0, false);
+  if not r.already_found or r.points <> 0 then raise exception 'FAIL: the capped call did not report already_found'; end if;
+  raise notice 'ok: repeated candidates are not counted and a player has at most 50 rows per spot';
+end $$;
+
+do $$
+declare
+  r record;
+  n int;
+begin
+  select * into r from public.request_spot(null, 200, -30, 0.2);
+  if r.duplicate then raise exception 'FAIL: a first request was called a duplicate'; end if;
+  select * into r from public.request_spot(null, 200.03, -30.02, 0.2);
+  if not r.duplicate then raise exception 'FAIL: a request 0.04 degrees away was not a duplicate'; end if;
+  select * into r from public.request_spot(null, 200.2, -30, 0.2);
+  if r.duplicate then raise exception 'FAIL: a request 0.2 degrees away was a duplicate'; end if;
+
+  insert into public.spot_requests (ra, dec)
+    select 100 + (g % 100), -60 + g * 0.3 from generate_series(1, 210) g;
+  begin
+    perform * from public.request_spot(null, 300, 40, 0.2);
+    raise exception 'FAIL: request_spot accepted a request with a full queue';
+  exception when others then
+    if sqlerrm <> 'queue_full' then raise; end if;
+  end;
+
+  set local role authenticated;
+  begin
+    perform * from public.request_spot(null, 1, 1, 0.2);
+    raise exception 'FAIL: authenticated called request_spot';
+  exception when insufficient_privilege then null;
+  end;
+  reset role;
+  raise notice 'ok: request_spot de-duplicates, refuses a full queue and is service-role only';
+end $$;
+
 rollback;

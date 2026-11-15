@@ -4,9 +4,12 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/info/route";
-import { answerInfo } from "@/lib/server/info";
+import { answerInfo, guardBandPx } from "@/lib/server/info";
+import { clearLiveCache } from "@/lib/server/liveCatalog";
+import { pixelToSky } from "@/lib/wcs";
+import type { FieldWcs } from "@/lib/types";
 import { resetRateLimit } from "@/lib/server/rateLimit";
 import { encodeUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
 
@@ -116,14 +119,24 @@ describe("GET /api/info: explore on a ready spot with the cookie", () => {
 });
 
 describe("GET /api/info: outside every ready spot", () => {
-  it("explore is granted, live lookups are skipped, nothing is invented", async () => {
-    const { status, body } = await get("ra=100&dec=-60&mode=explore");
-    expect(status).toBe(200);
+  it("explore is granted; SIMBAD and Gaia are asked live with an injected fetch, JPL is skipped", async () => {
+    // CDS answers 404 (it was down), Gaia finds nothing: each source reports its own status.
+    const seen: string[] = [];
+    const fake = async (url: string) => {
+      seen.push(url);
+      return url.includes("simbad")
+        ? new Response("not found", { status: 404 })
+        : new Response(JSON.stringify({ metadata: [], data: [] }), { status: 200 });
+    };
+    const body = await answerInfo(new Request("http://localhost/api/info"), { ra: 100, dec: -60, mode: "explore" }, undefined, {
+      fetchImpl: fake,
+      now: () => 0,
+    });
     expect(body).toEqual({
       mode: "explore",
       locked: false,
       position: { ra: 100, dec: -60 },
-      sources: { simbad: "skipped", gaia: "skipped", jpl: "skipped" },
+      sources: { simbad: "error", gaia: "empty", jpl: "skipped" },
       simbad: [],
       gaia: null,
       solar_system: [],
@@ -131,6 +144,21 @@ describe("GET /api/info: outside every ready spot", () => {
         { label: "IRSA Spectrophotometry Tool", url: "https://irsa.ipac.caltech.edu/applications/spherex/tool-spectrophotometry" },
       ],
     });
+    expect(seen).toHaveLength(2);
+  });
+
+  it("mode=round outside every ready spot gives the locked shape and makes no network call", async () => {
+    let calls = 0;
+    const fake = async () => {
+      calls++;
+      throw new Error("no network allowed for a round answer");
+    };
+    const body = await answerInfo(new Request("http://localhost/api/info"), { ra: 102, dec: -61, mode: "round" }, undefined, {
+      fetchImpl: fake,
+    });
+    expect(body).toEqual({ mode: "round", locked: true, position: { ra: 102, dec: -61 } });
+    expect(Object.keys(body).sort()).toEqual(["locked", "mode", "position"]);
+    expect(calls).toBe(0);
   });
 });
 
@@ -169,6 +197,100 @@ describe("GET /api/info: a ready spot without a catalog file", () => {
     const { body } = await get("spot=cygnus&x=60&y=60&mode=explore", ["cygnus"]);
     expect(body.locked).toBe(false);
     expect(body.sources.simbad).toBe("error");
+  });
+});
+
+describe("GET /api/info: overlapping ready spots", () => {
+  let overlapRoot: string | undefined;
+  afterAll(() => {
+    if (overlapRoot) rmSync(overlapRoot, { recursive: true, force: true });
+  });
+
+  it("a position inside two spots is unlocked only with the cookie for both", async () => {
+    // Two spots with the same picture, so every position in one is in the other too.
+    overlapRoot = mkdtempSync(path.join(tmpdir(), "info-overlap-"));
+    for (const slug of ["alpha", "beta"]) {
+      mkdirSync(path.join(overlapRoot, "public", "fields", slug), { recursive: true });
+      copyFileSync(
+        path.join(WEB, "public", "fields", "eros", "field.json"),
+        path.join(overlapRoot, "public", "fields", slug, "field.json"),
+      );
+    }
+    writeFileSync(
+      path.join(overlapRoot, "public", "fields", "index.json"),
+      JSON.stringify([{ slug: "alpha" }, { slug: "beta" }]),
+    );
+    const req = (cookieSpots: string[]) =>
+      new Request("http://localhost/api/info", {
+        headers: { cookie: `${UNLOCK_COOKIE}=${encodeUnlocked(cookieSpots)}` },
+      });
+    const query = { ra: erosCentre.ra, dec: erosCentre.dec, mode: "explore" } as const;
+
+    const oneOnly = await answerInfo(req(["alpha"]), query, overlapRoot);
+    expect(oneOnly).toMatchObject({ mode: "round", locked: true });
+    expect(Object.keys(oneOnly).sort()).toEqual(["locked", "mode", "position"]);
+
+    const both = await answerInfo(req(["alpha", "beta"]), query, overlapRoot);
+    expect(both).toMatchObject({ mode: "explore", locked: false, sources: { simbad: "skipped" } });
+  });
+});
+
+describe("GET /api/info: the guard band around a ready spot's picture", () => {
+  const field = readJson("public/fields/eros/field.json");
+  const [W, H] = field.size as [number, number];
+  /** ra/dec of pixel (x, y) on the eros picture. */
+  const skyOf = (x: number, y: number) => {
+    const [ra, dec] = pixelToSky(field.wcs as FieldWcs, H, x, y);
+    return `ra=${ra}&dec=${dec}`;
+  };
+  const fetchSpy = vi.fn(async (): Promise<Response> => {
+    throw new Error("a live lookup was made inside a ready spot's guard band");
+  });
+  beforeEach(() => {
+    fetchSpy.mockClear();
+    clearLiveCache();
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("the band is ceil(9 arcsec / pixel) + 1 px wide (3 px for 6.15 arcsec pixels)", () => {
+    expect(guardBandPx(6.15)).toBe(3);
+  });
+
+  const near: [number, number][] = [
+    [-0.51, 60], [-0.6, 60], [-1.5, 60], [-2, 60],
+    [60, -0.6], [60, -2], [60, H - 0.4], [60, H + 1.4],
+    [W - 0.4, 60], [W + 1.4, 60], [-2, -2], [W + 1.4, H + 1.4],
+  ];
+  it.each(near)("pixel (%f, %f) just outside the picture is locked, with no outbound call", async (x, y) => {
+    const { status, body } = await get(`${skyOf(x, y)}&mode=explore`);
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ mode: "round", locked: true });
+    expect(Object.keys(body).sort()).toEqual(["locked", "mode", "position"]);
+    expect(body.position.x).toBeCloseTo(x, 3);
+    expect(body.position.y).toBeCloseTo(y, 3);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("with the cookie the band is answered from the pre-made catalog, echoing the asked position", async () => {
+    const { body } = await get(`${skyOf(-1.5, 60)}&mode=explore`, ["eros"]);
+    expect(body).toMatchObject({ mode: "explore", locked: false });
+    expect(body.position.x).toBeCloseTo(-1.5, 3);
+    expect(body.sources.jpl).toMatch(/^(premade|empty)$/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("the cookie of another spot does not open the band", async () => {
+    const { body } = await get(`${skyOf(-2, 60)}&mode=explore`, ["hektor"]);
+    expect(body).toMatchObject({ mode: "round", locked: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("a position 10 px outside the picture is live: SIMBAD and Gaia are asked", async () => {
+    fetchSpy.mockImplementation(async () => new Response(JSON.stringify({ metadata: [], data: [] }), { status: 200 }));
+    const { body } = await get(`${skyOf(-10, 60)}&mode=explore`);
+    expect(body).toMatchObject({ mode: "explore", locked: false, sources: { simbad: "empty", gaia: "empty", jpl: "skipped" } });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,5 +1,6 @@
 // POST/GET /api/request-spot  Contract: docs/contracts/api.md section 9.
-// POST saves a queued request (service role; guests may ask). GET lists the queue.
+// POST saves a queued request through the request_spot() function (service role; guests may ask),
+// or returns the near-identical request already there. GET lists the queue.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -22,20 +23,38 @@ export async function POST(request: NextRequest): Promise<Response> {
       throw new ApiFail("db_unavailable", "No database is connected, so requests cannot be saved yet.");
     }
     const user = await userFromRequest(request);
+    // request_spot() (supabase migration) decides: an existing queued, processing or done request
+    // within 0.05 degrees is returned as a duplicate; 200 queued requests refuse a new one.
+    let row: { id: unknown; status: unknown; duplicate: unknown } | undefined;
+    let queueFull = false;
     try {
       const { data, error } = await sb
-        .from("spot_requests")
-        // The table allows ra in [0, 360); the contract allows 360, which is the same direction as 0.
-        .insert({ ra: body.ra % 360, dec: body.dec, fov: body.fov, user_id: user?.id ?? null })
-        .select("id")
-        .abortSignal(AbortSignal.timeout(5000))
-        .single();
-      if (error || !data) throw new Error(error?.message ?? "no row");
-      return NextResponse.json({ id: Number(data.id), status: "queued" }, { status: 201 });
+        .rpc("request_spot", {
+          p_user: user?.id ?? null,
+          // The table allows ra in [0, 360); the contract allows 360, which is the same direction as 0.
+          p_ra: body.ra % 360,
+          p_dec: body.dec,
+          p_fov: body.fov,
+        })
+        .abortSignal(AbortSignal.timeout(5000));
+      if (error && /queue_full/.test(error.message)) queueFull = true;
+      else if (error) throw new Error(error.message);
+      else row = Array.isArray(data) ? data[0] : data;
+      if (!queueFull && (!row || row.id === undefined)) throw new Error("no row");
     } catch (e) {
       console.error("[request-spot] insert failed", e instanceof Error ? e.message : e);
       throw new ApiFail("db_unavailable", "The request could not be saved right now. Please try again later.");
     }
+    if (queueFull) {
+      throw new ApiFail("rate_limited", "The request queue is full right now. Please try again later.");
+    }
+    const duplicate = row?.duplicate === true;
+    return NextResponse.json(
+      duplicate
+        ? { id: Number(row?.id), status: String(row?.status), duplicate: true }
+        : { id: Number(row?.id), status: "queued" },
+      { status: duplicate ? 200 : 201 },
+    );
   });
 }
 
