@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PROJECT_NAME } from "@/lib/brand";
-import TitleScreen, { starfield } from "./TitleScreen";
+import TitleScreen from "./TitleScreen";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -15,39 +15,49 @@ vi.mock("next/link", () => ({
 afterEach(cleanup);
 
 describe("TitleScreen", () => {
-  it("has one h1 with the project name, two main buttons and Settings and Leaderboard", () => {
+  it("has one h1 with the project name and the four menu links in order", () => {
     render(<TitleScreen />);
     const h1s = screen.getAllByRole("heading", { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0].textContent).toBe(PROJECT_NAME);
-    expect(screen.getByRole("link", { name: "Game stages" }).getAttribute("href")).toBe("/stages");
-    expect(screen.getByRole("link", { name: "Explore the sky" }).getAttribute("href")).toBe("/map");
-    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
-    expect(screen.getByRole("link", { name: "Leaderboard" }).getAttribute("href")).toBe("/leaderboard");
-    expect(screen.queryByRole("link", { name: "Start training" })).toBeNull();
+    const links = screen.getAllByRole("link");
+    expect(links.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Game stages", "/stages"],
+      ["Explore the sky", "/map"],
+      ["Leaderboard", "/leaderboard"],
+      ["Settings", "/settings"],
+    ]);
     expect(screen.queryByRole("button", { name: "Log in" })).toBeNull(); // the account control is in the layout
-    expect(screen.getAllByRole("link")).toHaveLength(4);
+    expect(screen.getByRole("progressbar", { name: "World progress" })).toBeTruthy();
   });
 
-  it("draws a deterministic ASCII starfield hidden from screen readers", () => {
-    expect(starfield()).toEqual(starfield());
-    const stars = starfield().flat().filter((c) => c.ch !== " ").length;
-    expect(stars).toBeGreaterThan(50);
+  it("moves focus with ArrowDown and ArrowUp, wrapping at the ends", () => {
     render(<TitleScreen />);
-    expect(screen.getByTestId("starfield").getAttribute("aria-hidden")).toBe("true");
+    const links = screen.getAllByRole("link");
+    links[0].focus();
+    fireEvent.keyDown(links[0], { key: "ArrowDown" });
+    expect(document.activeElement).toBe(links[1]);
+    fireEvent.keyDown(links[1], { key: "ArrowDown" });
+    fireEvent.keyDown(links[2], { key: "ArrowDown" });
+    expect(document.activeElement).toBe(links[3]);
+    fireEvent.keyDown(links[3], { key: "ArrowDown" });
+    expect(document.activeElement).toBe(links[0]);
+    fireEvent.keyDown(links[0], { key: "ArrowUp" });
+    expect(document.activeElement).toBe(links[3]);
   });
 
-  it("animates the sky: two drifting star layers that tile seamlessly, plus ASCII shooting stars", () => {
+  it("draws the real sky, hidden from screen readers: stars, constellation figures and the Milky Way", () => {
     render(<TitleScreen />);
-    const far = screen.getByTestId("starfield");
-    const near = screen.getByTestId("starfield-near");
-    expect(near.getAttribute("aria-hidden")).toBe("true");
-    // Each row holds its pattern twice, so a drift of half the width loops without a seam.
-    for (const layer of [far, near]) {
-      const row = (layer.querySelector("span")?.textContent ?? "").replace(/\n$/, "");
-      expect(row.length % 2).toBe(0);
-      expect(row.slice(0, row.length / 2)).toBe(row.slice(row.length / 2));
-    }
+    const sky = screen.getByTestId("starfield");
+    expect(sky.getAttribute("aria-hidden")).toBe("true");
+    expect(Number(sky.getAttribute("data-stars"))).toBeGreaterThan(900);
+    expect(screen.getByTestId("constellations").getAttribute("d")?.startsWith("M")).toBe(true);
+    expect(screen.getByTestId("milky-way").querySelectorAll("circle").length).toBeGreaterThan(40);
+    expect(sky.querySelectorAll("text").length).toBeGreaterThan(100);
+  });
+
+  it("keeps ASCII shooting stars behind the menu", () => {
+    render(<TitleScreen />);
     const shooting = screen.getAllByTestId("shooting-star");
     expect(shooting.length).toBeGreaterThanOrEqual(2);
     for (const s of shooting) {
