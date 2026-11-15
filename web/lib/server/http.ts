@@ -1,4 +1,4 @@
-// Shared helpers for route handlers (owner: SERVER). Server only.
+// Shared helpers for route handlers. Server only.
 // Error shape and codes: docs/contracts/api.md section 1.
 
 import { unstable_rethrow } from "next/navigation";

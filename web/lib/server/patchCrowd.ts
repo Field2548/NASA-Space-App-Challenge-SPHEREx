@@ -1,4 +1,4 @@
-// Crowd agreement on a picked patch (owner: SERVER). Pure, server only. Nothing here scores:
+// Crowd agreement on a picked patch. Pure, server only. Nothing here scores:
 // a patch has no answer key for an unknown mover, so agreement between players is only feedback.
 
 export interface CrowdMark {

@@ -1,4 +1,4 @@
-// The work behind POST /api/patch-check and GET /api/patches (owner: SERVER). Server only.
+// The work behind POST /api/patch-check and GET /api/patches. Server only.
 // A picked patch has no answer key on disk, so one is built here from JPL's Small-Body
 // Identification service at the times of the player's frames, then scored with the same
 // scoreSubmission as a ready spot. The geometry comes from the patch id alone (lib/patch.ts) and

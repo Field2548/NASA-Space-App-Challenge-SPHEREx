@@ -1,4 +1,4 @@
-// GET /api/player?name=: one player's public numbers (owner: SERVER). Server only.
+// GET /api/player?name=: one player's public numbers. Server only.
 // Contract: docs/contracts/api.md section 7a. Database: player_stats() in
 // supabase/migrations/20261118000000_leaderboard_v2.sql, which never returns a user id or an email.
 //
