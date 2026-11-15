@@ -273,3 +273,20 @@ describe("spectrumAlongPath on real Eros data", () => {
     expect(await loadExposures({ ...field, has: {} }, fake)).toBeNull();
   });
 });
+
+describe("exposures.u16 encodings", () => {
+  it("decodes asinh as soft * sinh((value - 32767) * step), keeps 65535 as NaN, and still decodes linear rows", () => {
+    // Plane 0 asinh: sky (32767), +1 sigma-ish, the brightest end (65534), no data. Plane 1 linear.
+    const u = new Uint16Array([32767, 33767, 65534, 65535, 100, 200, 300, 65535]);
+    const e0 = { k: 0, soft: 0.0127, step: 0.000331 };
+    const e1 = { k: 1, scale: 0.5, offset: -10 };
+    const json = { size: [4, 1], nodata: 65535, encoding: "asinh", exposures: [e0, e1] } as unknown as ExposuresJson;
+    const { planes } = decodeExposures(json, u.buffer, 0);
+    expect(planes[0][0]).toBe(0);
+    expect(planes[0][1]).toBeCloseTo(0.0127 * Math.sinh(1000 * 0.000331), 6);
+    expect(planes[0][2]).toBeCloseTo(0.0127 * Math.sinh(32767 * 0.000331), 3); // top of the range: not clipped
+    expect(planes[0][3]).toBeNaN();
+    expect(Array.from(planes[1].slice(0, 3))).toEqual([40, 90, 140]);
+    expect(planes[1][3]).toBeNaN();
+  });
+});
