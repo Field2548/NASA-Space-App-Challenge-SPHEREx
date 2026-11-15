@@ -61,13 +61,19 @@ describe("AuthDialog", () => {
   });
 
   it("sign-up without a session switches to Log in and keeps the notice", async () => {
-    sbMock.client = fakeClient();
+    const client = fakeClient();
+    sbMock.client = client;
     render(<AuthDialog open onClose={() => {}} initialMode="signup" />);
     fill("Email", "a@b.co");
     fill("Password", "longenough1");
     fill("Display name", "Vega");
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Log in" })).toBeTruthy());
+    expect(client.auth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: { data: { display_name: "Vega" }, emailRedirectTo: `${window.location.origin}/profile` },
+      }),
+    );
     expect(screen.getByRole("status").textContent).toBe("Check your email to confirm your account, then log in.");
   });
 
