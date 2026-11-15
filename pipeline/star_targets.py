@@ -1,6 +1,8 @@
 """Star targets ("tool tests"): named stars that stand in for the planted object.
 
-Two kinds, both built from real SPHEREx frames:
+Three kinds, all built from real SPHEREx frames:
+  static    a star that does not move or vary (Elias 16, seen through the Taurus cloud: the
+            point is its spectrum, which shows ice absorption).
   mover     a high proper motion star or brown dwarf. It moves a few pixels over the months
             between survey passes (inside one visit it moves less than 0.1 px).
   variable  a star that does not move; the answer is the star whose brightness changes.
@@ -48,6 +50,13 @@ STAR_SPOTS = [
      "star": {"id": "r-dra", "name": "R Draconis", "role": "variable", "variable": True,
               "ra": 248.16761083295, "dec": 66.75497941722, "pmra": -20.643, "pmdec": 6.149,
               "plx": 1.2509, "source": "SIMBAD V* R Dra"}},
+    # Elias 16 (Elia 3-16, a K giant behind the Taurus cloud): the ice-absorption test star. It does
+    # not move and is not variable; the spot ships the 102-band cube so its spectrum can be read.
+    {"slug": "taurus-ice", "folder": "data/motion_69.9119_26.1907_2025-08-27",
+     "title": "Taurus dark cloud: ice in starlight", "fov": 0.2,
+     "star": {"id": "elias16", "name": "Elias 16 (2MASS J04393886+2611266)", "role": "static",
+              "variable": False, "ra": 69.91193949634, "dec": 26.19073514211, "pmra": 20.325,
+              "pmdec": -28.804, "plx": 3.5094, "source": "SIMBAD Elia 3-16"}},
 ]
 
 
