@@ -229,6 +229,26 @@ describe("iceDips: continuum fit and optical depth", () => {
     expect(d.detected).toBe(false);
   });
 
+  it("a single spiked continuum band does not drag the continuum (sigma-clipped fit)", () => {
+    // Seen on a real Hektor-field star: one band at 4.18 um 100 x its neighbours.
+    const spec = synth(h2o, 8);
+    const i = WL.findIndex((w) => w > 4.1 && w < 4.18);
+    const flux = spec.flux.map((f, j) => (j === i ? 100 * f : f));
+    const r = iceDips({ ...spec, flux });
+    expect(r.dips.find((x) => x.feature === "H2O")!.detected).toBe(true);
+    for (const o of r.dips.filter((x) => x.feature !== "H2O")) expect(o.detected).toBe(false);
+  });
+
+  it("a negative or implausibly deep single band is a bad band, not CO ice", () => {
+    // Seen on a real Cygnus star: one band at 4.67 um at -0.11 of the continuum, neighbours at 0.95.
+    const spec = synth(() => 0, 9);
+    const i = WL.findIndex((w) => w >= 4.64 && w <= 4.7);
+    for (const scale of [-0.1, 0.1]) {
+      const flux = spec.flux.map((f, j) => (j === i ? scale * f : f));
+      expect(iceDips({ ...spec, flux }).dips.find((x) => x.feature === "CO")!.detected).toBe(false);
+    }
+  });
+
   it("gives no continuum when the source is too faint", () => {
     const spec = synth(() => 0, 4);
     const faint = { ...spec, flux: spec.flux.map((f, i) => f - 50 * Math.pow(WL[i], -1.2)) };

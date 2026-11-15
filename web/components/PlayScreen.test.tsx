@@ -605,6 +605,16 @@ describe("PlayScreen round mode", () => {
     expect(screen.queryByRole("dialog", { name: /INSPECT/ })).toBeNull();
   });
 
+  it("draws the spectrum circle on the viewer and the radius control resizes it", async () => {
+    const canvas = await loadGame({}, { has: { spectrum: true } });
+    fireEvent.keyDown(window, { key: "i" });
+    fireEvent.click(canvas, { clientX: 25, clientY: 15 });
+    const r0 = Number(screen.getByTestId("aperture").querySelector("circle")!.getAttribute("r"));
+    fireEvent.click(await screen.findByRole("button", { name: "Larger circle" }));
+    const r1 = Number(screen.getByTestId("aperture").querySelector("circle")!.getAttribute("r"));
+    expect(r1 / r0).toBeCloseTo(3 / 2, 9);
+  });
+
   it("bumps the scoreboard on every verdict", async () => {
     const wrong: CheckResponse = { ...known, verdict: { kind: "candidate", points: 0, message: "No." }, unlocked: false, reveal: undefined };
     const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(wrong), { status: 200 })) as unknown as typeof fetch });

@@ -275,6 +275,10 @@ export const ICE_WINDOWS: [number, number][] = [
 ];
 /** Ice bands wider than one SPHEREx band, which must show in more than one band. */
 const BROAD_DIPS = new Set<FeatureName>(["H2O"]);
+/** Largest believable optical depth of a dip narrower than one band (CO2, CO), see iceDips. */
+const NARROW_TAU_MAX = 1;
+/** Continuum points must lie within this distance of a dip band on each side, micron. */
+const BRACKET_UM = 0.3;
 /** Degree of the continuum polynomial in ln(flux) against wavelength. */
 const CONT_DEGREE = 2;
 /** A continuum point needs S/N >= 3 (ln of a noisy, possibly negative flux is meaningless). */
@@ -318,46 +322,76 @@ function invert3(m: number[][]): number[][] | null {
 /**
  * Ice continuum and dips. Fits ln F = c0 + c1 t + c2 t^2 (t = wl - 3.7) by weighted least squares
  * over 2.4 to 5 um outside ICE_WINDOWS, on points with S/N >= 3, weight (F / err)^2 (the variance of
- * ln F). For each dip of FEATURES (H2O, CO2, CO), over its measurement band:
+ * ln F), clipping points beyond 3 x the robust spread of the residuals. For each dip of FEATURES
+ * (H2O, CO2, CO), over its measurement band:
  *   depth D = mean(F_cont - F), var(D) = sum err^2 / n^2 + g' C g (C the fit covariance),
  *   sigma = D / (k sqrt(var D)), tau = -ln(mean F / mean F_cont),
  * where k = max(1, scatterInflation, sqrt(chi^2 / dof)): on real stars the cube's sky-noise errors
- * alone gave "features" at hundreds of sigma (see findFeatures). A dip needs a continuum point on
- * each side and sigma >= FEATURE_MIN_SIGMA to count as detected; the broad H2O band also needs 2
- * bands and the bar met with every single band left out in turn (on a real Cygnus star one low band
- * at 2.98 um alone gave 5 sigma).
+ * alone gave "features" at hundreds of sigma (see findFeatures). A dip needs a kept continuum point
+ * within 0.3 um on each side and sigma >= FEATURE_MIN_SIGMA to count as detected. The broad H2O band
+ * also needs 2 bands and the bar met with every single band left out in turn (on a real Cygnus star
+ * one low band at 2.98 um alone gave 5 sigma); CO2 and CO need 0 < tau <= 1.
  */
 export function iceDips(spec: Spectrum): IceResult {
-  const pts: { t: number; y: number; w: number }[] = [];
+  const pts: { t: number; y: number; w: number; e: number }[] = [];
   for (let i = 0; i < spec.wl.length; i++) {
     const wl = spec.wl[i];
     const f = spec.flux[i];
     const e = spec.err[i];
     if (!(wl >= CONTINUUM_RANGE[0] && wl <= CONTINUUM_RANGE[1]) || ICE_WINDOWS.some(([lo, hi]) => wl >= lo && wl <= hi)) continue;
     if (!Number.isFinite(f) || !(e > 0) || f / e < CONT_MIN_SNR) continue;
-    pts.push({ t: wl - WL_PIVOT, y: Math.log(f), w: (f / e) ** 2 });
+    pts.push({ t: wl - WL_PIVOT, y: Math.log(f), w: 0, e });
   }
-  if (pts.length < CONT_MIN_POINTS) return { continuum: null, dips: [], inflation: 1 };
+  // Weights (F / err)^2 from the median of each point and its neighbours, not the point itself, so
+  // one spiked band does not also get a huge weight; after each fit they come from the model.
+  pts.sort((p, q) => p.t - q.t);
+  pts.forEach((p, i) => {
+    const near = pts.slice(Math.max(0, i - 1), i + 2).map((q) => Math.exp(q.y)).sort((a, b) => a - b);
+    p.w = (median(near) / p.e) ** 2;
+  });
   const N = CONT_DEGREE + 1;
-  const M = Array.from({ length: N }, () => new Array<number>(N).fill(0));
-  const v = new Array<number>(N).fill(0);
-  for (const p of pts)
-    for (let j = 0; j < N; j++) {
-      v[j] += p.w * p.y * p.t ** j;
-      for (let l = 0; l < N; l++) M[j][l] += p.w * p.t ** (j + l);
-    }
-  const C = invert3(M);
-  if (!C) return { continuum: null, dips: [], inflation: 1 };
-  const c = C.map((row) => row.reduce((s, x, l) => s + x * v[l], 0));
-  const lnCont = (wl: number) => c.reduce((s, x, j) => s + x * (wl - WL_PIVOT) ** j, 0);
-  const chi2 = pts.reduce((s, p) => s + p.w * (p.y - lnCont(p.t + WL_PIVOT)) ** 2, 0);
-  const k = Math.max(1, scatterInflation(spec), Math.sqrt(chi2 / (pts.length - N)));
+  const fit = (use: typeof pts) => {
+    const M = Array.from({ length: N }, () => new Array<number>(N).fill(0));
+    const v = new Array<number>(N).fill(0);
+    for (const p of use)
+      for (let j = 0; j < N; j++) {
+        v[j] += p.w * p.y * p.t ** j;
+        for (let l = 0; l < N; l++) M[j][l] += p.w * p.t ** (j + l);
+      }
+    const C = invert3(M);
+    if (!C) return null;
+    const c = C.map((row) => row.reduce((s, x, l) => s + x * v[l], 0));
+    return { C, at: (t: number) => c.reduce((s, x, j) => s + x * t ** j, 0) };
+  };
+  // Sigma-clipped fit: single bad bands (a 100 x spike was seen on a real star) would otherwise
+  // pull the continuum far off. Clip at 3 x the robust spread of the normalised residuals.
+  let kept = pts;
+  let model = kept.length >= CONT_MIN_POINTS ? fit(kept) : null;
+  for (let it = 0; it < 5 && model; it++) {
+    const m = model;
+    const z = kept.map((p) => (p.y - m.at(p.t)) * Math.sqrt(p.w));
+    const s = Math.max(1, 1.4826 * median(z.map(Math.abs).sort((a, b) => a - b))); // 1.4826: MAD -> sigma
+    const next = kept.filter((_, i) => Math.abs(z[i]) <= 3 * s).map((p) => ({ ...p, w: (Math.exp(m.at(p.t)) / p.e) ** 2 }));
+    if (next.length < CONT_MIN_POINTS) break;
+    const done = next.length === kept.length;
+    kept = next;
+    model = fit(kept) ?? m;
+    if (done) break;
+  }
+  if (!model) return { continuum: null, dips: [], inflation: 1 };
+  const { C, at } = model;
+  const lnCont = (wl: number) => at(wl - WL_PIVOT);
+  const chi2 = kept.reduce((s, p) => s + p.w * (p.y - at(p.t)) ** 2, 0);
+  const k = Math.max(1, scatterInflation(spec), Math.sqrt(chi2 / (kept.length - N)));
 
   const dips: IceDip[] = [];
   for (const def of FEATURES) {
     if (def.kind !== "dip") continue;
     const [lo, hi] = def.band;
-    if (!pts.some((p) => p.t + WL_PIVOT < lo) || !pts.some((p) => p.t + WL_PIVOT > hi)) continue;
+    // Continuum on both sides within BRACKET_UM of the left-out window, so the depth is never an extrapolation.
+    const [wlo, whi] = ICE_WINDOWS.find(([a, b]) => a <= lo && b >= hi) ?? def.band;
+    const wls = kept.map((p) => p.t + WL_PIVOT);
+    if (!wls.some((w) => w < wlo && w >= wlo - BRACKET_UM) || !wls.some((w) => w > whi && w <= whi + BRACKET_UM)) continue;
     const inBand: { wl: number; f: number; e: number }[] = [];
     for (let i = 0; i < spec.wl.length; i++) {
       const wl = spec.wl[i];
@@ -389,9 +423,11 @@ export function iceDips(spec: Spectrum): IceResult {
     // Leave-one-out for the broad water band (about 0.3 um wide, several SPHEREx bands): the dip must
     // stay above the bar with any single band removed, so a lone low band is not a dip. CO2 and CO
     // are narrower than one band at R ~ 110, so a single band is all they can show.
-    const robust =
-      !BROAD_DIPS.has(def.feature) ||
-      (inBand.length >= 2 && inBand.every((_, i) => depth(inBand.filter((__, j) => j !== i)).sigma >= FEATURE_MIN_SIGMA));
+    // A narrow band can only show in one band, so there the guard is physical: an unresolved CO2 or
+    // CO dip cannot reach tau > 1 at this resolution, and a deeper or negative band is a bad band.
+    const robust = BROAD_DIPS.has(def.feature)
+      ? inBand.length >= 2 && inBand.every((_, i) => depth(inBand.filter((__, j) => j !== i)).sigma >= FEATURE_MIN_SIGMA)
+      : all.fm > 0 && -Math.log(all.fm / all.cm) <= NARROW_TAU_MAX;
     const tau = all.fm > 0 ? -Math.log(all.fm / all.cm) : null;
     const tauErr = all.fm > 0 ? k * Math.sqrt(all.varF / (all.fm * all.fm) + all.varCont / (all.cm * all.cm)) : null;
     dips.push({ feature: def.feature, tau, tauErr, sigma: all.sigma, detected: all.sigma >= FEATURE_MIN_SIGMA && robust });
