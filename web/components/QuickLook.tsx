@@ -225,7 +225,12 @@ export interface QuickLookProps {
 }
 
 /** Quick look at (ra, dec). Mount it where CoordinateBox's onQuickLook fires. */
-export default function QuickLook({ ra, dec, onClose }: QuickLookProps) {
+export default function QuickLook(props: QuickLookProps) {
+  // A new spot remounts: the old run is cancelled and its frames never show under the new heading.
+  return <QuickLookAt key={`${props.ra},${props.dec}`} {...props} />;
+}
+
+function QuickLookAt({ ra, dec, onClose }: QuickLookProps) {
   const [state, setState] = useState<QuickLookState>({ phase: "listing" });
   const [settings, setSettings] = useState<QuickLookSettings>(DEFAULT_SETTINGS);
   const [frame, setFrame] = useState(0);

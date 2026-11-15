@@ -385,6 +385,7 @@ function cachedHeaders(url: string, fetch: FetchLike | undefined, signal: AbortS
     };
     p.catch(drop);
     signal.addEventListener("abort", drop, { once: true });
+    p.then(() => signal.removeEventListener("abort", drop), () => {}); // a finished read stays cached
   }
   return p;
 }
@@ -422,6 +423,7 @@ function cachedRows(
   };
   promise.catch(drop);
   signal.addEventListener("abort", drop, { once: true }); // see cachedHeaders
+  promise.then(() => signal.removeEventListener("abort", drop), () => {});
   // Evict the oldest reads beyond the limit (Map keeps insertion order).
   for (const [k, v] of rowCache) {
     if (rowCacheBytes <= CACHE_LIMIT_BYTES || k === key) break;
