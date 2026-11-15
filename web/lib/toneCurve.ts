@@ -5,7 +5,7 @@
 
 export const CURVE_X = [0, 0.25, 0.5, 0.75, 1] as const;
 export type Curve = number[];
-export type CurvePreset = "linear" | "asinh" | "log" | "gamma";
+export type CurvePreset = "linear" | "asinh" | "log";
 
 export const DEFAULT_CURVE: Curve = [0, 0.25, 0.5, 0.75, 1];
 
@@ -20,7 +20,6 @@ export function presetCurve(name: CurvePreset, a = 5): Curve {
     // undo the asinh: brightness proportional to the signal
     linear: (y) => Math.sinh(y * Math.asinh(a)) / a,
     log: (y) => Math.log1p(9 * y) / Math.log(10),
-    gamma: (y) => y ** 0.6,
   };
   return CURVE_X.map((x) => f[name](x));
 }

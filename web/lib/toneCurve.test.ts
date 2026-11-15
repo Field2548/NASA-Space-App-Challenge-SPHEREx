@@ -34,7 +34,7 @@ describe("tone curve", () => {
     expect(movePoint(DEFAULT_CURVE, 2, 0.6)).toEqual([0, 0.25, 0.6, 0.75, 1]);
   });
   it("presets are monotone, end at (0,0) and (1,1), and differ from the default", () => {
-    for (const n of ["linear", "log", "gamma"] as const) {
+    for (const n of ["linear", "log"] as const) {
       const c = presetCurve(n);
       expect(c[0]).toBeCloseTo(0, 9);
       expect(c[4]).toBeCloseTo(1, 9);
@@ -42,6 +42,6 @@ describe("tone curve", () => {
       expect(isDefaultCurve(c)).toBe(false);
     }
     expect(presetCurve("linear")[2]).toBeLessThan(0.5);
-    expect(presetCurve("gamma")[2]).toBeGreaterThan(0.5);
+    expect(presetCurve("log")[2]).toBeGreaterThan(0.5);
   });
 });

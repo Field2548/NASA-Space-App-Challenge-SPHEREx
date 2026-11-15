@@ -1,7 +1,7 @@
 "use client";
 // Light intensity curve editor (PNL-06): input brightness (what the picture shows now) on the
 // horizontal axis, output brightness on the vertical. Five points move up and down (drag or
-// arrow keys, Shift for big steps); presets Linear, asinh (the default look), Log, Gamma, Reset.
+// arrow keys, Shift for big steps); presets Linear, Log, asinh (the default look and the reset).
 //
 // Props: { value: Curve; onChange(c: Curve): void }
 
@@ -12,9 +12,8 @@ import InfoPopover from "./InfoPopover";
 
 const PRESETS: { key: CurvePreset; label: string }[] = [
   { key: "linear", label: "Linear" },
-  { key: "asinh", label: "asinh" },
   { key: "log", label: "Log" },
-  { key: "gamma", label: "Gamma" },
+  { key: "asinh", label: "asinh" },
 ];
 const SIZE = 140;
 const PAD = 8;
@@ -57,7 +56,7 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
     onChange(movePoint(value, i, y));
   };
 
-  const demo = value.every((y, i) => Math.abs(y - DEFAULT_CURVE[i]) < 1e-9) ? presetCurve("gamma") : value;
+  const demo = value.every((y, i) => Math.abs(y - DEFAULT_CURVE[i]) < 1e-9) ? presetCurve("log") : value;
   const sc = rampScene();
 
   return (
@@ -73,7 +72,7 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
           </p>
           <p>
             Drag a dot up or down, or focus it and press the arrow keys (Shift for bigger steps). Presets: asinh is the default
-            look, Linear is brightness proportional to the signal, Log and Gamma lift the faint end.
+            look and the reset, Linear is brightness proportional to the signal, Log lifts the faint end.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
             <HelpImage data={sc.data} w={sc.w} h={sc.h} label="Before: a plain ramp from dark to bright with a faint blob" caption="Before" />
@@ -124,9 +123,6 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
             {p.label}
           </button>
         ))}
-        <button type="button" onClick={() => onChange(DEFAULT_CURVE)}>
-          Reset
-        </button>
       </div>
     </div>
   );
