@@ -21,7 +21,7 @@
     {
      "frame": 2,
      "x": 29.06,
-     "y": 29.2,
+     "y": 29.19,
      "in_grid": true,
      "snr": 3.7,
      "change_snr": 3.9
@@ -29,7 +29,7 @@
     {
      "frame": 3,
      "x": 30.01,
-     "y": 27.79,
+     "y": 27.78,
      "in_grid": true,
      "snr": 2.7,
      "change_snr": 2.9
@@ -52,7 +52,7 @@
     }
    ],
    "vx_px_per_day": 0.736,
-   "vy_px_per_day": -1.259
+   "vy_px_per_day": -1.257
   }
  ],
  "bot": {

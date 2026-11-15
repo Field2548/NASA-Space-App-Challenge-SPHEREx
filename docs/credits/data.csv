@@ -11,3 +11,6 @@ photutils,Photutils Developers,https://photutils.readthedocs.io/,BSD-3-Clause,st
 Requests,Kenneth Reitz and contributors,https://requests.readthedocs.io/,Apache-2.0,downloads in the repo's processing scripts,2026-11-15
 Pillow,Jeffrey A. Clark and contributors,https://python-pillow.org/,MIT-CMU,writing WebP thumbnails and reading PNG previews (pipeline/),2026-11-15
 pytest,pytest-dev team,https://pytest.org/,MIT,tests for the export pipeline (development only),2026-11-15
+"Bock et al. 2026, The SPHEREx Satellite Mission (canonical mission paper)","Bock, J. J. et al.",https://doi.org/10.3847/1538-4357/ae2be2,"published paper, cited as IRSA asks; no code or data copied","citation for the SPHEREx mission (ApJ 999, 139; arXiv 2511.02985)",2026-11-15
+"Akeson et al. 2026, The SPHEREx Image and Spectrophotometry Processing Pipeline (canonical pipeline paper)","Akeson, R. et al.",https://doi.org/10.3847/1538-4365/ae8843,"published paper, cited as IRSA asks; no code or data copied","citation for the SPHEREx data pipeline (ApJS 285, 67; arXiv 2511.15823)",2026-11-15
+"Lupton, Gunn & Szalay 1999, asinh magnitudes","Lupton, R. H., Gunn, J. E., Szalay, A. S.",https://doi.org/10.1086/301004,"published paper or method, cited; no code or data copied","softening of the asinh stretch (AJ 118, 1406; arXiv astro-ph/9903081)",2026-11-15

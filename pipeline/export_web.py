@@ -127,6 +127,23 @@ SPOTS = [
 ]
 
 
+SPHEREX_OBSERVER = "500@-163182"   # JPL Horizons id of the SPHEREx spacecraft as the observer
+MID_EXPOSURE_DAYS = 57.6 / 86400   # MJD-AVG minus DATE-OBS of a level 2 image (about half XPOSURE)
+
+
+def horizons_positions(track, mjds, wcs):
+    """Pixel position of a known object as SPHEREx sees it: Horizons with the spacecraft as
+    observer, at mid-exposure (a frame's mjd is the mean DATE-OBS, the start of exposure)."""
+    from astropy.coordinates import SkyCoord
+    from astropy.time import Time
+    from astroquery.jplhorizons import Horizons
+    jd = [Time(m + MID_EXPOSURE_DAYS, format="mjd", scale="utc").jd for m in mjds]
+    eph = Horizons(id=track, id_type="smallbody", location=SPHEREX_OBSERVER,
+                   epochs=jd).ephemerides(quantities="1")
+    x, y = wcs.world_to_pixel(SkyCoord(eph["RA"], eph["DEC"], unit="deg"))
+    return np.asarray(x), np.asarray(y), str(eph["targetname"][0])
+
+
 def _repo_imports():
     """The repo's scripts live at the top level; make them importable from pipeline/."""
     import sys
@@ -305,7 +322,7 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
                nothing_moves=False):
     """The server-only answer key (field-schema.md section 6).
     track: a JPL Horizons small-body id; its position in every frame comes from
-    motion_frames.track_positions. frames (top-down) adds the measured S/N at each position
+    horizons_positions. frames (top-down) adds the measured S/N at each position
     (max of the 3x3 pixels, as the repo's --track check does). change_snr is the same 3x3
     maximum in the frame minus the median of the other frames (motion_frames.residuals): stars
     cancel, so it tells whether the object itself is seen there. star is reserved for the
@@ -319,8 +336,7 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
     t_ref = float(mjds.mean())
     objects = []
     if track:
-        from motion_frames import track_positions
-        fx, fy, name = track_positions(track, list(mjds), wcs)
+        fx, fy, name = horizons_positions(track, list(mjds), wcs)
         x, y = to_top_down(fx, fy, height)
         days = mjds - t_ref
         resid = None
