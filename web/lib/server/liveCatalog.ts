@@ -1,4 +1,4 @@
-// Live catalogue lookups for a sky position outside every ready spot (owner: SERVER). Server only.
+// Live catalogue lookups for a sky position outside every ready spot. Server only.
 // Contract: docs/contracts/api.md section 6. Build prompt: 8.16 (radii, 8 s timeout, 1 arcsec cache)
 // and section 7 (endpoints and tables). Only SIMBAD and Gaia are live here. JPL needs an observation
 // time, which this lookup does not have, so it is never asked from here (api.md section 6).

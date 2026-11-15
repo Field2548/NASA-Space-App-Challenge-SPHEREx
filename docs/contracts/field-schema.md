@@ -1,6 +1,6 @@
-# Contract: field schema (owner: DATA)
+# Contract: field schema
 
-Version 1, published 2026-11-15 04:10 Bangkok. Change only through a `contract` issue (coordination 3.5). Version 1.1 (2026-11-15): neutral public title, kind and difficulty; `reveal` in the answer key (issue #10); `change_snr` in answer-key positions.
+Version 1, published 2026-11-15 04:10 Bangkok. Version 1.1 (2026-11-15): neutral public title, kind and difficulty; `reveal` in the answer key (issue #10); `change_snr` in answer-key positions.
 Every file below is written by `pipeline/export_web.py` (real spots) or `pipeline/make_fixture.py` (the `fixture` spot).
 
 ```
@@ -181,7 +181,7 @@ With all exposures of a frame selected, this reproduces `frames.u16` to a median
 
 ## 9. `web/data/catalog/<slug>.json` (server only, phase 2: DRAFT)
 
-Draft shape. It becomes final when DATA closes the `contract` issue for it (before 12:00); SERVER, comment there if you need other columns.
+Draft shape. It may still change.
 
 ```json
 {
@@ -209,7 +209,7 @@ Draft shape. It becomes final when DATA closes the `contract` issue for it (befo
 - Its answer key has a `reveal` block like the real spots: `{"title": "Fixture (synthetic test spot)", "kind": "fixture", "difficulty": "easy"}` (the fixture's public title; the public fixture files do not carry the block).
 - Its answer key has one bot candidate on the mover (`status: "known"`, `noise_bar_sigma` 6.0), so "matches the bot" paths can be tested.
 
-## 11. Routes owned by DATA: /api/overlay
+## 11. Overlay routes: /api/overlay
 
 `GET /api/overlay?spot=<slug>&mode=round|explore` (written form of issue #14). Draws two layers over a spot's picture in Explore: amber diamonds for known asteroids and comets, teal rings for catalog stars. Source: `web/data/catalog/<slug>.json` (section 9). Code: `web/lib/overlays.ts`, `web/app/api/overlay/route.ts`.
 

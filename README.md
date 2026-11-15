@@ -233,7 +233,7 @@ python pipeline/catalog_facts.py --all     # names and facts of known objects ne
 We used Claude Code (Anthropic's coding assistant) to help write the code in this repo.
 
 - The Python tools and the science behind them were written by the team with Claude Code. The repo history shows this: many commit messages carry a `Co-Authored-By: Claude` line.
-- The website was built by three Claude Code agent sessions, called DATA, GAME and SERVER. They worked on separate branches and talked to each other only through GitHub issues and pull requests, following the plans in `docs/plans/`.
+- The website was built with Claude Code sessions working on separate branches and delivering through pull requests.
 - People kept the jobs that need a person: accounts, secrets, approvals, and the final submission.
 - Every outside dataset, library, font and icon is credited in `CREDITS.md`.
 - No AI-generated images or video are used. Every picture on the site is real SPHEREx data, or is drawn in code (CSS and SVG).

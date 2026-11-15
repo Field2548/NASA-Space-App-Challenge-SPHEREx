@@ -1,4 +1,4 @@
-// The work behind POST /api/check and POST /api/complete (owner: SERVER). Server only.
+// The work behind POST /api/check and POST /api/complete. Server only.
 // Lives here, not in the route files, because Next.js route files may only export HTTP handlers,
 // and so tests can inject a database and a login (FlowDeps) without a real Supabase.
 // Contract: docs/contracts/api.md sections 2, 3 and 4.
