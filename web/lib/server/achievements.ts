@@ -11,19 +11,23 @@ const SOLVED_VERDICTS = new Set(["known", "bot_match", "nothing_correct"]);
 
 let cache: Promise<SpotInfo[]> | null = null;
 
-async function readJson(file: string): Promise<unknown> {
-  return JSON.parse(await readFile(path.join(process.cwd(), file), "utf8"));
+async function readIndex(): Promise<unknown> {
+  return JSON.parse(await readFile(path.join(process.cwd(), "public", "fields", "index.json"), "utf8"));
+}
+
+async function readAnswerKey(slug: string): Promise<unknown> {
+  return JSON.parse(await readFile(path.join(process.cwd(), "data", "answers", `${slug}.json`), "utf8"));
 }
 
 /** Every ready spot with its kind (from the answer key) and difficulty (from index.json). Cached. */
 export function loadSpotInfos(): Promise<SpotInfo[]> {
   cache ??= (async () => {
-    const index = (await readJson("public/fields/index.json")) as { slug?: unknown; difficulty?: unknown }[];
+    const index = (await readIndex()) as { slug?: unknown; difficulty?: unknown }[];
     const out: SpotInfo[] = [];
     for (const e of index) {
       if (typeof e.slug !== "string" || EXCLUDED.has(e.slug)) continue;
       try {
-        const key = (await readJson(`data/answers/${e.slug}.json`)) as { reveal?: { kind?: unknown } };
+        const key = (await readAnswerKey(e.slug)) as { reveal?: { kind?: unknown } };
         const kind = key.reveal?.kind;
         if (typeof kind === "string") out.push({ slug: e.slug, kind, difficulty: String(e.difficulty ?? "") });
       } catch {
