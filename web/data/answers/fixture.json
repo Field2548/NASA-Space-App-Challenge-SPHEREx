@@ -4,7 +4,7 @@
  "noise_bar_sigma": 6.0,
  "t_ref_mjd": 61000.1875,
  "reveal": {
-  "title": "Fixture mover",
+  "title": "Fixture (synthetic test spot)",
   "kind": "fixture",
   "difficulty": "easy"
  },

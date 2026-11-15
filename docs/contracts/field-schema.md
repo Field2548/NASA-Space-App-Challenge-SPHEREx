@@ -203,7 +203,7 @@ Draft shape. It becomes final when DATA closes the `contract` issue for it (befo
 - 3 static stars at `(8, 8)`, `(24, 10)`, `(12, 25)` with peak S/N 40, 25, 15.
 - 1 mover with peak S/N 20 at `(10, 16)` in frame 1, moving `+2 px` in x per frame: `(12, 16)`, `(14, 16)`, `(16, 16)`.
 - One pixel `(31, 31)` is no data (65535) in every frame, to exercise the NaN path.
-- Its answer key has a `reveal` block like the real spots: `{"title": "Fixture mover", "kind": "fixture", "difficulty": "easy"}` (the public fixture files do not carry it).
+- Its answer key has a `reveal` block like the real spots: `{"title": "Fixture (synthetic test spot)", "kind": "fixture", "difficulty": "easy"}` (the fixture's public title; the public fixture files do not carry the block).
 - Its answer key has one bot candidate on the mover (`status: "known"`, `noise_bar_sigma` 6.0), so "matches the bot" paths can be tested.
 
 ## 11. Routes owned by DATA: /api/overlay

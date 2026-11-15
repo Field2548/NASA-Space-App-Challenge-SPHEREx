@@ -3,6 +3,7 @@ They read the committed export, so they need no network. Tests that compare agai
 frames.fits are skipped when that (gitignored) file is absent."""
 import json
 import os
+import re
 import sys
 
 import numpy as np
@@ -353,6 +354,129 @@ def test_public_files_do_not_name_the_answer():
             assert "433" not in value, f"index.json contains '433' in {value!r}"
 
 
+PUBLIC = os.path.join(ROOT, "web", "public")
+NAME_WORDS = ["Eros", "Hektor", "Makemake", "Eris", "Cygnus control", "asteroid", "dwarf"]
+CATALOGUE_NUMBERS = re.compile(r"(?<!\d)(433|624|136472|136199)(?!\d)")
+# Narrow, documented exceptions (file relative to web/public, exact string value): generic
+# reference tables about stars, not about any spot, that contain the ordinary word "dwarf".
+NAME_EXCEPTIONS = {
+    ("ref/molecule_bands.json", "Gas in cool star and brown-dwarf atmospheres"),
+    ("ref/spt_teff.json",
+     'https://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt (Eric Mamajek, '
+     '"A Modern Mean Dwarf Stellar Color and Effective Temperature Sequence"); columns SpT and '
+     'Teff only, parsed verbatim by script, no values typed by hand'),
+}
+
+
+def _public_json_files():
+    found = []
+    for root, _, files in os.walk(PUBLIC):
+        for name in sorted(files):
+            if name.endswith(".json"):
+                found.append(os.path.join(root, name))
+    return sorted(found)
+
+
+def _string_values(obj):
+    """Every string VALUE anywhere in a parsed JSON value (keys and numbers are skipped)."""
+    if isinstance(obj, dict):
+        for v in obj.values():
+            yield from _string_values(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _string_values(v)
+    elif isinstance(obj, str):
+        yield obj
+
+
+def test_no_public_json_names_an_object():
+    """Walks EVERY .json under web/public/ (fields, spectrum, exposures, ref, ...), not only
+    field.json and index.json, and fails (naming file and value) if a string VALUE
+      - contains, case-sensitively, Eros, Hektor, Makemake, Eris, "Cygnus control", asteroid or dwarf,
+      - equals "control", or
+      - contains 433, 624, 136472 or 136199 as a whole token: the digits must not touch another
+        digit on either side (regex (?<!\\d)(...)(?!\\d)). So an id such as "2025W28_1B_0433_2"
+        is judged by the rule too: "_0433_" has a 0 right before 433, so it is NOT the number
+        433 and passes, while "433 Eros" or "(433)" or "A433" would fail. Plain decimals like
+        13.2004 are JSON numbers, not strings, and are never examined.
+    Keys and numbers are ignored; "Field in Cygnus" is allowed (a constellation).
+    Exceptions are exact (file, value) pairs in NAME_EXCEPTIONS: two generic star-reference
+    strings with the word "dwarf" under ref/."""
+    files = _public_json_files()
+    assert len(files) >= 20, files               # the walk really reaches all of web/public
+    examined = 0
+    for path in files:
+        rel = os.path.relpath(path, PUBLIC).replace(os.sep, "/")
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        for value in _string_values(data):
+            examined += 1
+            if (rel, value) in NAME_EXCEPTIONS:
+                continue
+            bad = [w for w in NAME_WORDS if w in value]
+            if value == "control":
+                bad.append("control")
+            m = CATALOGUE_NUMBERS.search(value)
+            if m:
+                bad.append(m.group(1))
+            assert not bad, f"{rel} has string value {value!r} that gives away {bad}"
+    assert examined > 100, examined
+
+
+def _number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _pairs(obj):
+    """Every pair of numbers that sits together: a 2-element list [a, b] of numbers, or an object
+    with numeric keys x and y."""
+    if isinstance(obj, dict):
+        if _number(obj.get("x")) and _number(obj.get("y")):
+            yield (obj["x"], obj["y"])
+        for v in obj.values():
+            yield from _pairs(v)
+    elif isinstance(obj, list):
+        if len(obj) == 2 and all(_number(v) for v in obj):
+            yield (obj[0], obj[1])
+        for v in obj:
+            yield from _pairs(v)
+
+
+def test_no_public_json_holds_answer_positions():
+    """Guards against the answer positions leaking under a neutral key. test_no_answer_data_in_any_public_file
+    only compares key names, so a copy of the JPL track stored as {"track": [[51.2, 63.9], ...]} or
+    {"pts": [{"x": ..., "y": ...}]} would pass it. Here, for each real spot with a known object, every
+    in_grid position of web/data/answers/<slug>.json is compared with every number pair found in the
+    spot's public JSON files (field.json, exposures.json, spectrum/index.json) and in index.json: a
+    pair is a 2-element list of numbers or an object with numeric x and y, and it fails if it is
+    within 0.15 px of an answer position as (x, y), whatever its key. The number of pairs examined is
+    asserted to be above zero in total (so the test cannot pass by examining nothing) and the
+    measured count per spot is in the failure message."""
+    index_pairs = list(_pairs(json.load(open(os.path.join(FIELDS, "index.json"), encoding="utf-8"))))
+    total = 0
+    counts = {}
+    for slug in SLUGS:
+        with open(os.path.join(ANSWERS, f"{slug}.json"), encoding="utf-8") as f:
+            ans = json.load(f)
+        answers = [(p["x"], p["y"]) for o in ans["objects"] for p in o["positions"] if p["in_grid"]]
+        if not answers:
+            continue
+        pairs = list(index_pairs)
+        for root, _, files in os.walk(os.path.join(FIELDS, slug)):
+            for name in files:
+                if name.endswith(".json"):
+                    with open(os.path.join(root, name), encoding="utf-8") as f:
+                        for pair in _pairs(json.load(f)):
+                            pairs.append(pair)
+        counts[slug] = len(pairs)
+        total += len(pairs)
+        for (a, b) in pairs:
+            for (x, y) in answers:
+                assert not (abs(a - x) < 0.15 and abs(b - y) < 0.15), \
+                    f"{slug}: public pair {(a, b)} is within 0.15 px of the answer position {(x, y)}"
+    assert total > 0, counts
+
+
 def test_public_title_kind_difficulty():
     with open(os.path.join(FIELDS, "index.json"), encoding="utf-8") as f:
         index = {e["slug"]: e for e in json.load(f)}
@@ -379,8 +503,8 @@ def test_fixture_is_unchanged_by_the_neutral_titles():
     with open(os.path.join(FIELDS, "fixture", "field.json"), encoding="utf-8") as f:
         assert json.load(f)["kind"] == "fixture"
     with open(os.path.join(ANSWERS, "fixture.json"), encoding="utf-8") as f:
-        assert json.load(f)["reveal"] == {"title": "Fixture mover", "kind": "fixture",
-                                          "difficulty": "easy"}
+        assert json.load(f)["reveal"] == {"title": "Fixture (synthetic test spot)",
+                                          "kind": "fixture", "difficulty": "easy"}
 
 
 # ------------------------------------------------------------------ bot candidate status
