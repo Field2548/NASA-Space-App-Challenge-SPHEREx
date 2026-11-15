@@ -83,7 +83,6 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         </InfoPopover>
       </div>
       <label style={{ display: "grid", gap: 2 }}>
-        <span>Stretch: {stretchText}</span>
         <input
           type="range"
           min={0}
@@ -100,9 +99,12 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
             <option key={p} value={i} label={PRESET_LABEL[p]} />
           ))}
         </datalist>
-        <span style={{ display: "flex", justifyContent: "space-between", opacity: 0.8 }} aria-hidden="true">
+        {/* No "Stretch:" caption: the current stop's name is lit; none is lit for a custom bend. */}
+        <span style={{ display: "flex", justifyContent: "space-between" }} aria-hidden="true">
           {CURVE_PRESETS.map((p) => (
-            <span key={p}>{PRESET_LABEL[p]}</span>
+            <span key={p} data-on={p === preset ? "true" : "false"} style={p === preset ? { color: "var(--cyan)" } : { opacity: 0.6 }}>
+              {PRESET_LABEL[p]}
+            </span>
           ))}
         </span>
       </label>
