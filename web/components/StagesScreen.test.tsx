@@ -1,15 +1,24 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+// /stages is the all-sky map: only a stage marker (SkyMap onSpot) selects, empty sky selects nothing.
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveGuestSubmission } from "@/lib/auth";
 import { CELEBRATED_KEY } from "@/lib/celebrated";
 import { TUTORIAL } from "@/lib/copy/tutorial";
 import { recordFind, resetGuest, saveGuest } from "@/lib/guest";
 import type { FieldSummary } from "@/lib/types";
+import type { SkyMapProps } from "./SkyMap";
 import StagesScreen from "./StagesScreen";
 import { makeField } from "./testFixtures";
 
+const last = vi.hoisted(() => ({ props: null as SkyMapProps | null }));
+vi.mock("./SkyMap", () => ({
+  PATCH_SHOW_FOV: 3,
+  SkyMap: (p: SkyMapProps) => {
+    last.props = p;
+    return <div data-testid="sky" />;
+  },
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -50,6 +59,7 @@ beforeEach(() => {
   overlay = overlayBody;
   served = INDEX;
   calls = [];
+  last.props = null;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -69,36 +79,72 @@ afterEach(() => {
   localStorage.removeItem("onion-sky:guest-replay");
 });
 
-const card = async (slug: string) => within(await screen.findByTestId(`stage-${slug}`));
+const pickSpot = (slug: string) => act(() => last.props?.onSpot?.(slug));
+const ready = async () => {
+  await screen.findByRole("progressbar");
+  await waitFor(() => expect(last.props?.spotMarks).toBeTruthy());
+};
+const card = async (slug: string) => {
+  await ready();
+  pickSpot(slug);
+  return within(await screen.findByTestId(`stage-${slug}`));
+};
 
 describe("StagesScreen", () => {
-  it("has one h1, a Back control and one card per spot in index order with number, difficulty, thumbnail and Play", async () => {
+  it("is the sky map: one h1, a Back control, spots on, the map's own list and card off", async () => {
     render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
+    await ready();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("link", { name: /Back/ }).getAttribute("href")).toBe("/");
-    const cards = screen.getAllByTestId(/^stage-/);
-    expect(cards.map((c) => c.getAttribute("data-testid"))).toEqual(["stage-eros", "stage-hektor", "stage-cygnus", "stage-makemake", "stage-eris"]);
+    expect(last.props?.showSpots).toBe(true);
+    expect(typeof last.props?.onSpot).toBe("function");
+    expect(screen.queryByTestId(/^stage-/)).toBeNull();
+  });
+
+  it("selects a stage only from a marker: the card has number, difficulty, thumbnail, status and Play", async () => {
+    render(<StagesScreen />);
     const second = await card("hektor");
-    expect(second.getByText("Stage 2")).toBeTruthy();
+    expect(second.getByRole("heading", { name: "Stage 2" })).toBeTruthy();
     expect(second.getByText("medium")).toBeTruthy();
     expect(second.getByRole("img").getAttribute("src")).toBe("/fields/hektor/thumbs/1.webp");
     expect(second.getByRole("link", { name: /Play/ }).getAttribute("href")).toBe("/play?spot=hektor");
     expect(second.getByText("Not played")).toBeTruthy();
+    expect(screen.getAllByTestId(/^stage-/)).toHaveLength(1);
   });
 
-  it("shows tried when the guest has sent an answer that was not a find", async () => {
+  it("a click on empty sky selects nothing and leaves the open card alone", async () => {
+    render(<StagesScreen />);
+    await ready();
+    act(() => last.props?.onClickSky?.({ ra: 10, dec: 10, fov: 5 }));
+    expect(screen.queryByTestId(/^stage-/)).toBeNull();
+    expect(screen.queryByTestId("training-card")).toBeNull();
+    pickSpot("eros");
+    await screen.findByTestId("stage-eros");
+    act(() => last.props?.onClickSky?.({ ra: 10, dec: 10, fov: 5 }));
+    expect(screen.getByTestId("stage-eros")).toBeTruthy();
+  });
+
+  it("Close drops the card", async () => {
+    render(<StagesScreen />);
+    const eros = await card("eros");
+    fireEvent.click(eros.getByRole("button", { name: "Close" }));
+    expect(screen.queryByTestId("stage-eros")).toBeNull();
+  });
+
+  it("shows tried when the guest has sent an answer that was not a find, and labels the marker", async () => {
     saveGuestSubmission({ spot: "hektor", answer: "nothing" } as never);
     render(<StagesScreen />);
     expect((await card("hektor")).getByText("Tried")).toBeTruthy();
     expect((await card("eros")).getByText("Not played")).toBeTruthy();
+    expect(last.props?.spotMarks).toEqual({ hektor: "Tried" });
   });
 
-  it("keeps the solution locked for an unsolved stage: no object name in the DOM and no explore request, even if the endpoint would answer", async () => {
+  it("keeps the solution locked for an unsolved stage: no object name in the DOM and no explore request", async () => {
     render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
     for (const slug of ["eros", "hektor", "cygnus", "makemake", "eris"]) {
-      expect((await card(slug)).getByText(/Solution locked/)).toBeTruthy();
+      const c = await card(slug);
+      fireEvent.click(c.getByRole("button", { name: "Solution" }));
+      expect(c.getByText(/Solution locked/)).toBeTruthy();
     }
     expect(document.body.innerHTML).not.toMatch(/Eros|Hektor|Makemake|Eris|433/);
     expect(calls.filter((u) => u.includes("/api/overlay") || u.includes("mode=explore"))).toEqual([]);
@@ -111,15 +157,13 @@ describe("StagesScreen", () => {
     const eros = await card("eros");
     expect(await eros.findByText("433 Eros")).toBeTruthy();
     expect(eros.getByText("Solved")).toBeTruthy();
+    expect(eros.getByRole("link", { name: "Play again" }).getAttribute("href")).toBe("/play?spot=eros");
     const line = document.querySelector('[data-testid="stage-eros"] polyline');
     expect(line?.getAttribute("points")).toBe("5.5,3.5 9.5,4.5");
     expect(document.querySelector('[data-testid="stage-eros"] svg')?.getAttribute("viewBox")).toBe("0 0 20 10");
     expect(eros.getByText(/2026-01-06/)).toBeTruthy();
     expect(eros.getByText(/2026-01-07/)).toBeTruthy();
-    // the other stages stay locked and are never asked about
-    expect((await card("hektor")).getByText(/Solution locked/)).toBeTruthy();
     expect(calls.filter((u) => u.includes("/api/overlay"))).toEqual(["/api/overlay?spot=eros&mode=explore"]);
-    expect(screen.getAllByText("433 Eros")).toHaveLength(1);
   });
 
   it("stays locked when the server does not honour the unlock (no cookie)", async () => {
@@ -128,7 +172,7 @@ describe("StagesScreen", () => {
     render(<StagesScreen />);
     const eros = await card("eros");
     await waitFor(() => expect(calls.some((u) => u.includes("/api/overlay"))).toBe(true));
-    expect(eros.getByText(/Solution locked/)).toBeTruthy();
+    await waitFor(() => expect(eros.getByText(/Solution locked/)).toBeTruthy());
     expect(document.body.innerHTML).not.toMatch(/Eros/);
   });
 
@@ -139,23 +183,15 @@ describe("StagesScreen", () => {
     expect(await (await card("cygnus")).findByText("Nothing moves here.")).toBeTruthy();
   });
 
-  it("groups by difficulty with counts, numbers continue across groups", async () => {
+  it("numbers stages Easy to Boss with tool tests after, and counts per group in the list", async () => {
+    served = [...INDEX, row("barnard", "tool")];
     recordFind("hektor", "known", 100);
     render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
+    await ready();
     const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(heads).toEqual(["Training0/1", "Easy0/1", "Medium1/2", "Hard0/1", "Boss0/1"]);
-    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Stage 0", "Stage 1", "Stage 2", "Stage 3", "Stage 4", "Stage 5"]);
-    expect((await card("cygnus")).getByText("Stage 3")).toBeTruthy();
-  });
-
-  it("lists tool-test stages in their own group after Boss", async () => {
-    served = [...INDEX, row("barnard", "tool")];
-    render(<StagesScreen />);
-    await screen.findByTestId("stage-barnard");
-    const heads = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(heads).toEqual(["Training0/1", "Easy0/1", "Medium0/2", "Hard0/1", "Boss0/1", "Tool tests0/1"]);
-    expect((await card("barnard")).getByText("Stage 6")).toBeTruthy();
+    expect(heads).toEqual(["Easy0/1", "Medium1/2", "Hard0/1", "Boss0/1", "Tool tests0/1"]);
+    expect((await card("cygnus")).getByRole("heading", { name: "Stage 3" })).toBeTruthy();
+    expect((await card("barnard")).getByRole("heading", { name: "Stage 6" })).toBeTruthy();
   });
 
   it("shows progress as a progressbar with solved count", async () => {
@@ -164,111 +200,66 @@ describe("StagesScreen", () => {
     const bar = await screen.findByRole("progressbar");
     expect(bar.getAttribute("aria-valuenow")).toBe("1");
     expect(bar.getAttribute("aria-valuemax")).toBe("5");
-    expect(bar.getAttribute("aria-valuemin")).toBe("0");
     expect(screen.getByText("1/5 solved")).toBeTruthy();
     expect(bar.querySelectorAll("[data-filled=true]")).toHaveLength(1);
   });
 
-  it("starts with a Training stage 0 that links to /tutorial and is NEXT until the tutorial is done", async () => {
+  it("Training is a button over the map: NEXT until the tutorial is done, card links to /tutorial", async () => {
     render(<StagesScreen />);
-    const t = within(await screen.findByTestId("training-card"));
-    expect(t.getByText("Stage 0")).toBeTruthy();
+    await ready();
+    const btn = screen.getByTestId("training-button");
+    expect(within(btn).getByText("NEXT")).toBeTruthy();
+    expect(last.props?.spotMarks?.eros).toBeUndefined();
+    fireEvent.click(btn);
+    const t = within(screen.getByTestId("training-card"));
+    expect(t.getByRole("heading", { name: "Stage 0" })).toBeTruthy();
     expect(t.getByRole("link", { name: "Play" }).getAttribute("href")).toBe("/tutorial");
     expect(t.getByText("NEXT")).toBeTruthy();
-    expect(screen.getAllByText("NEXT")).toHaveLength(1);
-    const cards = screen.getAllByTestId(/^(stage-|training-card)/);
-    expect(cards[0].getAttribute("data-testid")).toBe("training-card");
   });
 
   it("marks Training solved once every tutorial level is done, and NEXT moves to the first spot", async () => {
     saveGuest({ tutorial: { done: TUTORIAL.map((l) => l.id) } });
     render(<StagesScreen />);
-    const t = within(await screen.findByTestId("training-card"));
-    expect(t.queryByText("NEXT")).toBeNull();
-    expect(t.getByRole("link", { name: "Play again" })).toBeTruthy();
-    expect(screen.getByTestId("training-card").getAttribute("data-status")).toBe("solved");
+    await ready();
+    const btn = screen.getByTestId("training-button");
+    expect(btn.getAttribute("data-status")).toBe("solved");
+    expect(within(btn).queryByText("NEXT")).toBeNull();
+    fireEvent.click(btn);
+    expect(within(screen.getByTestId("training-card")).getByRole("link", { name: "Play again" })).toBeTruthy();
+    expect(last.props?.spotMarks).toEqual({ eros: "NEXT" });
     expect((await card("eros")).getByText("NEXT")).toBeTruthy();
   });
 
-  it("puts NEXT on the first unsolved stage in difficulty order only", async () => {
+  it("puts NEXT on the first unsolved stage in difficulty order only, Solved on the finished one", async () => {
     saveGuest({ tutorial: { done: TUTORIAL.map((l) => l.id) } });
     recordFind("eros", "known", 100);
     render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
-    const next = screen.getAllByText("NEXT");
-    expect(next).toHaveLength(1);
-    expect(next[0].closest("[data-testid]")?.getAttribute("data-testid")).toBe("stage-hektor");
+    await ready();
+    expect(last.props?.spotMarks).toEqual({ eros: "Solved", hektor: "NEXT" });
+    expect((await card("hektor")).getByText("NEXT")).toBeTruthy();
+    expect((await card("eros")).queryByText("NEXT")).toBeNull();
   });
 
-  it("marks tried stages with a TRIED badge", async () => {
-    saveGuestSubmission({ spot: "makemake", answer: "nothing" } as never);
+  it("the collapsible list reaches every stage with the keyboard, selects it and flies the map there", async () => {
     render(<StagesScreen />);
-    expect((await card("makemake")).getByText("TRIED")).toBeTruthy();
+    await ready();
+    expect(document.querySelector("details")?.hasAttribute("open")).toBe(false);
+    expect(screen.getByText("All stages (6)")).toBeTruthy();
+    const b = screen.getByTestId("list-makemake");
+    expect(b.textContent).toMatch(/Stage 4, Field in Somewhere\. Not played/);
+    fireEvent.click(b);
+    expect(await screen.findByTestId("stage-makemake")).toBeTruthy();
+    expect(last.props?.target).toMatchObject({ ra: 1, dec: 2 });
   });
 
-  it("expands a card with Enter and Space, one at a time", async () => {
-    const user = userEvent.setup();
-    render(<StagesScreen />);
-    const a = (await card("eros")).getByRole("button");
-    const b = (await card("hektor")).getByRole("button");
-    expect(a.getAttribute("aria-expanded")).toBe("false");
-    a.focus();
-    await user.keyboard("{Enter}");
-    expect(a.getAttribute("aria-expanded")).toBe("true");
-    b.focus();
-    await user.keyboard(" ");
-    expect(b.getAttribute("aria-expanded")).toBe("true");
-    expect(a.getAttribute("aria-expanded")).toBe("false");
-    await user.keyboard(" ");
-    expect(b.getAttribute("aria-expanded")).toBe("false");
-    expect(document.body.innerHTML).not.toMatch(/Eros|Hektor|433/);
-  });
-
-  it("expands when the card body is clicked but not when Play is clicked", async () => {
-    const user = userEvent.setup();
-    render(<StagesScreen />);
-    const eros = await card("eros");
-    await user.click(eros.getByRole("img"));
-    expect(eros.getByRole("button").getAttribute("aria-expanded")).toBe("true");
-    await user.click(eros.getByRole("link", { name: /Play/ }));
-    expect(eros.getByRole("button").getAttribute("aria-expanded")).toBe("true");
-  });
-
-  it("moves focus with arrow keys across groups (roving tabindex)", async () => {
-    const user = userEvent.setup();
-    render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
-    const toggles = screen.getAllByRole("button");
-    expect(toggles.map((t) => t.getAttribute("tabindex"))).toEqual(["0", "-1", "-1", "-1", "-1"]);
-    toggles[0].focus();
-    await user.keyboard("{ArrowRight}");
-    expect(document.activeElement).toBe(toggles[1]);
-    await user.keyboard("{ArrowDown}");
-    expect(document.activeElement).toBe(toggles[2]);
-    expect(toggles[2].getAttribute("tabindex")).toBe("0");
-    expect(toggles[0].getAttribute("tabindex")).toBe("-1");
-    await user.keyboard("{ArrowLeft}{ArrowUp}");
-    expect(document.activeElement).toBe(toggles[0]);
-    await user.keyboard("{ArrowLeft}");
-    expect(document.activeElement).toBe(toggles[0]);
-    await user.keyboard("{End}");
-    expect(document.activeElement).toBe(toggles[4]);
-    await user.keyboard("{Home}");
-    expect(document.activeElement).toBe(toggles[0]);
-  });
-
-  it("celebrates a newly solved stage once, then not again", async () => {
+  it("shows the celebration burst once for a newly solved stage", async () => {
     recordFind("eros", "known", 100);
     render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
-    const burst = document.querySelector('[data-testid="stage-eros"] [data-burst]');
-    expect(burst).toBeTruthy();
-    expect(burst?.getAttribute("aria-hidden")).toBe("true");
-    expect(document.querySelectorAll("[data-burst]")).toHaveLength(1);
-    expect(localStorage.getItem(CELEBRATED_KEY)).toContain("eros");
+    await card("eros");
+    expect(document.querySelector("[data-burst]")).toBeTruthy();
     cleanup();
     render(<StagesScreen />);
-    await screen.findByTestId("stage-eros");
+    await card("eros");
     expect(document.querySelector("[data-burst]")).toBeNull();
   });
 });

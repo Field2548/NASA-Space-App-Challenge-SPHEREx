@@ -59,6 +59,10 @@ export interface SkyMapProps {
   picked?: { corners: [number, number][] } | null;
   /** View centre (ICRS) and field of view, after the view settles. */
   onView?: (v: { ra: number; dec: number; fov: number }) => void;
+  /** A parent that owns the spot card (/stages): a marker click calls this and the map's own list and card stay off. */
+  onSpot?: (slug: string) => void;
+  /** Extra word per spot slug (Solved, Tried, NEXT), added to the marker label. */
+  spotMarks?: Record<string, string>;
 }
 
 /** A solved patch on the map: outline, matched known objects and players' reports. */
@@ -117,6 +121,8 @@ export function SkyMap({
   patches,
   picked,
   onView,
+  onSpot,
+  spotMarks,
 }: SkyMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
@@ -134,9 +140,9 @@ export function SkyMap({
   }, []);
 
   // Latest callbacks for Aladin's listeners, which are registered once.
-  const cbRef = useRef({ onPlay, onPointer, onClickSky, onView });
+  const cbRef = useRef({ onPlay, onPointer, onClickSky, onView, onSpot });
   useEffect(() => {
-    cbRef.current = { onPlay, onPointer, onClickSky, onView };
+    cbRef.current = { onPlay, onPointer, onClickSky, onView, onSpot };
   });
 
   const [spots, setSpots] = useState<FieldSummary[] | null>(null);
@@ -364,12 +370,14 @@ export function SkyMap({
           }, 0);
           const slug = (src.data as { slug?: string } | undefined)?.slug;
           const hit = spotsRef.current.find((s) => s.slug === slug);
-          if (hit) setSelected(hit);
+          if (!hit) return;
+          if (cbRef.current.onSpot) cbRef.current.onSpot(hit.slug);
+          else setSelected(hit);
         },
       });
       a.addCatalog(cat);
       cat.addSources(
-        rows.map((s) => lib.source(s.ra, s.dec, { slug: s.slug, label: `${s.title} · ${difficultyStyle(d).word}` })),
+        rows.map((s) => lib.source(s.ra, s.dec, { slug: s.slug, label: `${s.title} · ${difficultyStyle(d).word}${spotMarks?.[s.slug] ? ` · ${spotMarks[s.slug]}` : ""}` })),
       );
       cats.push(cat);
     }
@@ -382,7 +390,7 @@ export function SkyMap({
         }
       }
     };
-  }, [mapState, spots, showSpots]);
+  }, [mapState, spots, showSpots, spotMarks]);
 
   // Fly to the target.
   const tRa = target?.ra;
@@ -701,7 +709,7 @@ export function SkyMap({
       )}
 
       {/* Keyboard and screen-reader route to the spots (the canvas markers are mouse-only). */}
-      {showSpots && !failed && spots && spots.length > 0 && (
+      {showSpots && !onSpot && !failed && spots && spots.length > 0 && (
         <details
           style={{ ...chip, position: "absolute", left: 12, bottom: 40, maxWidth: 300, padding: "4px 10px" }}
         >
