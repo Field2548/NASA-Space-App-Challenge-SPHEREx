@@ -380,3 +380,5 @@ Achievements for the caller. With a valid `Authorization: Bearer` token: `source
 ```
 
 A spot is solved by a `finds` row with verdict `known`, `bot_match` or `nothing_correct`; wrong answers do not count. `fixture` and `quicklook` are ignored. Goals for a kind (asteroids, dwarf planets, stars, the control field) are capped at the number of spots of that kind, and an achievement whose kind has no spot is left out, so no goal can be out of reach. Names and kinds of unsolved spots are never sent. Points achievements use the sum of `finds.points`, the same total as the leaderboard (thresholds in `web/lib/achievements.ts`). Logic: `web/lib/achievements.ts` (pure), `web/lib/server/achievements.ts`.
+
+Note (display name): a name is picked once at sign-up and cannot be changed; migration `20261117000000_display_name_once.sql` removes the update grant and policy on `profiles`.
