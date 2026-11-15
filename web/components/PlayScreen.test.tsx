@@ -691,7 +691,7 @@ describe("PlayScreen round mode", () => {
   it("bumps the scoreboard on every verdict", async () => {
     const wrong: CheckResponse = { ...known, verdict: { kind: "candidate", points: 0, message: "No." }, unlocked: false, reveal: undefined };
     const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(wrong), { status: 200 })) as unknown as typeof fetch });
-    expect(screen.getByRole("button", { name: /Scoreboard/ })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Scope" })).toBeTruthy();
     await vi.waitFor(() => expect(boardCalls().length).toBeGreaterThan(0));
     expect(boardCalls()[0]).toContain("scope=spot");
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
@@ -723,7 +723,7 @@ describe("PlayScreen round mode", () => {
   it("the tutorial shows no scoreboard", async () => {
     await loadGame({ showTitle: true, objectName: "433 Eros" });
     expect(screen.getByRole("complementary", { name: "Scoreboard panel" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Scope" })).toBeNull();
   });
 
   it("after a verdict a result sheet offers NEXT STAGE; the old Next spot row and the mark prompt are gone", async () => {

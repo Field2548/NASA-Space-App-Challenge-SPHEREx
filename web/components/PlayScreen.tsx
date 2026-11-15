@@ -289,7 +289,6 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
   const [apRadius, setApRadius] = useState(RADIUS_DEFAULT);
   const [verdicts, setVerdicts] = useState(0); // Scoreboard.refreshKey: bumps on every verdict
   const viewerRef = useRef<HTMLDivElement>(null);
-  const [scoreOpen, setScoreOpen] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const [pointer, setPointer] = useState(false); // last input was a pointer: hide the crosshair
@@ -417,12 +416,12 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
 
   return (
     <div
-      className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}
+      className={`${styles.body} ${!tools.has("mark") ? styles.noRight : ""}`}
       style={{ "--left-w": `${panelW.left}px`, "--right-w": `${panelW.right}px` } as CSSProperties}
     >
       <PlayTimeTracker />
       <PanelResizer side="left" width={panelW.left} onChange={(w) => setPanelW("left", w)} className={styles.resizer} />
-      {tools.has("mark") && scoreOpen && (
+      {tools.has("mark") && (
         <PanelResizer side="right" width={panelW.right} onChange={(w) => setPanelW("right", w)} className={styles.resizer} />
       )}
       <aside className={styles.left}>
@@ -630,25 +629,18 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
 
       {tools.has("mark") && (
         <aside className={styles.right} aria-label="Scoreboard panel">
-          <button type="button" className={styles.collapse} aria-expanded={scoreOpen} onClick={() => setScoreOpen((o) => !o)}>
-            {scoreOpen ? "click to minimize" : "▸"}
-          </button>
-          {scoreOpen && (
-            <>
-              <section className="panel" data-part="PNL-07 // ANSWER" data-tutorial-target="answer-panel">
-                <p className={styles.small}>
-                  {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
-                </p>
-                {markHint && <p className={styles.small}>{markHint}</p>}
-                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} submitter={picked?.submit} />
-                <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
-                  Clear marks
-                </button>
-              </section>
-              {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
-              {!showTitle && !picked && <Scoreboard slug={spot} refreshKey={verdicts} />}
-            </>
-          )}
+          <section className="panel" data-part="PNL-07 // ANSWER" data-tutorial-target="answer-panel">
+            <p className={styles.small}>
+              {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
+            </p>
+            {markHint && <p className={styles.small}>{markHint}</p>}
+            <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} submitter={picked?.submit} />
+            <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
+              Clear marks
+            </button>
+          </section>
+          {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
+          {!showTitle && !picked && <Scoreboard slug={spot} refreshKey={verdicts} />}
         </aside>
       )}
 
