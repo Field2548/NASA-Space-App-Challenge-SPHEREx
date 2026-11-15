@@ -1,0 +1,62 @@
+{
+ "map.input": {
+  "x": 36.8125,
+  "y": 69.75,
+  "width": 288.1875,
+  "height": 28.5
+ },
+ "map.community": {
+  "x": 1102.640625,
+  "y": 11,
+  "width": 225.359375,
+  "height": 25
+ },
+ "map.legend": {
+  "x": 23,
+  "y": 781,
+  "width": 21.609375,
+  "height": 18
+ },
+ "map.zoomIn": {
+  "x": 1398,
+  "y": 738,
+  "width": 30,
+  "height": 30
+ },
+ "map.help": {
+  "x": 12,
+  "y": 141.5,
+  "width": 360,
+  "height": 139.5
+ },
+ "zoom.input": {
+  "x": 36.8125,
+  "y": 69.75,
+  "width": 288.1875,
+  "height": 28.5
+ },
+ "zoom.play": {
+  "x": 21,
+  "y": 132.5,
+  "width": 224.859375,
+  "height": 34
+ },
+ "zoom.card": {
+  "x": 12,
+  "y": 183.5,
+  "width": 360,
+  "height": 482
+ },
+ "zoom.playPatch": {
+  "x": 29,
+  "y": 614.5,
+  "width": 190.1875,
+  "height": 34
+ },
+ "zoom.readout": {
+  "x": 258.609375,
+  "y": 837,
+  "width": 129.609375,
+  "height": 16
+ }
+}
