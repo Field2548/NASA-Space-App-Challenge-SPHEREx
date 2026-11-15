@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { distanceLines, galactic, placePopup, type InfoExplore } from "./inspectPopup";
+import { distanceLines, galactic, placePopup, safeHttpsUrl, type InfoExplore } from "./inspectPopup";
 
 // Seeded LCG so the random cases are the same on every run.
 function rng(seed: number) {
@@ -166,5 +166,29 @@ describe("distanceLines", () => {
 
   it("returns no lines for a locked response", () => {
     expect(distanceLines({ mode: "round", locked: true })).toEqual([]);
+  });
+});
+
+describe("safeHttpsUrl", () => {
+  it("returns an https address as it is", () => {
+    const u = "https://simbad.cds.unistra.fr/simbad/sim-id?Ident=HD%205112";
+    expect(safeHttpsUrl(u)).toBe(u);
+  });
+  it.each([
+    "javascript:alert(1)",
+    "JaVaScRiPt:alert(1)",
+    " javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "http://simbad.cds.unistra.fr/",
+    "ftp://example.org/x",
+    "//example.org/x",
+    "/relative/path",
+    "not a url",
+    "",
+  ])("refuses %j", (u) => {
+    expect(safeHttpsUrl(u)).toBeNull();
+  });
+  it("refuses values that are not strings", () => {
+    for (const v of [undefined, null, 5, {}, ["https://a.org"]]) expect(safeHttpsUrl(v)).toBeNull();
   });
 });

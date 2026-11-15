@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type
 import { formatDec, formatRA } from "@/lib/coords";
 import { eclipticLatitude, lightCurveAt, toPlainType } from "@/lib/inspect";
 import { pixelToSky } from "@/lib/wcs";
-import { distanceLines, galactic, placePopup, type InfoExplore, type SourceStatus } from "@/lib/inspectPopup";
+import { distanceLines, galactic, placePopup, safeHttpsUrl, type InfoExplore, type SourceStatus } from "@/lib/inspectPopup";
 import type { Field } from "@/lib/types";
 
 const LOCKED_TEXT = "[LOCKED] Names and distances unlock after you submit.";
@@ -151,6 +151,11 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
   const info = current?.data ?? null;
   const failed = current !== null && info === null;
   const locked = info?.locked === true;
+  // Every link comes from API data: only https:// addresses become links, anything else is dropped.
+  const safeLinks = (info?.links ?? []).flatMap((l) => {
+    const href = safeHttpsUrl(l.url);
+    return href ? [{ label: l.label, href }] : [];
+  });
 
   // Section A: where.
   const [ra, dec] = pixelToSky(field.wcs, field.size[1], x, y);
@@ -383,11 +388,11 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
           <p style={{ margin: 0, ...dimStyle }}>Loading catalog facts…</p>
         ) : failed ? (
           <p style={{ margin: 0 }}>Could not load catalog facts.</p>
-        ) : info && info.links?.length ? (
+        ) : safeLinks.length ? (
           <ul style={listStyle}>
-            {info.links.map((l) => (
-              <li key={l.url}>
-                <a href={l.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
+            {safeLinks.map((l) => (
+              <li key={l.href}>
+                <a href={l.href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
                   {l.label}
                 </a>
               </li>
@@ -427,10 +432,10 @@ function DetailsD({ info }: { info: InfoExplore }) {
                 {s.sp_type ? `, spectral type ${s.sp_type}` : ""}
                 {typeof s.sep_arcsec === "number" ? ` (${s.sep_arcsec.toFixed(1)}″ away)` : ""}
                 <Source>SIMBAD</Source>
-                {s.url ? (
+                {safeHttpsUrl(s.url) ? (
                   <>
                     {" "}
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
+                    <a href={safeHttpsUrl(s.url) as string} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
                       SIMBAD page
                     </a>
                   </>
