@@ -1,5 +1,5 @@
 "use client";
-// /tutorial (BP 8.13): levels 0 and 1 from lib/copy/tutorial.ts on the real Eros spot. A coach
+// /tutorial (BP 8.13): levels 0 to 2 (Watch, Look closer, Find it) from lib/copy/tutorial.ts on the real Eros spot. A coach
 // mark points at each step's target; a step finishes when PlayScreen emits its doneWhen event.
 // Progress is saved in guest storage; Back and Skip work from the keyboard (the coach mark comes
 // first in tab order). Eros leaves the picture after frame 3, so marks are limited to frames 1-3.
@@ -36,6 +36,8 @@ export function nextPos(pos: TutorialPos, event: string, detail: PlayEventDetail
   const steps = levels[pos.level]?.steps ?? [];
   const step = steps[pos.step];
   if (!step || step.doneWhen !== event) return null;
+  // A submit that missed the dot does not finish the step; the coach says how to retry.
+  if (event === "submitted" && detail.unlocked !== true) return null;
   if (event === "mark-placed") {
     // The n-th mark step of a level needs marks in n distinct frames (a same-frame click replaces).
     const n = steps.slice(0, pos.step + 1).filter((s) => s.doneWhen === "mark-placed").length;
@@ -44,10 +46,12 @@ export function nextPos(pos: TutorialPos, event: string, detail: PlayEventDetail
   return { level: pos.level, step: pos.step + 1 };
 }
 
-/** Tools a level unlocks at its start (BP 8.13 table); the rest unlock at the step that targets them. */
-export const LEVEL_TOOLS: Record<number, PlayTool[]> = { 1: ["color-by-time"] };
-/** Coach-mark target -> the tool that step introduces. */
+/** Coach-mark target -> the tool that step introduces (shown from that step on). */
 export const STEP_TOOLS: Record<string, PlayTool> = {
+  "blink-speed": "frames-spacing", // also brings in the Frames stepper and the Blink bar
+  "color-by-time": "color-by-time",
+  brightness: "brightness", // the Brightness and Morphology panels
+  wavelength: "wavelength",
   "mark-tool": "mark",
   "inspect-toggle": "inspect",
   "overlay-known-asteroids": "overlays",
@@ -58,7 +62,6 @@ export function toolsAt(pos: TutorialPos | null, levels: TutorialLevel[] = TUTOR
   const out = new Set<PlayTool>();
   if (!pos) return out;
   levels.slice(0, pos.level + 1).forEach((l, li) => {
-    for (const t of LEVEL_TOOLS[l.id] ?? []) out.add(t);
     const upto = li < pos.level ? l.steps.length : pos.step + 1;
     for (const s of l.steps.slice(0, upto)) {
       const t = s.target ? STEP_TOOLS[s.target] : undefined;
@@ -129,7 +132,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
   );
 
   const onEvent = useCallback(
-    (name: PlayEvent | "intro-seen", detail: PlayEventDetail) => {
+    (name: PlayEvent | "next", detail: PlayEventDetail) => {
       if (detail.inspectOn !== undefined) setInspectOn(detail.inspectOn);
       // A submit that missed Eros says so until the next mark (or a step change).
       if (name === "submitted") setMissed(detail.unlocked === false);
@@ -163,8 +166,8 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
           text={complete ? (lastLevel ? "Training done. You found a real asteroid in real SPHEREx data." : `Next: level ${levels[pos.level + 1].id}, ${levels[pos.level + 1].title}.`) : text}
           progress={progress}
         >
-          {step?.doneWhen === "intro-seen" && (
-            <button type="button" onClick={() => onEvent("intro-seen", { markedFrames: 0 })}>
+          {step?.doneWhen === "next" && (
+            <button type="button" onClick={() => onEvent("next", { markedFrames: 0 })}>
               Next
             </button>
           )}

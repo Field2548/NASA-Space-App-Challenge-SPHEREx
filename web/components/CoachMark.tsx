@@ -75,6 +75,19 @@ export default function CoachMark({ target, heading, text, progress, children }:
     };
   }, [target]);
 
+  // A target below or above the fold (phones, where the panels stack) is scrolled into view once
+  // per step, so the ring and the card are not off screen.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const el = findTarget(target);
+      const r = el?.getBoundingClientRect();
+      if (el && r && r.height > 0 && r.height < window.innerHeight * 0.8 && (r.bottom > window.innerHeight || r.top < 0)) {
+        el.scrollIntoView?.({ block: "center" });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+
   // Real card size (text length varies); the fallback is the CSS width and a typical height.
   const cardRef = useRef<HTMLElement>(null);
   const [size, setSize] = useState<[number, number]>([320, 180]);

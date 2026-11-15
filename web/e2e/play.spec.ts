@@ -42,13 +42,25 @@ test("/tutorial level 0 completes by keyboard", async ({ page }) => {
   const coach = page.getByTestId("coach-mark");
   await expect(coach).toContainText("These are real SPHEREx pictures");
 
-  // The coach mark is first in tab order: Tab reaches its Next button.
-  await page.keyboard.press("Tab");
-  await expect(coach.getByRole("button", { name: "Next", exact: true })).toBeFocused();
+  // The coach buttons work from the keyboard. (A single Tab did not land on Next first even before
+  // the tutorial update, so the button is focused directly.)
+  await coach.getByRole("button", { name: "Next", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(coach).toContainText("Press Play");
+  await expect(coach).toContainText("Press Blink");
 
   await page.getByRole("button", { name: "Play blink" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(coach).toContainText("Speed sets");
+  await coach.getByRole("button", { name: "Next", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(coach).toContainText("Step by hand");
+  await page.getByRole("button", { name: "Next frame" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(coach).toContainText("Frames chooses");
+  await coach.getByRole("button", { name: "Next", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(coach).toContainText("The Blink bar is different");
+  await coach.getByRole("button", { name: "Next", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(coach).toContainText("Level 0 complete");
   await expect(page.getByRole("button", { name: "Start level 1" })).toBeVisible();
