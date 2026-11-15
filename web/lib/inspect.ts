@@ -83,6 +83,30 @@ export function tileValue(tile: Uint16Array, idx: SpectrumIndex, b: number, x: n
   return v === idx.nodata || v === undefined ? NaN : v * idx.bands[b].scale + idx.bands[b].offset;
 }
 
+/** Fetch (cached) and decode tile (tx, ty) of a spot's cube: B x tile x tile little-endian Uint16. */
+export function loadSpectrumTile(
+  field: Field,
+  idx: SpectrumIndex,
+  tx: number,
+  ty: number,
+  fetcher: typeof fetch = fetch,
+  base = FIELDS_BASE,
+): Promise<Uint16Array> {
+  const url = `${base}/${encodeURIComponent(field.slug)}/spectrum/t_${tx}_${ty}.u16`;
+  return cached(tileCache, url, async () => {
+    const r = await fetcher(url);
+    if (!r.ok) throw new Error(`GET ${url} failed: ${r.status}`);
+    const buf = await r.arrayBuffer();
+    const expected = 2 * idx.bands.length * idx.tile * idx.tile;
+    if (buf.byteLength !== expected) throw new Error(`${url} is ${buf.byteLength} bytes, expected ${expected}`);
+    // Explicit little-endian decode (contract), independent of host byte order.
+    const view = new DataView(buf);
+    const out = new Uint16Array(buf.byteLength / 2);
+    for (let i = 0; i < out.length; i++) out[i] = view.getUint16(2 * i, true);
+    return out;
+  });
+}
+
 /**
  * Spectrum of the cube at pixel (x, y) (rounded to the nearest pixel). Loads only the one tile that
  * holds the pixel, cached per URL. Null when the spot has no cube (`has.spectrum`), the pixel is
@@ -102,22 +126,8 @@ export async function loadSpectrumAt(
   const dx = px - idx.origin[0];
   const dy = py - idx.origin[1];
   if (dx < 0 || dy < 0 || dx >= idx.covered[0] || dy >= idx.covered[1]) return null;
-  const tx = Math.floor(dx / idx.tile);
-  const ty = Math.floor(dy / idx.tile);
-  const url = `${base}/${encodeURIComponent(field.slug)}/spectrum/t_${tx}_${ty}.u16`;
+  const tile = await loadSpectrumTile(field, idx, Math.floor(dx / idx.tile), Math.floor(dy / idx.tile), fetcher, base);
   const nB = idx.bands.length;
-  const tile = await cached(tileCache, url, async () => {
-    const r = await fetcher(url);
-    if (!r.ok) throw new Error(`GET ${url} failed: ${r.status}`);
-    const buf = await r.arrayBuffer();
-    const expected = 2 * nB * idx.tile * idx.tile;
-    if (buf.byteLength !== expected) throw new Error(`${url} is ${buf.byteLength} bytes, expected ${expected}`);
-    // Explicit little-endian decode (contract), independent of host byte order.
-    const view = new DataView(buf);
-    const out = new Uint16Array(buf.byteLength / 2);
-    for (let i = 0; i < out.length; i++) out[i] = view.getUint16(2 * i, true);
-    return out;
-  });
   const out: CubeSpectrum = { wl: [], flux: [], err: [], det: [], band: [], dateObs: [], units: "MJy/sr" };
   for (let b = 0; b < nB; b++) {
     const v = tileValue(tile, idx, b, px, py);

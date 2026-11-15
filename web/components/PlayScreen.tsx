@@ -35,7 +35,9 @@ import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
 import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
 import { type BlinkMode, MAX_BLINK_FPS, useBlink } from "@/lib/useBlink";
+import { ANNULUS_GAP, ANNULUS_WIDTH, RADIUS_DEFAULT } from "@/lib/aperture";
 import BrightnessSlider from "./BrightnessSlider";
+import CircleSpectrum from "./CircleSpectrum";
 import FrameContext from "./FrameContext";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import InspectPanel from "./InspectPanel";
@@ -266,6 +268,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [scale, setScale] = useState(fit);
   // Inspected pixel plus its screen point (InspectPopup opens beside it).
   const [inspected, setInspected] = useState<{ x: number; y: number; click: { x: number; y: number } } | null>(null);
+  // Radius of the spectrum circle (section C); kept here because the viewer draws the same circle.
+  const [apRadius, setApRadius] = useState(RADIUS_DEFAULT);
   const [verdicts, setVerdicts] = useState(0); // Scoreboard.refreshKey: bumps on every verdict
   const viewerRef = useRef<HTMLDivElement>(null);
   const [scoreOpen, setScoreOpen] = useState(true);
@@ -528,6 +532,11 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               morphology={morph}
               curve={curve}
               scale={scale}
+              aperture={
+                !showTitle && mode === "inspect" && inspected && field.has?.spectrum
+                  ? { x: Math.round(inspected.x), y: Math.round(inspected.y), r: apRadius, rIn: apRadius + ANNULUS_GAP, rOut: apRadius + ANNULUS_GAP + ANNULUS_WIDTH }
+                  : null
+              }
               inspectSlot={
                 // Tutorial only: InspectPopup takes no name, and the tutorial names its object from its own copy.
                 showTitle && mode === "inspect" && inspected ? (
@@ -556,6 +565,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               mode={verdictIn ? "explore" : "round"}
               byPosition={picked !== undefined}
               onClose={() => setInspected(null)}
+              spectrumSlot={
+                field.has?.spectrum ? (
+                  <CircleSpectrum field={field} x={inspected.x} y={inspected.y} radius={apRadius} onRadius={setApRadius} vision={vision} />
+                ) : (
+                  <p style={{ margin: 0 }}>No spectrum here.</p>
+                )
+              }
             />
           )}
           <p id={statusId} className={styles.kbdStatus} aria-live="polite">

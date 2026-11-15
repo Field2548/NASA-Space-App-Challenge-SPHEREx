@@ -50,6 +50,15 @@ describe("helpers", () => {
   });
 });
 
+describe("FieldViewer spectrum circle", () => {
+  it("draws the circle and both edges of the background ring at the pixel centre", () => {
+    setup({ aperture: { x: 5, y: 4, r: 2, rIn: 4, rOut: 7 } });
+    const rings = screen.getByTestId("aperture").querySelectorAll("circle");
+    expect([...rings].map((c) => c.getAttribute("r"))).toEqual(["8", "16", "28"]);
+    expect(rings[0].getAttribute("cx")).toBe(`${5.5 * 4}`);
+  });
+});
+
 describe("FieldViewer known overlay", () => {
   const known = {
     asteroids: [{ name: "(433) Eros", positions: [{ frame: 1, x: 2, y: 3 }, { frame: 2, x: 7, y: 5 }] }],

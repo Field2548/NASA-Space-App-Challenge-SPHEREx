@@ -66,6 +66,8 @@ export interface FieldViewerProps {
   crosshair?: [number, number] | null;
   /** Known-asteroid overlay; diamonds are drawn for the shown frame only. */
   known?: KnownOverlay | null;
+  /** Spectrum circle and its background ring (native pixels), drawn so the player sees what is measured. */
+  aperture?: { x: number; y: number; r: number; rIn: number; rOut: number } | null;
 }
 
 /** Largest integer scale that fits the box, at least 1. */
@@ -273,6 +275,13 @@ export default function FieldViewer(props: FieldViewerProps) {
                 />
               );
             })}
+            {props.aperture && (
+              <g data-testid="aperture" fill="none" strokeWidth={1.5}>
+                <circle cx={(props.aperture.x + 0.5) * scale} cy={(props.aperture.y + 0.5) * scale} r={props.aperture.r * scale} stroke="#56B4E9" />
+                <circle cx={(props.aperture.x + 0.5) * scale} cy={(props.aperture.y + 0.5) * scale} r={props.aperture.rIn * scale} stroke="#F0E442" strokeDasharray="4 3" opacity={0.8} />
+                <circle cx={(props.aperture.x + 0.5) * scale} cy={(props.aperture.y + 0.5) * scale} r={props.aperture.rOut * scale} stroke="#F0E442" strokeDasharray="4 3" opacity={0.8} />
+              </g>
+            )}
             {cur && (
               <g data-testid="kb-cursor" stroke="var(--text, #fff)" strokeWidth={1} fill="none">
                 <path d={`M${(cur.x + 0.5) * scale} 0V${H * scale}M0 ${(cur.y + 0.5) * scale}H${W * scale}`} opacity={0.6} />
