@@ -40,6 +40,12 @@
   padding: var(--space-3);
 }
 
+/* Big still of the picked patch at the top of the card, like a place photo on a street map. */
+.preview {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
 .cardTitle {
   margin: 0 0 var(--space-1);
   font-size: 14px;

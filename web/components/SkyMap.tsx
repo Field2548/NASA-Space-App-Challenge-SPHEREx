@@ -180,6 +180,7 @@ export function SkyMap({
     const ctl = new AbortController();
     let cancelled = false;
     let raf = 0;
+    let dblZoom: (() => void) | null = null;
     const fail = (why: string) => {
       if (cancelled) return;
       cancelled = true;
@@ -318,6 +319,18 @@ export function SkyMap({
           viewSoon();
         });
         a.on("positionChanged", viewSoon);
+        // Double click zooms in one step, like a street map (Aladin's own double click only recentres
+        // on the point, so together they zoom into it). A single click never zooms.
+        dblZoom = () => {
+          if (cancelled) return;
+          try {
+            const f = a.getFov()[0];
+            if (Number.isFinite(f)) a.zoomToFoV(f / 2, 0.35);
+          } catch {
+            /* view not ready */
+          }
+        };
+        el.addEventListener("dblclick", dblZoom);
 
         aladinRef.current = a;
         libRef.current = lib;
@@ -335,6 +348,7 @@ export function SkyMap({
       raf = 0;
       if (clickTimer.current) clearTimeout(clickTimer.current);
       clickTimer.current = null;
+      if (dblZoom) el.removeEventListener("dblclick", dblZoom);
       aladinRef.current = null;
       releaseAladin(el);
     };

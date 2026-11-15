@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { paintStill, planStill, stillTilePath } from "@/lib/hipsStill";
 import { type Patch, randomPatch } from "@/lib/patch";
 import { savePatchCheck, submitPatchCheck, type PatchCheckResponse } from "@/lib/patchSolves";
+import { loadQuickLookList } from "@/lib/quicklookPrefetch";
 import {
   planQuickLook,
   type QuickLookField,
@@ -64,7 +65,7 @@ export function patchRequest(patch: Patch, field: Field, req: CheckRequest) {
     : { patch: patch.id, answer: "nothing" as const, frames };
 }
 
-function Still({ patch, children }: { patch: Patch; children?: ReactNode }) {
+export function Still({ patch, children, className }: { patch: Patch; children?: ReactNode; className?: string }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const plan = planStill(patch.wcs, patch.size);
@@ -97,7 +98,7 @@ function Still({ patch, children }: { patch: Patch; children?: ReactNode }) {
     };
   }, [patch]);
   return (
-    <div className={styles.still}>
+    <div className={className ? `${styles.still} ${className}` : styles.still}>
       <canvas ref={ref} width={patch.size[0]} height={patch.size[1]} aria-label="Still picture of this patch from the SPHEREx all-sky map" role="img" />
       {children}
     </div>
@@ -123,17 +124,16 @@ export default function PatchPlay({ patch, renderGame }: { patch: Patch; renderG
   const runId = useRef<string | null>(null);
 
   useEffect(() => {
-    const ac = new AbortController();
-    fetch(`/api/quicklook/list?ra=${patch.ra}&dec=${patch.dec}`, { signal: ac.signal })
-      .then(async (r) => {
-        const body = await r.json();
-        if (!r.ok) throw new Error(body?.error?.message ?? `IRSA list failed (${r.status}).`);
-        setState({ s: "ready", list: body as QuickLookList });
-      })
+    let alive = true;
+    // Shared with the sky map, which starts this query when the patch is picked.
+    loadQuickLookList(patch.ra, patch.dec)
+      .then((list) => alive && setState({ s: "ready", list }))
       .catch((e: unknown) => {
-        if (!ac.signal.aborted) setState({ s: "list-error", message: e instanceof Error ? e.message : String(e) });
+        if (alive) setState({ s: "list-error", message: e instanceof Error ? e.message : String(e) });
       });
-    return () => ac.abort();
+    return () => {
+      alive = false;
+    };
   }, [patch]);
 
   useEffect(
