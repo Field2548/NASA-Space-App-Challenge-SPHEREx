@@ -21,7 +21,7 @@ import { Minus, Plus, RotateCw, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
 import { FIELDS_BASE } from "@/lib/fields";
-import { edgeUrl } from "@/lib/hipsProxy";
+import { edgeUrl, IRSA_BAND_SRC } from "@/lib/hipsProxy";
 import type { Difficulty, FieldSummary } from "@/lib/types";
 import {
   findHipsUrl,
@@ -30,7 +30,6 @@ import {
   IRSA_HIPS,
   IRSA_HIPS_ID,
   IRSA_HIPS_NAME,
-  IRSA_SLICE_ARG,
   loadAladin,
   releaseAladin,
   type AladinCatalog,
@@ -227,7 +226,9 @@ export function SkyMap({
         setFromIrsa(irsa);
         const survey = lib.HiPS(irsa ? IRSA_HIPS_ID : HIPS_ID, {
           // Tiles go through the site's edge cache (app/api/hips); the probe above used the source.
-          url: edgeUrl(url, window.location.origin),
+          // IRSA's cube is shown as its 0.81 um band through the proxy's plain HiPS view (lib/hipsProxy.ts),
+          // so Aladin keeps the coarser picture while a zoom loads sharper tiles instead of flashing grey.
+          url: irsa ? `${window.location.origin}/api/hips/${IRSA_BAND_SRC}` : edgeUrl(url, window.location.origin),
           name: irsa ? IRSA_HIPS_NAME : HIPS_NAME,
           errorCallback: () => fail(`The SPHEREx sky picture from ${irsa ? "IRSA" : "CDS (Strasbourg)"} stopped answering.`),
         });
@@ -255,13 +256,6 @@ export function SkyMap({
           showReticle: false,
           log: false,
         });
-        // IRSA's cube opens on its middle band, a blank dichroic channel (its properties file).
-        // IRSA_SLICE_ARG makes Aladin fetch tile suffix _3 (0.81 um), which matches the credit label.
-        // Aladin applies the slice only once the layer is attached, so set it again after that.
-        if (irsa) {
-          survey.setSliceNumber?.(IRSA_SLICE_ARG);
-          for (const ms of [0, 300, 1500]) setTimeout(() => !cancelled && survey.setSliceNumber?.(IRSA_SLICE_ARG), ms);
-        }
         a.gotoRaDec(GALACTIC_CENTER[0], GALACTIC_CENTER[1]);
         a.setFoV(360);
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/hips/[src]/[...path]/route";
-import { CACHE_NONE, CACHE_OK, edgeUrl, HIPS_SOURCES, upstreamUrl } from "./hipsProxy";
+import { bandProperties, CACHE_NONE, CACHE_OK, edgeUrl, HIPS_SOURCES, IRSA_BAND_SRC, upstreamUrl } from "./hipsProxy";
 
 const IRSA = HIPS_SOURCES.irsa;
 
@@ -19,6 +19,49 @@ describe("upstreamUrl", () => {
     expect(upstreamUrl("irsa", ["Norder3", "Dir0", "Npix1.fits"])).toBeNull();
     expect(upstreamUrl("irsa", ["Norder3", "Dir0", "Npix1.png?x=1"])).toBeNull();
     expect(upstreamUrl("irsa", ["index.html"])).toBeNull();
+  });
+});
+
+describe("IRSA one-band view", () => {
+  it("maps plain tile names to the 0.81 um slice and refuses a client-chosen slice", () => {
+    expect(upstreamUrl(IRSA_BAND_SRC, ["properties"])).toBe(`${IRSA}/properties`);
+    expect(upstreamUrl(IRSA_BAND_SRC, ["Norder3", "Allsky.png"])).toBe(`${IRSA}/Norder3/Allsky_3.png`);
+    expect(upstreamUrl(IRSA_BAND_SRC, ["Norder5", "Dir10000", "Npix12345.png"])).toBe(`${IRSA}/Norder5/Dir10000/Npix12345_3.png`);
+    expect(upstreamUrl(IRSA_BAND_SRC, ["Norder0", "Dir0", "Npix0_50.png"])).toBeNull();
+    expect(upstreamUrl(IRSA_BAND_SRC, ["Norder3", "Allsky_3.png"])).toBeNull();
+  });
+
+  it("rewrites the cube properties into a plain image HiPS", () => {
+    const cube = [
+      "creator_did          = ivo://IPAC/P/SPHEREx/DR1/cube",
+      "hips_order           = 5",
+      "hips_tile_format     = png",
+      "hips_service_url     = https://irsa.example/cube",
+      "dataproduct_type     = cube",
+      "hips_cube_depth      = 102",
+      "hips_cube_firstframe = 1",
+      "data_cube_crval3_arr = 0.753 0.771",
+      "custom_tile_format   = fits-cube",
+      "",
+    ].join("\n");
+    const out = bandProperties(cube);
+    expect(out).toContain("hips_order           = 5");
+    expect(out).toContain("hips_tile_format     = png");
+    expect(out).toMatch(/^dataproduct_type\s*=\s*image$/m);
+    expect(out).not.toMatch(/cube_|custom_tile_format|hips_service_url|=\s*cube\s*$/m);
+  });
+
+  it("serves the rewritten properties from the proxy", async () => {
+    const f = vi.fn(async () => new Response("dataproduct_type = cube\nhips_cube_depth = 102\nhips_order = 5\n"));
+    vi.stubGlobal("fetch", f);
+    const res = await GET(new Request("http://x/api/hips"), { params: Promise.resolve({ src: IRSA_BAND_SRC, path: ["properties"] }) });
+    vi.unstubAllGlobals();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe(CACHE_OK);
+    const text = await res.text();
+    expect(text).toContain("hips_order = 5");
+    expect(text).not.toContain("hips_cube_depth");
+    expect(f.mock.calls[0]).toEqual([`${IRSA}/properties`, expect.anything()]);
   });
 });
 

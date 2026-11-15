@@ -202,12 +202,6 @@ export const IRSA_HIPS = "https://irsa.ipac.caltech.edu/data/hips/SPHEREx/sphere
 /** creator_did of IRSA_HIPS (its properties file). */
 export const IRSA_HIPS_ID = "IPAC/P/SPHEREx/DR1/cube";
 export const IRSA_HIPS_NAME = "SPHEREx DR1 all-sky (IRSA)";
-/**
- * Argument for Aladin's setSliceNumber on IRSA_HIPS. Aladin turns it into a frequency and back, which
- * reverses the order for this cube (0 asks for tile suffix _102, none for _50), so the value is set
- * from the tile suffix the browser then requests (checked with tmp/probe-map.cjs).
- */
-export const IRSA_SLICE_ARG = 82;
 
 /** Where pipeline/mirror_hips.py puts the coarse copy (web/public/hips/spherex-color). */
 export const LOCAL_HIPS = "/hips/spherex-color";
