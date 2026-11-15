@@ -25,19 +25,23 @@
 // Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools?; initialView?; onViewChange?; knownLocal? }
 
 import Link from "next/link";
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFrames } from "@/lib/fields";
+import { cueSolved } from "@/lib/music";
 import { loadVision } from "@/lib/settings";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
 import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
 import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
 import { type BlinkMode, MAX_BLINK_FPS, useBlink } from "@/lib/useBlink";
+import { ANNULUS_GAP, ANNULUS_WIDTH, RADIUS_DEFAULT } from "@/lib/aperture";
 import BrightnessSlider from "./BrightnessSlider";
+import CircleSpectrum from "./CircleSpectrum";
 import FrameContext from "./FrameContext";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import InspectPanel from "./InspectPanel";
+import PanelResizer, { usePanelWidths } from "./PanelResizer";
 import { InspectPopup } from "./InspectPopup";
 import MorphologyControl from "./MorphologyControl";
 import PatchPlay, { type PickedHooks } from "./PatchPlay";
@@ -264,6 +268,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [scale, setScale] = useState(fit);
   // Inspected pixel plus its screen point (InspectPopup opens beside it).
   const [inspected, setInspected] = useState<{ x: number; y: number; click: { x: number; y: number } } | null>(null);
+  // Radius of the spectrum circle (section C); kept here because the viewer draws the same circle.
+  const [apRadius, setApRadius] = useState(RADIUS_DEFAULT);
   const [verdicts, setVerdicts] = useState(0); // Scoreboard.refreshKey: bumps on every verdict
   const viewerRef = useRef<HTMLDivElement>(null);
   const [scoreOpen, setScoreOpen] = useState(true);
@@ -364,6 +370,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const onResult = (res: CheckResponse) => {
     // A wrong answer leaves the spot locked (api.md 3), so the name stays hidden for a retry.
     if (res.unlocked) setVerdictIn(true);
+    if (res.unlocked && !res.practice) cueSolved();
     if (res.unlocked) setRevealTitle(res.spot_reveal?.title ?? res.verdict.object_name ?? field.title);
     if (res.unlocked && res.reveal) setRevealName(res.spot_reveal?.title ?? res.verdict.object_name ?? null);
     setVerdicts((v) => v + 1);
@@ -390,12 +397,20 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   }, [toggleInspect, pause]);
 
   const png8 = field.data.precision === "png8";
+  const [panelW, setPanelW] = usePanelWidths();
 
   return (
-    <div className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}>
+    <div
+      className={`${styles.body} ${!tools.has("mark") ? styles.noRight : scoreOpen ? "" : styles.scoreClosed}`}
+      style={{ "--left-w": `${panelW.left}px`, "--right-w": `${panelW.right}px` } as CSSProperties}
+    >
+      <PanelResizer side="left" width={panelW.left} onChange={(w) => setPanelW("left", w)} className={styles.resizer} />
+      {tools.has("mark") && scoreOpen && (
+        <PanelResizer side="right" width={panelW.right} onChange={(w) => setPanelW("right", w)} className={styles.resizer} />
+      )}
       <aside className={styles.left}>
         {canInspect && (
-          <section className="panel" data-part="Inspect">
+          <section className="panel" data-part="PNL-01 // INSPECT">
             <button
               type="button"
               aria-pressed={mode === "inspect"}
@@ -412,7 +427,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("color-by-time") && (
-          <section className="panel" data-part="Image tools">
+          <section className="panel" data-part="PNL-02 // IMAGE TOOLS">
             <button
               type="button"
               aria-pressed={overlay === "colorByTime"}
@@ -431,7 +446,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("wavelength") && field.has?.exposures === true && (
-          <section className="panel" data-part="Wavelength">
+          <section className="panel" data-part="PNL-03 // WAVELENGTH">
             <WavelengthSwitch field={field} value={wavelength} onChange={setWavelength} fewerThanThree={wl.fewerThanThree} />
             {wavelength !== "all" && !wl.frames && (
               <p className={styles.small} role="status" data-testid="wavelength-status">
@@ -441,7 +456,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {showOverlays && (
-          <section className="panel" data-part="Overlays">
+          <section className="panel" data-part="PNL-04 // OVERLAYS">
             <div data-slot="overlays">
               <button
                 type="button"
@@ -466,12 +481,12 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("brightness") && (
-          <section className="panel" data-part="Morphology">
+          <section className="panel" data-part="PNL-05 // MORPHOLOGY">
             <MorphologyControl value={morph} onChange={setMorph} />
           </section>
         )}
         {tools.has("brightness") && (
-          <section className="panel" data-part="Brightness">
+          <section className="panel" data-part="PNL-06 // BRIGHTNESS">
             <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
             <ToneCurveEditor value={curve} onChange={setCurve} />
           </section>
@@ -517,6 +532,11 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               morphology={morph}
               curve={curve}
               scale={scale}
+              aperture={
+                !showTitle && mode === "inspect" && inspected && field.has?.spectrum
+                  ? { x: Math.round(inspected.x), y: Math.round(inspected.y), r: apRadius, rIn: apRadius + ANNULUS_GAP, rOut: apRadius + ANNULUS_GAP + ANNULUS_WIDTH }
+                  : null
+              }
               inspectSlot={
                 // Tutorial only: InspectPopup takes no name, and the tutorial names its object from its own copy.
                 showTitle && mode === "inspect" && inspected ? (
@@ -545,6 +565,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               mode={verdictIn ? "explore" : "round"}
               byPosition={picked !== undefined}
               onClose={() => setInspected(null)}
+              spectrumSlot={
+                field.has?.spectrum ? (
+                  <CircleSpectrum field={field} x={inspected.x} y={inspected.y} radius={apRadius} onRadius={setApRadius} vision={vision} />
+                ) : (
+                  <p style={{ margin: 0 }}>No spectrum here.</p>
+                )
+              }
             />
           )}
           <p id={statusId} className={styles.kbdStatus} aria-live="polite">
@@ -565,13 +592,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
       </main>
 
       {tools.has("mark") && (
-        <aside className={styles.right} aria-label="Answer">
+        <aside className={styles.right} aria-label="Scoreboard panel">
           <button type="button" className={styles.collapse} aria-expanded={scoreOpen} onClick={() => setScoreOpen((o) => !o)}>
             {scoreOpen ? "click to minimize" : "▸"}
           </button>
           {scoreOpen && (
             <>
-              <section className="panel" data-part="Answer">
+              <section className="panel" data-part="PNL-07 // ANSWER">
                 <p className={styles.small}>
                   {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
                 </p>

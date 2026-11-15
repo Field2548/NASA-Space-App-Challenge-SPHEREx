@@ -129,10 +129,8 @@
   justify-items: center;
   gap: var(--space-3);
   padding: var(--space-5);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--card-radius);
-  backdrop-filter: blur(6px);
+  background: rgb(0 0 0 / 0.72);
+  border: 1px solid var(--cyan);
   text-align: center;
 }
 
@@ -158,19 +156,16 @@
 .primary {
   display: inline-block;
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--line-ui);
+  border: 1px solid currentColor;
   border-radius: 999px;
   text-decoration: none;
   font: inherit;
-  color: var(--text);
-  background: var(--card);
+  color: inherit;
+  background: transparent;
 }
 
 .primary {
-  color: var(--on-accent);
-  background: var(--accent);
-  border-color: var(--accent);
-  font-weight: 700;
+  color: var(--cyan);
 }
 
 .secondary {

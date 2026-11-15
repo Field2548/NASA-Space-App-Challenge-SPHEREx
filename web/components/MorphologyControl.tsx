@@ -1,5 +1,5 @@
 "use client";
-// Morphology control: an ordered stack of steps, applied first to last to every frame.
+// Morphology control (PNL-05): an ordered stack of steps, applied first to last to every frame.
 // Each step is a card: operation, kernel shape and size, iterations for erosion and dilation.
 // An empty stack is Off. Cards reorder by dragging the handle (pointer events: mouse, touch, pen)
 // or with the Move up / Move down buttons. The explanation and the before/after example live in

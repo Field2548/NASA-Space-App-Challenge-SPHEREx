@@ -3,7 +3,7 @@
   z-index: 40;
   border: 2px solid var(--magenta);
   border-radius: 6px;
-  box-shadow: 0 0 0 4px rgb(255 107 107 / 0.25);
+  box-shadow: 0 0 0 4px rgb(255 46 136 / 0.25);
   pointer-events: none;
   transition: all 0.2s ease;
 }

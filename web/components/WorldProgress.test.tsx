@@ -19,7 +19,8 @@ describe("WorldProgress", () => {
   it("shows checked boxes out of 3,072 once, with a progressbar", async () => {
     const f = stub(() => new Response(JSON.stringify({ source: "db", cells: [[1, 2], [5, 1], [9, 4]] }), { status: 200 }));
     render(<WorldProgress />);
-    expect(await screen.findByText(/3 \/ 3,072 sky boxes checked \(0\.1%\)/)).toBeTruthy();
+    expect(await screen.findByText(/3 \/ 3,072 sky boxes checked/)).toBeTruthy();
+    expect(screen.getByTestId("world-pct").textContent).toBe("0.1%");
     const bar = screen.getByRole("progressbar", { name: "World progress" });
     expect(bar.getAttribute("aria-valuemin")).toBe("0");
     expect(bar.getAttribute("aria-valuemax")).toBe("3072");
