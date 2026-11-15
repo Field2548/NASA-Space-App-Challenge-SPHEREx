@@ -6,7 +6,7 @@ import { type KeyboardEvent, type PointerEvent, useCallback, useSyncExternalStor
 
 export const PANEL_MIN = 160;
 export const PANEL_MAX = 480;
-export const PANEL_DEFAULT = { left: 220, right: 240 } as const;
+export const PANEL_DEFAULT = { left: 330, right: 360 } as const;
 const KEY = "onion.panelWidths";
 const STEP = 16;
 

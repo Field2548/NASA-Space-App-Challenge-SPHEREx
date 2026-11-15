@@ -25,6 +25,25 @@ describe("InfoPopover", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(btn);
   });
+  it("opening a second (i) closes the first, so only one is open", () => {
+    render(
+      <>
+        <InfoPopover label="A" title="About A">
+          <p>a</p>
+        </InfoPopover>
+        <InfoPopover label="B" title="About B">
+          <p>b</p>
+        </InfoPopover>
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "About A" }));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "About B" }));
+    const open = screen.getAllByRole("dialog");
+    expect(open).toHaveLength(1);
+    expect(open[0].textContent).toContain("About B");
+  });
+
   it("closes with its Close button", () => {
     render(<InfoPopover label="X" title="T">body</InfoPopover>);
     fireEvent.click(screen.getByRole("button", { name: "About X" }));

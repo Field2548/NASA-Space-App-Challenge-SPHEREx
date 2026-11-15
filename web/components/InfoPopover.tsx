@@ -8,6 +8,8 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import styles from "./InfoPopover.module.css";
 
+const POPOVER_EVENT = "onion:info-popover";
+
 export interface InfoPopoverProps {
   label: string;
   title: string;
@@ -23,6 +25,17 @@ export default function InfoPopover({ label, title, children }: InfoPopoverProps
   useEffect(() => {
     if (open) dlgRef.current?.focus();
   }, [open]);
+
+  // Only one (i) is open at a time: opening one closes any other.
+  useEffect(() => {
+    if (!open) return;
+    window.dispatchEvent(new CustomEvent(POPOVER_EVENT, { detail: titleId }));
+    const onOther = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== titleId) setOpen(false);
+    };
+    window.addEventListener(POPOVER_EVENT, onOther);
+    return () => window.removeEventListener(POPOVER_EVENT, onOther);
+  }, [open, titleId]);
 
   const close = () => {
     setOpen(false);
