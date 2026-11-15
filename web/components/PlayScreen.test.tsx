@@ -86,7 +86,7 @@ function stubFetch(ok: boolean, over: Partial<Field> = {}) {
       if (url.startsWith("/api/info")) return new Response(JSON.stringify(info.reply), { status: 200 });
       if (url.startsWith("/api/leaderboard")) return new Response(JSON.stringify(board), { status: 200 });
       if (url.startsWith("/api/overlay")) return overlayReply.body ? new Response(JSON.stringify(overlayReply.body), { status: 200 }) : new Response("no", { status: 404 });
-      if (url.endsWith("/index.json")) return new Response(JSON.stringify([{ slug: "fixture" }, { slug: "other" }]), { status: 200 });
+      if (url.endsWith("/index.json")) return new Response(JSON.stringify([{ slug: "fixture", difficulty: "easy" }, { slug: "other", difficulty: "easy" }]), { status: 200 });
       if (url.endsWith("field.json")) return new Response(JSON.stringify(field), { status: 200 });
       return new Response(bytes, { status: 200 });
     }),
@@ -627,14 +627,14 @@ describe("PlayScreen round mode", () => {
     expect(screen.queryByRole("button", { name: /Log in/ })).toBeNull();
   });
 
-  it("the tutorial gets no Next spot link (the coach leads on)", async () => {
+  it("the tutorial gets no next-stage link (the coach leads on)", async () => {
     const canvas = await loadGame({ showTitle: true, fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
     fireEvent.click(canvas, { clientX: 15, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
-    expect(screen.queryByRole("link", { name: /Next spot/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /NEXT STAGE|Next spot/ })).toBeNull();
   });
 
   it("the tutorial shows no scoreboard", async () => {
@@ -643,7 +643,7 @@ describe("PlayScreen round mode", () => {
     expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
   });
 
-  it("after a verdict offers the next spot and the sky map, so a round can move on", async () => {
+  it("after a verdict a result sheet offers NEXT STAGE; the old Next spot row and the mark prompt are gone", async () => {
     const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
     expect(screen.queryByRole("link", { name: /Next spot/ })).toBeNull();
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
@@ -651,9 +651,10 @@ describe("PlayScreen round mode", () => {
     fireEvent.click(canvas, { clientX: 15, clientY: 5 });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
-    const next = await screen.findByRole("link", { name: /Next spot/ });
+    const next = await screen.findByRole("link", { name: /NEXT STAGE/ });
     expect(next.getAttribute("href")).toBe("/play?spot=other");
-    expect(screen.getByRole("link", { name: /Sky map/ }).getAttribute("href")).toBe("/map");
+    expect(screen.queryByRole("link", { name: /Next spot/ })).toBeNull();
+    expect(document.body.textContent).not.toContain("Mark the mover in at least 2 frames");
   });
 
   it("the tutorial's Inspect names the object from the start", async () => {

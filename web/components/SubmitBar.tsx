@@ -16,19 +16,11 @@ import { saveGuestSubmission } from "@/lib/auth";
 import { recordFind } from "@/lib/guest";
 import { fitTrack, isStatic, validateMarks } from "@/lib/marks";
 import type { CheckRequest, CheckResponse, Mark, VerdictKind } from "@/lib/types";
+import ResultSheet from "./ResultSheet";
 import styles from "./SubmitBar.module.css";
 
 export const OFFLINE_TEXT = "Checking is not live yet; your marks stay on screen.";
 export const STATIC_HINT = "These marks barely move. You can still submit; the checker decides.";
-
-const KIND_TITLE: Record<VerdictKind, string> = {
-  known: "KNOWN OBJECT",
-  bot_match: "MATCHES THE BOT",
-  candidate: "UNCONFIRMED CANDIDATE",
-  static: "NOT MOVING",
-  nothing_correct: "CORRECT: NOTHING MOVES",
-  nothing_wrong: "SOMETHING MOVES HERE",
-};
 
 /** Kinds that count as a find in guest mode. */
 const FIND_KINDS: VerdictKind[] = ["known", "bot_match", "nothing_correct"];
@@ -37,6 +29,8 @@ export interface SubmitBarProps {
   spot: string;
   marks: Mark[];
   fetcher?: typeof fetch;
+  /** Training round: the result sheet has no stage numbers or next-stage link. */
+  tutorial?: boolean;
   onResult?(res: CheckResponse): void;
 }
 
@@ -44,7 +38,7 @@ type State =
   | { s: "idle" }
   | { s: "invalid"; text: string }
   | { s: "pending" }
-  | { s: "done"; res: CheckResponse }
+  | { s: "done"; res: CheckResponse; marks: Mark[]; open: boolean }
   | { s: "error"; text: string };
 
 export const NOT_FOUND_TEXT = "The server does not know this spot.";
@@ -65,7 +59,7 @@ export function errorText(e: unknown): string {
   return e.message || OFFLINE_TEXT;
 }
 
-export default function SubmitBar({ spot, marks, fetcher, onResult }: SubmitBarProps) {
+export default function SubmitBar({ spot, marks, fetcher, tutorial, onResult }: SubmitBarProps) {
   const [state, setState] = useState<State>({ s: "idle" });
   const pending = state.s === "pending";
   const valid = validateMarks(marks) === null;
@@ -81,7 +75,7 @@ export default function SubmitBar({ spot, marks, fetcher, onResult }: SubmitBarP
         saveGuestSubmission(req);
         if (FIND_KINDS.includes(res.verdict.kind)) recordFind(spot, res.verdict.kind, res.verdict.points);
       }
-      setState({ s: "done", res });
+      setState({ s: "done", res, marks, open: true });
       onResult?.(res);
     } catch (e) {
       setState({ s: "error", text: errorText(e) });
@@ -117,35 +111,14 @@ export default function SubmitBar({ spot, marks, fetcher, onResult }: SubmitBarP
           </p>
         )}
         {state.s === "error" && <p className={styles.calm}>{state.text}</p>}
-        {state.s === "done" && <VerdictView res={state.res} />}
+        {state.s === "done" && !state.open && (
+          <button type="button" className={styles.secondary} onClick={() => setState({ ...state, open: true })}>
+            Show result
+          </button>
+        )}
       </div>
-    </div>
-  );
-}
-
-function VerdictView({ res }: { res: CheckResponse }) {
-  const { verdict: v, track, reveal } = res;
-  return (
-    <div className={styles.verdict} data-kind={v.kind} data-testid="verdict">
-      <p className={styles.kind}>{KIND_TITLE[v.kind] ?? v.kind.toUpperCase()}</p>
-      <p>{v.message}</p>
-      <p>
-        <strong>+{v.points}</strong> points{res.practice ? " (practice: this spot was already open)" : res.already_found ? " (already found)" : ""}
-        {res.first_finder ? ", first finder" : ""}
-      </p>
-      {track && (
-        <p className={styles.small}>
-          Rate {track.rate_arcsec_per_hour.toFixed(2)}″/h ({Math.hypot(track.vx, track.vy).toFixed(2)} px/day, fit rms{" "}
-          {track.rms.toFixed(2)} px)
-        </p>
-      )}
-      {reveal && (
-        <p className={styles.small}>
-          Answer key: frame {reveal.frame} at x {reveal.x.toFixed(1)}, y {reveal.y.toFixed(1)}
-        </p>
-      )}
-      {v.kind === "bot_match" && res.noise_bar_sigma !== null && (
-        <p className={styles.small}>Noise bar {res.noise_bar_sigma.toFixed(1)}σ</p>
+      {state.s === "done" && state.open && (
+        <ResultSheet res={state.res} marks={state.marks} spot={spot} tutorial={tutorial} onClose={() => setState({ ...state, open: false })} />
       )}
     </div>
   );
