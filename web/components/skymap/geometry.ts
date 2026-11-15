@@ -94,7 +94,7 @@ export interface DifficultyStyle {
   /** Plain word shown next to the marker and in lists. */
   word: string;
   /** CSS custom property from globals.css. */
-  cssVar: "--cyan" | "--amber" | "--magenta" | "--text" | "--text-dim";
+  cssVar: "--cyan" | "--green" | "--amber" | "--magenta" | "--text" | "--text-dim";
   /** sRGB fallback for canvas drawing if the custom property cannot be read. */
   fallback: string;
   /** Inner glyph as an SVG path in a 24 x 24 box (also used with Path2D on the map canvas). */
@@ -106,7 +106,7 @@ export const RETICLE_PATH = "M3 8V3H8M16 3H21V8M21 16V21H16M8 21H3V16";
 
 // Colour is never the only signal: every difficulty also has its own glyph and a word label.
 export const DIFFICULTY_STYLE: Record<Difficulty, DifficultyStyle> = {
-  easy: { word: "Easy", cssVar: "--cyan", fallback: "#00e1ff", glyph: "M15 12A3 3 0 1 1 9 12A3 3 0 1 1 15 12Z" },
+  easy: { word: "Easy", cssVar: "--green", fallback: "#3dff8a", glyph: "M15 12A3 3 0 1 1 9 12A3 3 0 1 1 15 12Z" },
   medium: { word: "Medium", cssVar: "--amber", fallback: "#ffb000", glyph: "M12 8L16 12L12 16L8 12Z" },
   hard: { word: "Hard", cssVar: "--magenta", fallback: "#ff2e88", glyph: "M12 7.5L16.5 15.5H7.5Z" },
   boss: { word: "Boss", cssVar: "--text", fallback: "#d7e3f4", glyph: "M8 8H16V16H8ZM11 11H13V13H11Z" },

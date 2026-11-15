@@ -45,6 +45,7 @@ describe("ToneCurveEditor", () => {
     const stretch = () => screen.getByRole("slider", { name: "Stretch" }) as HTMLInputElement;
     expect(stretch().value).toBe("1");
     expect(stretch().getAttribute("aria-valuetext")).toBe("Log");
+    expect(screen.queryByText(/Stretch:/)).toBeNull();
     expect(screen.getByRole("slider", { name: "Curve bend" }).getAttribute("aria-valuenow")).toBe("54");
     rerender(<ToneCurveEditor value={{ bend: 0.6 }} onChange={() => {}} />);
     expect(stretch().getAttribute("aria-valuetext")).toBe("Custom");
