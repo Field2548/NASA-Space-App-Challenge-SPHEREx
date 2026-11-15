@@ -58,6 +58,8 @@ const STATS = {
   first_finds: 2,
   patches_solved: 5,
   active_days: 2,
+  seconds_played: 12_000,
+  seconds_week: 2_700,
 };
 
 // eros (easy), hektor (medium), makemake (hard), two tools, and a slug that is not a ready spot.
@@ -108,7 +110,25 @@ describe("GET /api/player", () => {
       first_finds: 2,
       patches_solved: 5,
       active_days: 2,
+      seconds_played: 12_000,
+      seconds_week: 2_700,
     });
+  });
+
+  it("answers null play time when the database function is the old one without it", async () => {
+    const { seconds_played: _a, seconds_week: _b, ...old } = STATS;
+    void _a;
+    void _b;
+    state.reply = { data: [old], error: null };
+    const body = await (await GET(get("/api/player?name=nova"))).json();
+    expect(body).toMatchObject({ points: 1850, seconds_played: null, seconds_week: null });
+  });
+
+  it("answers 0 play time for a player who has not played, and the sums as numbers when the database sends strings", async () => {
+    state.reply = { data: [{ ...STATS, seconds_played: "0", seconds_week: "0" }], error: null };
+    expect(await (await GET(get("/api/player?name=nova"))).json()).toMatchObject({ seconds_played: 0, seconds_week: 0 });
+    state.reply = { data: [{ ...STATS, seconds_played: "3600", seconds_week: "60" }], error: null };
+    expect(await (await GET(get("/api/player?name=nova"))).json()).toMatchObject({ seconds_played: 3600, seconds_week: 60 });
   });
 
   it("has null accuracy, ranks and dates for a player with nothing yet", async () => {

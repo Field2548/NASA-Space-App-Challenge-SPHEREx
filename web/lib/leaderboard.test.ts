@@ -7,6 +7,7 @@ import {
   fetchBoardV2,
   fetchPlayer,
   flagEmoji,
+  formatPlayTime,
   PlayerError,
   relativeTime,
   splitPodium,
@@ -144,8 +145,15 @@ describe("fetchPlayer", () => {
     if (!p.is_bot) {
       expect(p.country).toBe("TH");
       expect(p.points_week).toBeNull();
+      expect(p.seconds_played).toBeNull();
+      expect(p.seconds_week).toBeNull();
       expect(p.by_difficulty.easy).toEqual({ done: 1, total: 1 });
     }
+  });
+  it("parses play time, and keeps 0 as 0", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ name: "a", is_bot: false, seconds_played: 12000, seconds_week: 0 }), { status: 200 })));
+    const p = await fetchPlayer("a");
+    expect(!p.is_bot && [p.seconds_played, p.seconds_week]).toEqual([12000, 0]);
   });
   it("parses the bot and reports the HTTP status", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ name: "Shift-and-stack bot", is_bot: true, points: 1750, about: "About." }), { status: 200 })));
@@ -154,5 +162,23 @@ describe("fetchPlayer", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 503 })));
     await expect(fetchPlayer("x")).rejects.toEqual(expect.objectContaining({ status: 503 }));
     await expect(fetchPlayer("x")).rejects.toBeInstanceOf(PlayerError);
+  });
+});
+
+describe("formatPlayTime", () => {
+  it.each([
+    [0, "under 1 min"],
+    [59, "under 1 min"],
+    [-30, "under 1 min"],
+    [Number.NaN, "under 1 min"],
+    [60, "1 min"],
+    [2700, "45 min"],
+    [3599, "59 min"],
+    [3600, "1 h"],
+    [12000, "3 h 20 min"],
+    [12059, "3 h 20 min"],
+    [90000, "25 h"],
+  ])("%s s is %s", (seconds, text) => {
+    expect(formatPlayTime(seconds)).toBe(text);
   });
 });

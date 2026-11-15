@@ -26,6 +26,8 @@ const PLAYER = {
   first_finds: 2,
   patches_solved: 5,
   active_days: 2,
+  seconds_played: 12_000,
+  seconds_week: 2_700,
 };
 const BOT = { name: "Shift-and-stack bot", is_bot: true, is_me: false, points: 1750, about: "An automatic search that plays every stage." };
 
@@ -76,6 +78,34 @@ describe("PlayerStatsDialog", () => {
     expect(screen.getByText("3 / 6")).toBeTruthy();
     expect(screen.getByText("3 hours ago").getAttribute("title")).toMatch(/UTC$/);
     expect(screen.getByText("3 days ago")).toBeTruthy();
+  });
+
+  it("shows time played, all time and this week, with the small print", async () => {
+    reply(PLAYER);
+    render(<PlayerStatsDialog name="nova" onClose={vi.fn()} />);
+    await screen.findByText("#1");
+    expect(screen.getByText("Time played").nextElementSibling?.textContent).toBe("3 h 20 min");
+    expect(screen.getByText("Time played this week").nextElementSibling?.textContent).toBe("45 min");
+    expect(screen.getByText(/counts only while a stage is open, visible and in use/)).toBeTruthy();
+  });
+
+  it("shows 'under 1 min' for a player with almost no play time", async () => {
+    reply({ ...PLAYER, seconds_played: 20, seconds_week: 0 });
+    render(<PlayerStatsDialog name="nova" onClose={vi.fn()} />);
+    await screen.findByText("#1");
+    expect(screen.getByText("Time played").nextElementSibling?.textContent).toBe("under 1 min");
+    expect(screen.getByText("Time played this week").nextElementSibling?.textContent).toBe("under 1 min");
+  });
+
+  it("hides time played, and its small print, when the server sent null or nothing", async () => {
+    const rest: Record<string, unknown> = { ...PLAYER, seconds_played: null };
+    delete rest.seconds_week;
+    reply(rest);
+    render(<PlayerStatsDialog name="nova" onClose={vi.fn()} />);
+    await screen.findByText("#1");
+    expect(screen.queryByText("Time played")).toBeNull();
+    expect(screen.queryByText("Time played this week")).toBeNull();
+    expect(screen.queryByText(/counts only while a stage is open/)).toBeNull();
   });
 
   it("hides the whole stages section when the server left the stage totals out", async () => {

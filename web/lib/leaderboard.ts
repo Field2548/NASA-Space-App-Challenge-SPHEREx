@@ -124,6 +124,9 @@ export interface PlayerStats {
   first_finds: number | null;
   patches_solved: number | null;
   active_days: number | null;
+  /** Seconds played, all time / last 7 days. Null when the server did not send them (hide the stat). */
+  seconds_played: number | null;
+  seconds_week: number | null;
 }
 
 /** The bot only shows its points and a short description. */
@@ -183,6 +186,8 @@ function normalisePlayer(body: unknown): PlayerResult {
     first_finds: numOrNull(body.first_finds),
     patches_solved: numOrNull(body.patches_solved),
     active_days: numOrNull(body.active_days),
+    seconds_played: numOrNull(body.seconds_played),
+    seconds_week: numOrNull(body.seconds_week),
   };
 }
 
@@ -237,6 +242,16 @@ export function relativeTime(iso: string | null | undefined, now: number | Date)
   if (days < 30) return plural(days, "day");
   if (days < 365) return plural(Math.floor(days / 30), "month");
   return plural(Math.floor(days / 365), "year");
+}
+
+/** Play time for the stats dialog: "3 h 20 min", "3 h", "45 min" or "under 1 min" (whole minutes, rounded down). */
+export function formatPlayTime(seconds: number): string {
+  const minutes = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds / 60) : 0;
+  if (minutes < 1) return "under 1 min";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
 /** The exact time, in UTC, for a tooltip: "2026-11-15 09:28 UTC". Empty when not a date. */

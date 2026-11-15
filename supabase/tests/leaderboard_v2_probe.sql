@@ -16,6 +16,8 @@
 --   probe_d  --  eros nothing_correct 20 (no country).
 --   probe_e  --  profile, no finds.
 --   probe_f  --  eros wrong answer 0 points (a zero-point player who is still listed on the boards).
+--   play_time: probe_a has 600 s today, 300 s 3 days ago, 50 s 6 days ago (in the week), 70 s 7 days ago
+--   and 1000 s 10 days ago (outside the week); probe_e is the player who pings add_play_time().
 
 begin;
 
@@ -61,6 +63,13 @@ update public.finds set created_at = now() - interval '10 days'
 insert into public.patch_solves (patch_id, user_id, ra, dec, created_at) values
   ('p11-1', '0000000a-0000-4000-8000-00000000000a', 1, 1, now()),
   ('p11-2', '0000000a-0000-4000-8000-00000000000a', 1, 1, now() - interval '3 days');
+
+insert into public.play_time (user_id, day, seconds) values
+  ('0000000a-0000-4000-8000-00000000000a', (now() at time zone 'UTC')::date, 600),
+  ('0000000a-0000-4000-8000-00000000000a', (now() at time zone 'UTC')::date - 3, 300),
+  ('0000000a-0000-4000-8000-00000000000a', (now() at time zone 'UTC')::date - 6, 50),
+  ('0000000a-0000-4000-8000-00000000000a', (now() at time zone 'UTC')::date - 7, 70),
+  ('0000000a-0000-4000-8000-00000000000a', (now() at time zone 'UTC')::date - 10, 1000);
 
 select pg_temp.expect('fixture: the 6 profiles exist with countries',
   (select string_agg(display_name || ':' || coalesce(country, '-'), ',' order by display_name)
@@ -349,6 +358,133 @@ end $$;
 -- The board for the new country now shows B (local boards follow the profile country).
 select pg_temp.expect('after set_my_country, the FR board lists B',
   (select string_agg(display_name || ':' || rank, ' ') from public.leaderboard_v2(null, null, 'fr')), 'probe_b:1');
+
+-- ---------------------------------------------------------------- play time
+
+do $$
+declare
+  e constant uuid := '0000000e-0000-4000-8000-00000000000e';
+  d constant date := (now() at time zone 'UTC')::date;
+  got int;
+begin
+  -- A guest (anon) cannot call add_play_time; nor can the table be read or written directly.
+  if has_function_privilege('anon', 'public.add_play_time(int)', 'execute')
+     or has_function_privilege('public', 'public.add_play_time(int)', 'execute')
+     or not has_function_privilege('authenticated', 'public.add_play_time(int)', 'execute') then
+    raise exception 'FAIL: add_play_time must be callable by authenticated only';
+  end if;
+  set local role anon;
+  begin
+    perform public.add_play_time(30);
+    raise exception 'FAIL: anon called add_play_time';
+  exception when insufficient_privilege then null;
+  end;
+  reset role;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  begin
+    perform 1 from public.play_time;
+    raise exception 'FAIL: authenticated read play_time directly';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.play_time (user_id, day, seconds) values (e, d - 1, 5000);
+    raise exception 'FAIL: authenticated wrote play_time directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  -- The first ping of the day has no earlier ping: the gap counts as 90, so a huge claim gives 90.
+  got := public.add_play_time(100000);
+  if got <> 90 then raise exception 'FAIL: first ping with a huge claim credited %, wanted 90', got; end if;
+  -- A second ping in the same instant has no elapsed time to credit.
+  got := public.add_play_time(60);
+  if got <> 0 then raise exception 'FAIL: an immediate second ping credited %, wanted 0', got; end if;
+
+  -- Ping again 10 s after the last one: about 10 s, never the 60 that was claimed.
+  reset role;
+  update public.play_time set last_ping = now() - interval '10 seconds' where user_id = e and day = d;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  got := public.add_play_time(60);
+  if got <> 10 then raise exception 'FAIL: a ping 10 s after the last credited %, wanted 10', got; end if;
+
+  -- After a long gap the credit is the claim, capped at 90.
+  reset role;
+  update public.play_time set last_ping = now() - interval '1 hour' where user_id = e and day = d;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  got := public.add_play_time(60);
+  if got <> 60 then raise exception 'FAIL: 60 s after a long gap credited %, wanted 60', got; end if;
+  reset role;
+  update public.play_time set last_ping = now() - interval '1 hour' where user_id = e and day = d;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  got := public.add_play_time(500);
+  if got <> 90 then raise exception 'FAIL: 500 s after a long gap credited %, wanted 90', got; end if;
+
+  -- Negative, zero and null claims credit nothing (and never subtract).
+  reset role;
+  update public.play_time set last_ping = now() - interval '1 hour' where user_id = e and day = d;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  if public.add_play_time(-50) <> 0 or public.add_play_time(0) <> 0 or public.add_play_time(null) <> 0 then
+    raise exception 'FAIL: a negative, zero or null claim credited something';
+  end if;
+  reset role;
+  if (select seconds from public.play_time where user_id = e and day = d) <> 90 + 10 + 60 + 90 then
+    raise exception 'FAIL: the day total is % (wanted 250)', (select seconds from public.play_time where user_id = e and day = d);
+  end if;
+
+  -- The day never exceeds 86400.
+  update public.play_time set seconds = 86395, last_ping = now() - interval '1 hour' where user_id = e and day = d;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  got := public.add_play_time(90);
+  if got <> 5 then raise exception 'FAIL: near the day cap credited %, wanted 5', got; end if;
+  reset role;
+  update public.play_time set last_ping = now() - interval '1 hour' where user_id = e and day = d;
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '0000000e-0000-4000-8000-00000000000e', true);
+  got := public.add_play_time(90);
+  if got <> 0 then raise exception 'FAIL: at the day cap credited %, wanted 0', got; end if;
+  reset role;
+  if (select seconds from public.play_time where user_id = e and day = d) <> 86400 then
+    raise exception 'FAIL: the day total is not capped at 86400';
+  end if;
+
+  -- A caller with no user (no sub) is a guest: nothing credited, nothing written.
+  set local role authenticated;
+  perform set_config('request.jwt.claim.sub', '', true);
+  if public.add_play_time(60) <> 0 then raise exception 'FAIL: a caller with no user was credited'; end if;
+  reset role;
+
+  -- Only the caller's own row was ever touched.
+  if (select count(*) from public.play_time where user_id not in (e, '0000000a-0000-4000-8000-00000000000a')) <> 0 then
+    raise exception 'FAIL: add_play_time created a row for another player';
+  end if;
+  if (select sum(seconds) from public.play_time where user_id = '0000000a-0000-4000-8000-00000000000a') <> 2020 then
+    raise exception 'FAIL: add_play_time changed another player''s play time';
+  end if;
+  raise notice 'ok: add_play_time (first ping 90, 10 s gap gives 10, long gap capped at 90, clamps, day cap 86400, guests, own row only)';
+end $$;
+
+-- probe_a: 600 + 300 + 50 + 70 + 1000 = 2020 s in all, and 950 s in the last 7 UTC days
+-- (today, 3 and 6 days ago; the 7-day-old and 10-day-old rows are outside).
+select pg_temp.expect('player_stats play time for probe_a (all time, last 7 days)',
+  (select concat_ws(' ', seconds_played, seconds_week) from public.player_stats('probe_a')), '2020 950');
+select pg_temp.expect('player_stats play time for a player who never played',
+  (select concat_ws(' ', seconds_played, seconds_week) from public.player_stats('probe_c')), '0 0');
+select pg_temp.expect('player_stats play time for probe_e (86400 s today)',
+  (select concat_ws(' ', seconds_played, seconds_week) from public.player_stats('probe_e')), '86400 86400');
+do $$
+declare r text;
+begin
+  set local role anon;
+  select seconds_played || ' ' || seconds_week into r from public.player_stats('probe_a');
+  reset role;
+  if r is distinct from '2020 950' then raise exception 'FAIL: a guest sees play time [%]', r; end if;
+  raise notice 'ok: a guest reads play time through player_stats';
+end $$;
 
 -- ---------------------------------------------------------------- no user ids anywhere
 

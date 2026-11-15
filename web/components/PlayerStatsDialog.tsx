@@ -5,7 +5,7 @@
 // description. Object names never appear: the API does not send them.
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { countryName, difficultyRows, exactTime, fetchPlayer, flagEmoji, PlayerError, relativeTime, type PlayerResult } from "@/lib/leaderboard";
+import { countryName, difficultyRows, exactTime, fetchPlayer, flagEmoji, formatPlayTime, PlayerError, relativeTime, type PlayerResult } from "@/lib/leaderboard";
 import { formatAccuracy } from "@/lib/scoreboard";
 import styles from "./PlayerStatsDialog.module.css";
 
@@ -118,6 +118,8 @@ export default function PlayerStatsDialog({ name, onClose }: { name: string; onC
               <Stat label="First finds">{num(player.first_finds)}</Stat>
               <Stat label="Sky patches solved">{num(player.patches_solved)}</Stat>
               <Stat label="Active days">{num(player.active_days)}</Stat>
+              {player.seconds_played !== null && <Stat label="Time played">{formatPlayTime(player.seconds_played)}</Stat>}
+              {player.seconds_week !== null && <Stat label="Time played this week">{formatPlayTime(player.seconds_week)}</Stat>}
               <Stat label="Member since" title={exactTime(player.member_since)}>
                 {relativeTime(player.member_since, state.status === "ok" ? state.now : 0)}
               </Stat>
@@ -125,6 +127,9 @@ export default function PlayerStatsDialog({ name, onClose }: { name: string; onC
                 {relativeTime(player.last_active, state.status === "ok" ? state.now : 0)}
               </Stat>
             </dl>
+            {(player.seconds_played !== null || player.seconds_week !== null) && (
+              <p className={styles.note}>Time played counts only while a stage is open, visible and in use.</p>
+            )}
 
             {player.stages_total !== null && (
               <section aria-labelledby={`${titleId}-stages`} className={styles.stages}>

@@ -21,6 +21,12 @@
 --                             and never which stages the player solved. Dates are day-level (UTC).
 --   player_spots(name)        the spot slugs a player solved. service_role ONLY (the web server turns
 --                             them into per-difficulty counts; the slugs never reach a browser).
+--   play_time                 seconds a logged-in player has spent playing, one row per player and UTC
+--                             day. RLS on, no policies, no grants: only the functions below touch it.
+--   add_play_time(seconds)    the caller reports play time; the credit is capped by the real time since
+--                             their last report, so a forged client cannot add more than elapsed time.
+--                             authenticated only.
+--   player_stats also returns seconds_played (all time) and seconds_week (the last 7 UTC days).
 -- The index on finds(created_at) below is created without `concurrently` (the table is small at
 -- the moment, so the brief write lock is fine; use a separate concurrent build if it ever grows).
 -- Everything public is stable, security definer, search_path = '' and returns names and numbers only.
@@ -52,6 +58,69 @@ as $$
     and pg_catalog.btrim(p_country) ~ '^[A-Za-z]{2}$'
     and pg_catalog.upper(pg_catalog.btrim(p_country)) <> 'XX'
     and p.country is distinct from pg_catalog.upper(pg_catalog.btrim(p_country));
+$$;
+
+-- ---------------------------------------------------------------- play time
+
+-- Seconds played, per player and UTC day. Written only by add_play_time() (security definer), read
+-- only by player_stats(). The check keeps a day within 24 hours.
+create table if not exists public.play_time (
+  user_id uuid not null references auth.users on delete cascade,
+  day date not null,
+  seconds int not null default 0 check (seconds between 0 and 86400),
+  last_ping timestamptz,
+  primary key (user_id, day)
+);
+comment on table public.play_time is
+  'Seconds a logged-in player spent playing a stage, per UTC day. Written by add_play_time() only.';
+alter table public.play_time enable row level security;
+-- No policies: nobody reads or writes this table directly.
+revoke all on public.play_time from anon, authenticated;
+
+-- The caller reports p_seconds of play. The credit is the smallest of: p_seconds (never below 0),
+-- 90, the seconds since this player's last report today (taken as 90 when there is none today), and
+-- what is left of the day (86400). So a forged client can add at most the real time that has passed,
+-- and a day never exceeds 24 hours. Returns the seconds credited (0 for a guest). The row is locked
+-- while it is updated, so two parallel calls cannot both claim the same gap.
+create or replace function public.add_play_time(p_seconds int)
+returns int
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_day date := (pg_catalog.now() at time zone 'UTC')::date;
+  v_have int;
+  v_last timestamptz;
+  v_gap int;
+  v_credit int;
+begin
+  if v_uid is null then
+    return 0;
+  end if;
+
+  insert into public.play_time (user_id, day) values (v_uid, v_day)
+  on conflict (user_id, day) do nothing;
+
+  select t.seconds, t.last_ping into v_have, v_last
+  from public.play_time t
+  where t.user_id = v_uid and t.day = v_day
+  for update;
+
+  v_gap := case
+    when v_last is null then 90
+    else greatest(0, pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now() - v_last))::int)
+  end;
+  v_credit := least(greatest(coalesce(p_seconds, 0), 0), 90, v_gap, 86400 - v_have);
+
+  update public.play_time t
+  set seconds = t.seconds + v_credit, last_ping = pg_catalog.now()
+  where t.user_id = v_uid and t.day = v_day;
+
+  return v_credit;
+end;
 $$;
 
 -- ---------------------------------------------------------------- internal ranking helper
@@ -146,6 +215,8 @@ $$;
 --   first_finds              rows where this player was the first finder.
 --   patches_solved           rows in patch_solves.
 --   active_days              distinct UTC dates with any find or patch solve.
+--   seconds_played           all-time seconds of play (sum of play_time).
+--   seconds_week             seconds of play on the last 7 UTC days (today and the 6 before it).
 -- No user id is returned. Call with the caller's token so is_me works.
 -- An earlier draft of this function also returned spots_solved; a changed result type cannot be
 -- replaced in place, so drop it first (the grants below are re-applied on every run).
@@ -154,7 +225,8 @@ create or replace function public.player_stats(p_name text)
 returns table (
   display_name text, is_me boolean, country text, member_since timestamptz, last_active timestamptz,
   points bigint, points_week bigint, rank_all bigint, rank_week bigint,
-  classifications bigint, correct bigint, first_finds bigint, patches_solved bigint, active_days bigint
+  classifications bigint, correct bigint, first_finds bigint, patches_solved bigint, active_days bigint,
+  seconds_played bigint, seconds_week bigint
 )
 language sql
 stable
@@ -184,7 +256,10 @@ as $$
          (select count(distinct d.day)
             from (select (f.created_at at time zone 'UTC')::date as day from public.finds f where f.user_id = p.id
                   union
-                  select (s.created_at at time zone 'UTC')::date from public.patch_solves s where s.user_id = p.id) d)
+                  select (s.created_at at time zone 'UTC')::date from public.patch_solves s where s.user_id = p.id) d),
+         (select coalesce(sum(t.seconds), 0)::bigint from public.play_time t where t.user_id = p.id),
+         (select coalesce(sum(t.seconds), 0)::bigint from public.play_time t
+            where t.user_id = p.id and t.day > (pg_catalog.now() at time zone 'UTC')::date - 7)
   from public.profiles p
   where pg_catalog.lower(p.display_name) = pg_catalog.lower(pg_catalog.btrim(p_name))
   limit 1;
@@ -217,11 +292,16 @@ revoke execute on function
   public.leaderboard_v2(text, timestamptz, text, int),
   public.leaderboard_countries(text, timestamptz),
   public.player_stats(text),
-  public.player_spots(text)
+  public.player_spots(text),
+  public.add_play_time(int)
 from public, anon, authenticated, service_role;
 
 -- A guest has no profile to change, so set_my_country is for logged-in players only.
 grant execute on function public.set_my_country(text) to authenticated;
+
+-- Likewise play time: a guest has nothing to credit. Callers pass only the number of seconds; the
+-- function decides how much of it counts.
+grant execute on function public.add_play_time(int) to authenticated;
 
 grant execute on function
   public.leaderboard_v2(text, timestamptz, text, int),

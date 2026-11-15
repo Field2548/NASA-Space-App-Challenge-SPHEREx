@@ -48,6 +48,9 @@ export type PlayerAnswer = {
   first_finds: number;
   patches_solved: number;
   active_days: number;
+  /** Seconds played, all time / the last 7 UTC days; null when the database function has no play time yet. */
+  seconds_played: number | null;
+  seconds_week: number | null;
 };
 
 export type BotAnswer = { name: string; is_bot: true; is_me: false; points: number; about: string };
@@ -214,5 +217,7 @@ export async function answerPlayer(
     first_finds: num(row.first_finds),
     patches_solved: num(row.patches_solved),
     active_days: num(row.active_days),
+    seconds_played: numOrNull(row.seconds_played),
+    seconds_week: numOrNull(row.seconds_week),
   };
 }
