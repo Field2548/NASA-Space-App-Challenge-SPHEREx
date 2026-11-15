@@ -99,8 +99,24 @@
   font-size: 12px;
 }
 
+/* Each stage takes its difficulty colour (as on the map); not played yet is the same colour, dimmed. */
+.listItems button[data-status] {
+  color: var(--diff-color, var(--text));
+  border-left: 3px solid var(--diff-color, var(--line));
+}
+
+.listItems button[data-status="new"] {
+  opacity: 0.5;
+}
+
+.listItems button[data-status="new"]:hover,
+.listItems button[data-status="new"]:focus-visible {
+  opacity: 0.8;
+}
+
 .listItems button[aria-pressed="true"] {
-  border-color: var(--cyan);
+  border-color: var(--diff-color, var(--cyan));
+  opacity: 1;
 }
 
 .progress {

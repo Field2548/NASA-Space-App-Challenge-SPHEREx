@@ -246,7 +246,10 @@ describe("StagesScreen", () => {
     expect(document.querySelector("details")?.hasAttribute("open")).toBe(false);
     expect(screen.getByText("All stages (6)")).toBeTruthy();
     const b = screen.getByTestId("list-makemake");
-    expect(b.textContent).toMatch(/Stage 4, Field in Somewhere\. Not played/);
+    // Not played yet: no label, the row is dimmed (data-status="new") in its difficulty colour.
+    expect(b.textContent).toBe("Stage 4, Field in Somewhere.");
+    expect(b.getAttribute("data-status")).toBe("new");
+    expect(b.style.getPropertyValue("--diff-color")).toMatch(/^var\(--/);
     fireEvent.click(b);
     expect(await screen.findByTestId("stage-makemake")).toBeTruthy();
     expect(last.props?.target).toMatchObject({ ra: 1, dec: 2 });
