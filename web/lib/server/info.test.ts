@@ -22,7 +22,13 @@ const erosFrame1 = erosObject.positions.find((p: { frame: number }) => p.frame =
 const erosCatalog = readJson("data/catalog/eros.json");
 const erosCentre = { ra: 13.2004, dec: 14.38 };
 
-beforeEach(() => resetRateLimit());
+// The tests below check the old lock, which stays behind INSPECT_LOCK=1. The default (Inspect open
+// for everyone, user decision 2026-11-15) is checked in "Inspect open by default" at the end.
+beforeEach(() => {
+  resetRateLimit();
+  vi.stubEnv("INSPECT_LOCK", "1");
+});
+afterEach(() => vi.unstubAllEnvs());
 
 /** Call GET /api/info; `unlocked` lists the spots the caller's cookie opens. */
 async function call(query: string, unlocked?: string[]) {
@@ -336,5 +342,22 @@ describe("GET /api/info: input errors", () => {
     const { status, body } = await get("spot=nosuch&x=1&y=1");
     expect(status).toBe(404);
     expect(body.error.code).toBe("not_found");
+  });
+});
+
+describe("GET /api/info: Inspect open by default", () => {
+  it("mode=round on eros, with no cookie, answers in full and names the object", async () => {
+    vi.stubEnv("INSPECT_LOCK", "");
+    const { status, text } = await call(`${erosXy}&mode=round`);
+    const body = JSON.parse(text);
+    expect(status).toBe(200);
+    expect(body.locked).toBe(false);
+    expect(text).toContain("Eros");
+  });
+
+  it("a missing mode is also answered in full", async () => {
+    vi.stubEnv("INSPECT_LOCK", "");
+    const { body } = await get(`${erosXy}`);
+    expect(body.locked).toBe(false);
   });
 });
