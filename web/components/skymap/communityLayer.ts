@@ -11,10 +11,11 @@ import { cellCenter } from "@/lib/healpix";
 import { cellOfPatch, patchIpix } from "@/lib/hpxTiles";
 import { patchFromId } from "@/lib/patch";
 import { loadLocalPatchSolves } from "@/lib/patchSolves";
+import { authHeader } from "@/lib/supabase";
 import type { AladinCatalog, AladinInstance, AladinOverlay, AladinShape, AladinSource, AladinStatic } from "./aladin";
 import { drawGlow, glowLevel, type GlowData, type GlowKind } from "./communityGlyph";
 import { selectLod, viewRadiusDeg, visibleTiles, zoomTargetFov, type Lod, type ViewState } from "./communityLod";
-import { tileKey, TileLoader, type TileData, type TileSpec } from "./communityTiles";
+import { TILES_URL, tileKey, TileLoader, type TileData, type TilePatchInfo, type TileSpec } from "./communityTiles";
 
 /** Most density dots drawn (the busiest are kept). */
 export const MAX_DOTS = 4000;
@@ -48,26 +49,73 @@ function sepDeg(ra1: number, dec1: number, ra2: number, dec2: number): number {
   return (2 * Math.asin(Math.min(1, Math.sqrt(s)))) / D2R;
 }
 
+interface Own {
+  id: string;
+  ra: number;
+  dec: number;
+  solved: boolean;
+  reported: boolean;
+  /** Also on the player's account, so the community counts already include it. */
+  inDb: boolean;
+}
+
+/** The player's own patches: this device's local store plus the account's (`account`, from /api/patch-tiles?who=me). */
+export function ownPatches(account: TilePatchInfo[] = []): Own[] {
+  const by = new Map<string, Own>();
+  for (const p of loadLocalPatchSolves()) {
+    by.set(p.id, { id: p.id, ra: p.ra, dec: p.dec, solved: p.solved_at !== null, reported: p.reports.length > 0, inDb: false });
+  }
+  for (const a of account) {
+    const e = by.get(a.id);
+    if (e) {
+      e.solved ||= a.solved;
+      e.reported ||= a.reported;
+      e.inDb = true;
+      continue;
+    }
+    const p = patchFromId(a.id);
+    if (p) by.set(a.id, { id: a.id, ra: p.ra, dec: p.dec, solved: a.solved, reported: a.reported, inDb: true });
+  }
+  return [...by.values()];
+}
+
 /** The player's own patches as footprints, within `radius` degrees of the view centre. */
-export function localFootprints(view: ViewState, radius: number): Footprint[] {
-  return loadLocalPatchSolves()
+export function localFootprints(view: ViewState, radius: number, account: TilePatchInfo[] = []): Footprint[] {
+  return ownPatches(account)
     .filter((p) => sepDeg(view.ra, view.dec, p.ra, p.dec) <= radius)
-    .map((p) => ({ id: p.id, solved: p.solved_at !== null, reported: p.reports.length > 0, mine: true }));
+    .map((p) => ({ id: p.id, solved: p.solved, reported: p.reported, mine: true }));
 }
 
 /** The player's own patches counted into cells at `order`, within `radius` degrees of the view centre. */
-export function localCells(view: ViewState, radius: number, order: number): DensityCell[] {
-  const by = new Map<number, DensityCell>();
-  for (const p of loadLocalPatchSolves()) {
+export function localCells(view: ViewState, radius: number, order: number, account: TilePatchInfo[] = []): DensityCell[] {
+  const by = new Map<number, DensityCell & { inDb: number }>();
+  for (const p of ownPatches(account)) {
     const ipix = patchIpix(p.id);
     if (ipix === null || sepDeg(view.ra, view.dec, p.ra, p.dec) > radius) continue;
     const cell = cellOfPatch(ipix, order);
-    const e = by.get(cell) ?? { ipix: cell, solves: 0, reports: 0, mine: true };
-    if (p.solved_at !== null) e.solves++;
-    if (p.reports.length) e.reports++;
+    const e = by.get(cell) ?? { ipix: cell, solves: 0, reports: 0, mine: true, inDb: 0 };
+    if (p.solved) e.solves++;
+    if (p.reported) e.reports++;
+    if (p.inDb) e.inDb++;
     by.set(cell, e);
   }
   return [...by.values()];
+}
+
+/**
+ * Take the player's own counts out of the community counts for the same cell, so a cell is cyan for what is
+ * theirs and green for what is other players' (never both colours over the same patches). Only account-saved
+ * patches are subtracted: those are the ones the server counted.
+ */
+export function withoutOwn(cells: DensityCell[], mine: (DensityCell & { inDb?: number })[]): DensityCell[] {
+  const own = new Map(mine.map((m) => [m.ipix, m]));
+  return cells
+    .map((c) => {
+      const m = own.get(c.ipix);
+      if (!m?.inDb) return c;
+      return { ...c, solves: Math.max(0, c.solves - m.solves), reports: Math.max(0, c.reports - m.reports) };
+    })
+    .filter((c) => c.solves + c.reports > 0);
 }
 
 /** Merge tile footprints with the player's own: one entry per patch, mine first, at most `cap`. */
@@ -116,6 +164,8 @@ export interface CommunityLayerOptions {
   /** A dot was clicked: the map must not also treat it as a click on the sky. */
   onObjectClick?: () => void;
   loader?: TileLoader;
+  /** The account's own patches (default: GET /api/patch-tiles?who=me with the login token; none for guests). */
+  loadMine?: () => Promise<TilePatchInfo[]>;
 }
 
 export interface CommunityLayer {
@@ -135,6 +185,25 @@ export function createCommunityLayer(opts: CommunityLayerOptions): CommunityLaye
   const cornerCache = new Map<string, [number, number][]>();
 
   const loader = opts.loader ?? new TileLoader({ onTile: () => schedule() });
+  let account: TilePatchInfo[] = [];
+  const loadMine =
+    opts.loadMine ??
+    (async (): Promise<TilePatchInfo[]> => {
+      const headers = await authHeader();
+      if (!headers.Authorization) return [];
+      const res = await fetch(`${TILES_URL}?who=me`, { headers });
+      const body = (await res.json()) as { patches?: TilePatchInfo[] };
+      return res.ok && Array.isArray(body.patches) ? body.patches : [];
+    });
+  loadMine()
+    .then((p) => {
+      if (dead) return;
+      account = p;
+      schedule();
+    })
+    .catch(() => {
+      /* guests and failures: only this device's own patches show */
+    });
 
   let dots: AladinCatalog | null = null;
   let outline: AladinOverlay | null = null;
@@ -175,8 +244,10 @@ export function createCommunityLayer(opts: CommunityLayerOptions): CommunityLaye
   }
 
   function renderDensity(l: Extract<Lod, { mode: "density" }>, v: ViewState): void {
-    const { cells, max } = collectCells(specs.map((s) => loader.get(s)));
-    const mine = localCells(v, viewRadiusDeg(v.fov, v.fovY), l.order);
+    const collected = collectCells(specs.map((s) => loader.get(s)));
+    const mine = localCells(v, viewRadiusDeg(v.fov, v.fovY), l.order, account);
+    const cells = withoutOwn(collected.cells, mine);
+    const max = collected.max;
     const sources: AladinSource<GlowData>[] = [];
     for (const c of cells) {
       const [ra, dec] = cellCenter(c.ipix, l.order);
@@ -193,7 +264,7 @@ export function createCommunityLayer(opts: CommunityLayerOptions): CommunityLaye
   }
 
   function renderPatches(v: ViewState): void {
-    const mine = localFootprints(v, viewRadiusDeg(v.fov, v.fovY));
+    const mine = localFootprints(v, viewRadiusDeg(v.fov, v.fovY), account);
     const merged = mergeFootprints(specs.map((s) => loader.get(s)), mine);
     const shapes: AladinShape[] = [];
     for (const f of merged) {
@@ -218,7 +289,7 @@ export function createCommunityLayer(opts: CommunityLayerOptions): CommunityLaye
   function render(): void {
     if (dead || !view || !lod) return;
     // Skip when nothing on screen changed: same level of detail and the same tiles loaded.
-    const sig = `${lod.mode}:${"order" in lod ? lod.order : 11}:${specs.map((s) => (loader.get(s) ? tileKey(s) : "-")).join(",")}:${loadLocalPatchSolves().length}`;
+    const sig = `${lod.mode}:${"order" in lod ? lod.order : 11}:${specs.map((s) => (loader.get(s) ? tileKey(s) : "-")).join(",")}:${loadLocalPatchSolves().length}:${account.length}`;
     if (sig === signature) return;
     signature = sig;
     try {
