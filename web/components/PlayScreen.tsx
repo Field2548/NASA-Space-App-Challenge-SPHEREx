@@ -47,6 +47,7 @@ import InspectPanel from "./InspectPanel";
 import PanelResizer, { usePanelWidths } from "./PanelResizer";
 import { InspectPopup } from "./InspectPopup";
 import MorphologyControl from "./MorphologyControl";
+import MotionPad, { type Motion } from "./MotionPad";
 import PatchPlay, { type PickedHooks } from "./PatchPlay";
 import PlayTimeTracker from "./PlayTimeTracker";
 import type { Patch } from "@/lib/patch";
@@ -273,6 +274,8 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
   const [revealName, setRevealName] = useState<string | null>(null);
   const [revealTitle, setRevealTitle] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
+  // Shift (opt-in, with Stack): null = off, else the motion the stacked frames follow.
+  const [shift, setShift] = useState<Motion | null>(null);
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
   const [morph, setMorph] = useState<MorphStack>(EMPTY_MORPH_STACK);
@@ -448,6 +451,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               onClick={() => {
                 // Turning it on stops the blink: the colour composite is one still picture of all frames.
                 if (overlay !== "colorByTime") pause();
+                else setShift(null);
                 setOverlay((o) => (o === "colorByTime" ? "none" : "colorByTime"));
                 emit("color-by-time-toggled", marks);
               }}
@@ -455,8 +459,26 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               className={styles.wide}
               data-tutorial-target="color-by-time"
             >
-              Color by time
+              Stack
             </button>
+            {(
+              <button
+                type="button"
+                aria-pressed={shift !== null}
+                onClick={() => {
+                  if (shift !== null) return setShift(null);
+                  pause();
+                  setOverlay("colorByTime");
+                  setShift({ vx: 0, vy: 0 });
+                }}
+                title="Move the frames back along a motion before stacking: a mover with that motion becomes one dot, stars become trails."
+                className={styles.wide}
+                style={{ marginTop: 6 }}
+              >
+                Shift
+              </button>
+            )}
+            {shift !== null && <MotionPad value={shift} onChange={setShift} />}
           </section>
         )}
         {tools.has("wavelength") && field.has?.exposures === true && (
@@ -540,6 +562,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
               onInspect={inspectAt}
               overlay={overlay}
               overlayFrames={onionRangeFrames(onionRange)}
+              shift={shift}
               known={knownData}
               crosshair={pointer ? null : cursor}
               brightness={black}

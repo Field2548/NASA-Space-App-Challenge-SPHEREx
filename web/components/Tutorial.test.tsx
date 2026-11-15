@@ -174,13 +174,13 @@ describe("Tutorial", () => {
     expect(coach().textContent).toContain("Level 0 complete");
     expect(loadGuest().tutorial.done).toEqual([0]);
 
-    // Level 1: Color by time on, then off again; then Brightness, Wavelength, Morphology, zoom.
+    // Level 1: Stack on, then off again; then Brightness, Wavelength, Morphology, zoom.
     fireEvent.click(screen.getByRole("button", { name: "Start level 1" }));
     expect(coach().textContent).toContain(TUTORIAL[1].steps[0].text);
-    fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stack" }));
     expect(coach().textContent).toContain(TUTORIAL[1].steps[1].text);
     expect(document.querySelector('[data-tutorial-target="color-range"]')).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stack" }));
     for (const s of TUTORIAL[1].steps.slice(2)) {
       expect(coach().textContent).toContain(s.text);
       fireEvent.click(within(coach()).getByRole("button", { name: "Next" }));
@@ -234,8 +234,8 @@ describe("Tutorial", () => {
       const { unmount } = render(<Tutorial />);
       await screen.findByTestId("field-canvas");
       expect(coach().getAttribute("data-target"), `step ${TUTORIAL[li].steps[si].id}`).toBe(target);
-      // The Color bar only exists while Color by time is on.
-      if (target === "color-range") fireEvent.click(screen.getByRole("button", { name: "Color by time" }));
+      // The Color bar only exists while Stack is on.
+      if (target === "color-range") fireEvent.click(screen.getByRole("button", { name: "Stack" }));
       expect(document.querySelector(`[data-tutorial-target~="${target}"]`), `target ${target} of ${TUTORIAL[li].steps[si].id}`).not.toBeNull();
       unmount();
       cleanup();
@@ -262,7 +262,7 @@ describe("Tutorial", () => {
     await screen.findByTestId("field-canvas");
     const has = (name: string | RegExp) => screen.queryByRole("button", { name }) !== null;
     expect(has(/Play blink/) && has("Next frame")).toBe(true);
-    expect([has(/Inspect/), has("Color by time"), has("Known asteroids"), has("Submit"), has("Show more frames"), has("1 frame per second")]).toEqual([false, false, false, false, false, false]);
+    expect([has(/Inspect/), has("Stack"), has("Known asteroids"), has("Submit"), has("Show more frames"), has("1 frame per second")]).toEqual([false, false, false, false, false, false]);
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /Play blink/ }));
     fireEvent.click(screen.getByRole("button", { name: /Pause blink/ }));
@@ -270,7 +270,7 @@ describe("Tutorial", () => {
     expect([has("1 frame per second"), has("Show fewer frames"), screen.queryByRole("slider", { name: "Blink start frame" }) !== null]).toEqual([true, true, true]);
     for (let i = 0; i < 4; i++) fireEvent.click(screen.getByRole("button", { name: "Skip step" })); // level 0 complete
     fireEvent.click(screen.getByRole("button", { name: "Start level 1" }));
-    expect([has("Color by time"), has("Submit")]).toEqual([true, false]);
+    expect([has("Stack"), has("Submit")]).toEqual([true, false]);
     for (let i = 0; i < TUTORIAL[1].steps.length; i++) fireEvent.click(screen.getByRole("button", { name: "Skip step" }));
     fireEvent.click(screen.getByRole("button", { name: "Start level 2" }));
     expect([has("Submit"), has(/Inspect/), has("Known asteroids")]).toEqual([true, false, false]);
