@@ -361,17 +361,11 @@ describe("GET /api/info: Inspect open by default", () => {
     expect(body.locked).toBe(false);
   });
 
-  it("a picked-patch round (patch=1) stays locked: no name before a correct answer", async () => {
+  it("a picked-patch round (patch=1) is open from the start, like every Inspect", async () => {
     vi.stubEnv("INSPECT_LOCK", "");
-    const { status, text } = await call(`ra=13.2004&dec=14.38&mode=round&patch=1`);
+    const { status, body } = await get(`ra=13.2004&dec=14.38&mode=round&patch=1`);
     expect(status).toBe(200);
-    expect(JSON.parse(text)).toEqual({ mode: "round", locked: true, position: expect.any(Object) });
-    expect(text).not.toContain("Eros");
-  });
-
-  it("patch=1 with explore keeps the cookie rule inside a ready spot", async () => {
-    vi.stubEnv("INSPECT_LOCK", "");
-    expect((await get(`ra=13.2004&dec=14.38&mode=explore&patch=1`)).body.locked).toBe(true);
-    expect((await get(`ra=13.2004&dec=14.38&mode=explore&patch=1`, ["eros"])).body.locked).toBe(false);
+    expect(body.locked).toBe(false);
+    expect((await get(`ra=13.2004&dec=14.38&mode=explore&patch=1`)).body.locked).toBe(false);
   });
 });
