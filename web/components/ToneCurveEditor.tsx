@@ -1,7 +1,8 @@
 "use client";
 // Light intensity curve editor (PNL-06). One one-handle Bezier curve; the handle slides along the
-// anti-diagonal (drag, or arrow keys with Shift for big steps). The 3-stop Stretch slider (Linear,
-// Log, asinh; asinh is the default look and the reset) sets that same curve to a preset shape.
+// anti-diagonal (drag, or arrow keys with Shift for big steps). The Stretch slider is the same bend,
+// continuous from -1 to 1, with the Linear, asinh and Log shapes marked at their own bend (asinh,
+// bend 0, is the default look and the reset).
 //
 // Props: { value: Curve; onChange(c: Curve): void }
 
@@ -54,10 +55,10 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
     setBend(y - x); // projection onto the anti-diagonal
   };
 
-  // The slider sits on the matching stop, or on the nearest one when the handle was dragged off.
+  // The slider is the bend itself (-1..1), the same value the handle sets; the stops are labelled
+  // at their own bend, so the slider position matches the real shape of the curve.
   const preset = presetOf(value);
-  const nearest = CURVE_PRESETS.reduce((a, p) => (Math.abs(PRESET_BEND[p] - value.bend) < Math.abs(PRESET_BEND[a] - value.bend) ? p : a));
-  const presetIdx = CURVE_PRESETS.indexOf(preset ?? nearest);
+  const stopLeft = (p: CurvePreset) => `${Math.round(((PRESET_BEND[p] + 1) / 2) * 100)}%`;
   const stretchText = preset ? PRESET_LABEL[preset] : "Custom";
   const demo = isDefaultCurve(value) ? presetCurve("log") : value;
   const sc = rampScene();
@@ -68,8 +69,9 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
         Light curve{" "}
         <InfoPopover label="Light curve" title="Light curve: how bright each level is drawn">
           <p>
-            The Stretch slider sets the curve to a ready shape: asinh is the default look and the reset, Linear is brightness
-            proportional to the signal, Log lifts the faint end. Moving the dot off a shape shows Custom.
+            The Stretch slider bends the curve smoothly, from darker faint end on the left to brighter on the right. Three shapes
+            are marked on it: Linear is brightness proportional to the signal, asinh is the default look and the reset, Log lifts
+            the faint end most. Between the marks the curve shows Custom.
           </p>
           <p>
             On the curve, left-right is the brightness the picture has now, the height is the brightness it gets.
@@ -85,24 +87,29 @@ export default function ToneCurveEditor({ value, onChange }: ToneCurveEditorProp
       <label style={{ display: "grid", gap: 2 }}>
         <input
           type="range"
-          min={0}
-          max={CURVE_PRESETS.length - 1}
-          step={1}
+          min={-1}
+          max={1}
+          step={0.01}
           list="tone-presets"
-          value={presetIdx}
+          value={Math.round(clampBend(value.bend) * 100) / 100}
           aria-label="Stretch"
           aria-valuetext={stretchText}
-          onChange={(e) => onChange(presetCurve(CURVE_PRESETS[Number(e.target.value)] ?? "asinh"))}
+          onChange={(e) => setBend(Number(e.target.value))}
         />
         <datalist id="tone-presets">
-          {CURVE_PRESETS.map((p, i) => (
-            <option key={p} value={i} label={PRESET_LABEL[p]} />
+          {CURVE_PRESETS.map((p) => (
+            <option key={p} value={PRESET_BEND[p]} label={PRESET_LABEL[p]} />
           ))}
         </datalist>
         {/* No "Stretch:" caption: the current stop's name is lit; none is lit for a custom bend. */}
-        <span style={{ display: "flex", justifyContent: "space-between" }} aria-hidden="true">
+        <span style={{ position: "relative", height: "1.4em" }} aria-hidden="true">
           {CURVE_PRESETS.map((p) => (
-            <span key={p} data-on={p === preset ? "true" : "false"} style={p === preset ? { color: "var(--cyan)" } : { opacity: 0.6 }}>
+            <span
+              key={p}
+              data-stop={p}
+              data-on={p === preset ? "true" : "false"}
+              style={{ position: "absolute", left: stopLeft(p), transform: "translateX(-50%)", ...(p === preset ? { color: "var(--cyan)" } : { opacity: 0.6 }) }}
+            >
               {PRESET_LABEL[p]}
             </span>
           ))}

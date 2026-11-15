@@ -10,7 +10,8 @@
 //   linear -0.44 fit to sinh(y asinh 5)/5 (undoes the asinh), rms 0.004
 // The default (bend 0) is the identity: applyCurve returns the same array.
 
-export const CURVE_PRESETS = ["linear", "log", "asinh"] as const;
+// Ordered by bend (how much each lifts the faint end), so the Stretch slider runs Linear, asinh, Log.
+export const CURVE_PRESETS = ["linear", "asinh", "log"] as const;
 export type CurvePreset = (typeof CURVE_PRESETS)[number];
 export interface Curve {
   bend: number;
