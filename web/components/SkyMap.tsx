@@ -14,7 +14,7 @@
 //   Options: cooFrame "galactic", projection "AIT", fov 360, mode "dark", show*Control flags (from
 //   iA.DEFAULT_OPTIONS). Aladin's logo (bottom right) stays visible: its terms of use ask for that.
 //
-// Aladin Lite is GPL-3.0; the HiPS is ODbL (CDS). Credit both on /credits.
+// Aladin Lite is GPL-3.0; the HiPS is courtesy NASA/JPL-Caltech, built by CDS. Credit both on /credits.
 
 import Image from "next/image";
 import { Minus, Plus, RotateCw, X } from "lucide-react";
@@ -922,7 +922,7 @@ export function SkyMap({
         </div>
       )}
 
-      {/* Data credit (ODbL asks for attribution). Aladin's own logo sits at the far bottom-right. */}
+      {/* Data credit (NASA/JPL-Caltech data, HiPS by CDS). Aladin's own logo sits at the far bottom-right. */}
       {!failed && <div
         style={{
           position: "absolute",
@@ -933,7 +933,7 @@ export function SkyMap({
           pointerEvents: "none",
         }}
       >
-        {fromIrsa ? "SPHEREx DR1 HiPS (0.81 µm): IRSA" : "SPHEREx QR2 HiPS: CDS"}
+        {fromIrsa ? "SPHEREx DR1 HiPS (0.81 µm): IRSA" : "SPHEREx QR2 HiPS: NASA/JPL-Caltech, HiPS by CDS (CNRS/Unistra)"}
       </div>}
     </div>
   );
