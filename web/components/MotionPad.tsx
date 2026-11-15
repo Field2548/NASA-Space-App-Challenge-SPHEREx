@@ -54,7 +54,7 @@ export default function MotionPad({ value, onChange }: { value: Motion; onChange
     onChange(motionFromPad(x, y));
   };
   const onKey = (e: KeyboardEvent<SVGSVGElement>) => {
-    const step = e.shiftKey ? 1 : 3;
+    const step = e.shiftKey ? 0.25 : 2; // pad px; hold Shift for slow movers (~0.05 px/day near the centre)
     const d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
     const k = d[e.key];
     if (!k) return;

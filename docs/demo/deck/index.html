@@ -88,9 +88,9 @@ svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; poi
   <div class="chev" style="left:474px; top:292px;">›</div>
   <div class="card" style="left:540px; top:236px; width:400px; height:200px;"><div class="n">2</div><h3>Align</h3><p>One burst = one moment, lined up</p></div>
   <div class="chev" style="left:950px; top:292px;">›</div>
-  <div class="card" style="left:1016px; top:236px; width:400px; height:200px;"><div class="n">3</div><h3>Colour</h3><p>Onion skin: one colour per moment</p></div>
+  <div class="card" style="left:1016px; top:236px; width:400px; height:200px;"><div class="n">3</div><h3>Stack</h3><p>Onion skin: one colour per moment</p></div>
   <div class="chev" style="left:1426px; top:292px;">›</div>
-  <div class="card" style="left:1492px; top:236px; width:364px; height:200px;"><div class="n">4</div><h3>Stack</h3><p>Finds faint, slow movers</p></div>
+  <div class="card" style="left:1492px; top:236px; width:364px; height:200px;"><div class="n">4</div><h3>Shift</h3><p>Lines up faint, slow movers</p></div>
   <div id="s3shot"></div>
   <svg class="ov" id="s3svg"></svg>
   <div class="abs" style="left:1150px; top:490px; width:706px;">
@@ -245,17 +245,17 @@ function annotate(slideId, items) {
 }
 // ---- Slide 5 ----
 {
-  const M = shot("s5a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 235], scale: 0.88 });
+  const M = shot("s5a", { src: "img/play_stack_shift.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 235], scale: 0.88 });
   const T = shot("s5b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 468], scale: 1.3 });
   const C = shot("s5c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 815], scale: 1.3 });
   document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1400px; top:408px; font-size:28px;">Plain frame: where is it?</div>`);
   annotate("s5", [
     { n: 1, box: M.r([122, 693, 591, 142]), at: M.p(790, 790), cap: "Flip through the frames", side: "r" },
-    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(345, 262), cap: "Colour<br>by time", side: "r" },
-    { n: 3, box: C.r([606, 282, 205, 170]), at: [1425, 745], cap: "Coloured dots<br>= the mover", side: "r" },
-    { n: 4, box: M.r([1106, 163, 309, 34]), at: [1400, 352], cap: "Mark it, then Submit", side: "r" },
+    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(345, 200), cap: "Stack", side: "r" },
+    { n: 3, box: M.r([25, 220, 279, 32]), at: M.p(345, 300), cap: "Shift: line up<br>a slow mover", side: "r" },
+    { n: 4, box: C.r([606, 282, 205, 170]), at: [1425, 745], cap: "Coloured dots<br>= the mover", side: "r" },
+    { n: 5, box: M.r([1106, 163, 309, 34]), at: [1400, 352], cap: "Mark it, then Submit", side: "r" },
   ]);
-  { const b = M.r([598, 268, 230, 200]); document.getElementById("s5svg").insertAdjacentHTML("beforeend", `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="none" stroke="#ffb000" stroke-width="5"/>`); }
 }
 // ---- Slide 6 ----
 {
