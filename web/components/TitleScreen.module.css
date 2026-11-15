@@ -184,6 +184,16 @@
   font-size: clamp(32px, 6vw, 64px);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+/* The mark sizes with the title text. */
+.titleMark {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
 }
 
 .tagline {

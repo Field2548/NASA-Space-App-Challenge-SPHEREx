@@ -3,7 +3,7 @@
 // (allowlist, cache headers) is in lib/hipsProxy.ts. Not rate limited: one map view asks for
 // dozens of tiles at once, and the allowlist keeps the route to public, fixed files.
 
-import { CACHE_MISSING, CACHE_NONE, CACHE_OK, upstreamUrl } from "@/lib/hipsProxy";
+import { bandProperties, CACHE_MISSING, CACHE_NONE, CACHE_OK, IRSA_BAND_SRC, upstreamUrl } from "@/lib/hipsProxy";
 
 export async function GET(
   _request: Request,
@@ -21,6 +21,12 @@ export async function GET(
   }
   if (res.status === 404) return new Response(null, { status: 404, headers: { "Cache-Control": CACHE_MISSING } });
   if (!res.ok) return new Response(null, { status: 502, headers: { "Cache-Control": CACHE_NONE } });
+  if (src === IRSA_BAND_SRC && path.join("/") === "properties") {
+    return new Response(bandProperties(await res.text()), {
+      status: 200,
+      headers: { "Content-Type": "text/plain", "Cache-Control": CACHE_OK, "Access-Control-Allow-Origin": "*" },
+    });
+  }
   const type = res.headers.get("content-type") ?? (url.endsWith("properties") ? "text/plain" : "application/octet-stream");
   return new Response(res.body, {
     status: 200,

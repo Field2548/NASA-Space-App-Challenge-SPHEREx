@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke-linecap="round">
+  <!-- SPHEREx looking straight at you: the shield rims become an eye, the iris is its six detector
+       bands from 0.75 to 5 microns, and in the pupil a mover crosses three frames. -->
+  <!-- Shield rims seen from above -->
+  <circle cx="32" cy="32" r="28" stroke="#2a4a6b" stroke-width="1" />
+  <circle cx="32" cy="32" r="22.5" stroke="#3a5f86" stroke-width="1" />
+  <circle cx="32" cy="32" r="17.5" stroke="#00e1ff" stroke-width="1.2" />
+  <!-- Reticle ticks: the game's crosshair -->
+  <path d="M32 1V7M32 57V63M1 32H7M57 32H63" stroke="#00e1ff" stroke-width="1.4" />
+  <!-- Iris: six detector bands, short to long wavelength -->
+  <path d="M32.76 17.52A14.5 14.5 0 0 1 44.16 24.10L39.97 26.83A9.5 9.5 0 0 0 32.50 22.51Z" fill="#4d7cff" />
+  <path d="M44.92 25.42A14.5 14.5 0 0 1 44.92 38.58L40.46 36.31A9.5 9.5 0 0 0 40.46 27.69Z" fill="#00c8ff" />
+  <path d="M44.16 39.90A14.5 14.5 0 0 1 32.76 46.48L32.50 41.49A9.5 9.5 0 0 0 39.97 37.17Z" fill="#3dff8a" />
+  <path d="M31.24 46.48A14.5 14.5 0 0 1 19.84 39.90L24.03 37.17A9.5 9.5 0 0 0 31.50 41.49Z" fill="#ffe14d" />
+  <path d="M19.08 38.58A14.5 14.5 0 0 1 19.08 25.42L23.54 27.69A9.5 9.5 0 0 0 23.54 36.31Z" fill="#ffb000" />
+  <path d="M19.84 24.10A14.5 14.5 0 0 1 31.24 17.52L31.50 22.51A9.5 9.5 0 0 0 24.03 26.83Z" fill="#ff4d3d" />
+  <!-- Pupil: the dark sky with a mover in three frames -->
+  <circle cx="32" cy="32" r="8" fill="#000" stroke="#00e1ff" stroke-width="0.8" />
+  <circle cx="28.5" cy="34.5" r="1.1" fill="#56b4e9" />
+  <circle cx="32" cy="32" r="1.1" fill="#e69f00" />
+  <circle cx="35.5" cy="29.5" r="1.1" fill="#cc79a7" />
+  <!-- Catch-light -->
+  <circle cx="35" cy="27" r="0.7" fill="#fff" opacity="0.8" />
+</svg>

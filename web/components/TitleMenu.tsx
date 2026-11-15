@@ -10,7 +10,7 @@ export const MENU_ITEMS = [
   { href: "/stages", label: "Game stages" },
   { href: "/map", label: "Explore the sky" },
   { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/settings", label: "Settings" },
+  { href: "/achievements", label: "Achievements" },
 ] as const;
 
 export default function TitleMenu() {

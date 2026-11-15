@@ -20,12 +20,13 @@ describe("TitleScreen", () => {
     const h1s = screen.getAllByRole("heading", { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0].textContent).toBe(PROJECT_NAME);
+    expect(h1s[0].querySelector('svg[data-part="brand-mark"][aria-hidden="true"]')).toBeTruthy();
     const links = screen.getAllByRole("link");
     expect(links.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
       ["Game stages", "/stages"],
       ["Explore the sky", "/map"],
       ["Leaderboard", "/leaderboard"],
-      ["Settings", "/settings"],
+      ["Achievements", "/achievements"],
     ]);
     expect(screen.queryByRole("button", { name: "Log in" })).toBeNull(); // the account control is in the layout
     expect(screen.getByRole("progressbar", { name: "World progress" })).toBeTruthy();
