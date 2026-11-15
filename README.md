@@ -24,7 +24,7 @@ Planet X would have.
 *The sky map. Pick any patch of the whole sky to search. Green glows show where other players have already looked.*
 
 ![Game page showing ten frames of one sky patch](docs/images/game.png)
-*The game. Blink through the frames, colour them by time or stack them, then mark the mover and submit.*
+*The game. Blink through the frames, stack them or shift them, then mark the mover and submit.*
 
 ## Play: how the web game works
 
