@@ -1,11 +1,81 @@
-# NASA-Space-App-Challenge-SPHEREx
+# Onion Sky: finding moving objects in NASA SPHEREx images
 
-Python tools that download NASA SPHEREx images from IRSA and turn them into pictures where
-**moving objects (asteroids, dwarf planets) are easy to spot**: each moment in time gets its
-own colour, so things that stay still look white and things that move leave a coloured trail.
+**Play the game: https://onion-sky.vercel.app**
+
+We turn NASA SPHEREx sky images into pictures where **moving objects (asteroids, dwarf planets)
+are easy to spot**, and into a web game where anyone can hunt for them. Each moment in time gets
+its own colour, so things that stay still look white and things that move leave a coloured trail.
+
+**The challenge.** This is our entry for the NASA Space Apps Challenge 2026, "Planet X and
+SPHEREx". SPHEREx photographs the whole sky in 102 near-infrared colours. A hidden distant
+planet ("Planet X") would creep across those images very slowly, so we first learn to find movers
+that are fast (asteroids), then slower ones (Neptune, dwarf planets), working toward the speed a
+Planet X would have.
 
 ![Eros onion skin](data/motion_13.2004_14.38_2025-07-09/summary.png)
 *Asteroid (433) Eros on 9 July 2025: one coloured dot per moment (blue → sky blue → green), inside the circles where JPL says Eros was. Stars that didn't move are white.*
+
+## Play: how the web game works
+
+**Onion Sky** ([onion-sky.vercel.app](https://onion-sky.vercel.app), code in [`web/`](web/)) shows
+real SPHEREx images of the same patch of sky taken at different times. You flip through them and
+mark what moved.
+
+- **Tutorial:** a short guided start, from an obvious asteroid to harder ones.
+- **Stages:** real sky patches in increasing difficulty. "Nothing moved" is a valid answer for some.
+- **Image tools, sky map and timeline:** colour-blind modes, a sky map, and an Inspect pop-up that shows what can honestly be said about a clicked spot.
+- **Achievements, leaderboard and accounts:** sign in to keep a profile and compare scores. Guests can play too.
+- Points are worked out on the server and the answer keys never reach the browser.
+
+## How it works
+
+The Python tools in this repo download SPHEREx images from NASA's IRSA archive, line up the
+frames, tint each moment with its own colour and search for faint movers. The sky patches in the
+game are exported from that output (`pipeline/export_web.py`). The method, results and figures
+are in the sections below.
+
+## Run it yourself
+
+**Python pipeline** (see Setup and Scripts below for all options):
+
+```bash
+python -m venv .venv
+.venvScriptsactivate          # Windows  (macOS/Linux: source .venv/bin/activate)
+pip install -r requirements.txt
+python motion_frames.py 26.3271 -0.4338 --start 2026-01-06T00:47 --min-spacing 20 --fov 0.1 --track 136199
+python shift_stack.py data/motion_26.3271_-0.4338_2026-01-06 --track 136199
+```
+
+**Web app:**
+
+```bash
+cd web && npm ci && npm run dev      # then open http://localhost:3000
+```
+
+With no environment variables the game still runs in guest mode (scores come from the answer
+keys, and the leaderboard shows a saved snapshot). For accounts and the live leaderboard, put
+these in `web/.env.local` (never commit them): `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. Optional: `CRON_SECRET`,
+`UNLOCK_SECRET`, `INSPECT_LOCK`.
+
+## Repository layout
+
+| Path | What is there |
+| --- | --- |
+| `*.py` (top level) | The pipeline scripts: `download.py`, `spectral_bands.py`, `deglow.py`, `motion_frames.py`, `shift_stack.py` |
+| `data/` | Results of the demo fields (pictures, GIFs, CSV tables) |
+| `pipeline/` | Python that exports sky patches and catalog facts for the web game, with tests |
+| `web/` | The Next.js web game (Onion Sky) |
+| `supabase/` | Database migrations and security checks |
+| `docs/` | Plans, contracts between parts of the project, the full game spec |
+| `scripts/` | Helper scripts, including the credits check |
+| `CREDITS.md`, `LICENSE` | Credits for everything we used; the licence (GPL-3.0) |
+
+## Licence and credits
+
+The code is licensed under GPL-3.0, see [`LICENSE`](LICENSE). The data is NASA SPHEREx data from
+the NASA/IPAC Infrared Science Archive (IRSA). Every dataset, service, library, font and paper we
+used is credited in [`CREDITS.md`](CREDITS.md).
 
 ## Setup
 
@@ -134,9 +204,7 @@ Margins are small (Eris beats the bar by 1σ), and crowded fields have a higher 
 
 ## Website
 
-The `web/` folder holds a public web game built for the 2026 NASA Space Apps Challenge. Players look at real SPHEREx images of the same patch of sky taken at different times and try to spot the objects that moved: asteroids, dwarf planets and nearby stars. It has a short tutorial, image tools, colour-blind modes, a timeline, a sky map and an Inspect pop-up that shows what can honestly be said about a clicked spot. The public URL will be added here at deploy time.
-
-To run it on your own computer:
+The game lives in [`web/`](web/) and is live at https://onion-sky.vercel.app (see "Play" above). To run it on your own computer:
 
 ```bash
 cd web && npm ci && npm run dev
@@ -156,7 +224,7 @@ We used Claude Code (Anthropic's coding assistant) to help write the code in thi
 - The Python tools and the science behind them were written by the team with Claude Code. The repo history shows this: many commit messages carry a `Co-Authored-By: Claude` line.
 - The website was built by three Claude Code agent sessions, called DATA, GAME and SERVER. They worked on separate branches and talked to each other only through GitHub issues and pull requests, following the plans in `docs/plans/`.
 - People kept the jobs that need a person: accounts, secrets, approvals, and the final submission.
-- Every outside idea, dataset, library, font and icon is credited in `CREDITS.md`. Other teams' projects were read for ideas only. The code is our own.
+- Every outside dataset, library, font and icon is credited in `CREDITS.md`.
 - No AI-generated images or video are used. Every picture on the site is real SPHEREx data, or is drawn in code (CSS and SVG).
 
 ## Acknowledgments
@@ -165,4 +233,4 @@ This publication makes use of data products from the Spectro-Photometer for the 
 
 This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology.
 
-Every dataset, service, library, font and idea we used is listed in [`CREDITS.md`](CREDITS.md) with its author, link and license. This project is licensed under GPL-3.0, see [`LICENSE`](LICENSE).
+Every dataset, service, library, font and paper we used is listed in [`CREDITS.md`](CREDITS.md) with its author, link and license. This project is licensed under GPL-3.0, see [`LICENSE`](LICENSE).

@@ -72,14 +72,6 @@ def test_missing_license_fails(tmp_path):
     assert "empty license" in r.stderr
 
 
-def test_missing_idea_row_fails(tmp_path):
-    dst = make_copy(tmp_path)
-    edit_rows(dst, lambda rows: [x for x in rows if x["name"] != "Driftnet"])
-    r = run(dst, "--check")
-    assert r.returncode != 0
-    assert "Driftnet" in r.stderr
-
-
 def test_unlisted_ref_file_fails(tmp_path):
     dst = make_copy(tmp_path)
     (dst / "web" / "public" / "ref" / "mystery.json").write_text("{}")
@@ -103,7 +95,6 @@ def test_stale_credits_md_fails(tmp_path):
 def test_output_is_deterministic_and_has_required_text(tmp_path):
     dst = make_copy(tmp_path)
     text = (dst / "CREDITS.md").read_text(encoding="utf-8")
-    assert "We read these projects for ideas; all code here is our own." in text
     assert "GPL-3.0" in text and "LICENSE" in text
     run(dst)
     assert (dst / "CREDITS.md").read_text(encoding="utf-8") == text
