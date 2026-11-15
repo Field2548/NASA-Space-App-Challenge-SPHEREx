@@ -39,9 +39,13 @@ export function usePrefersReducedMotion(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
+/** Rates the speed slider steps through (frames per second), all within MAX_BLINK_FPS. */
+export const BLINK_SPEEDS = [0.5, 1, 2, 3] as const;
+
 export interface BlinkOptions {
   fps?: number; // requested rate, capped at MAX_BLINK_FPS
   mode?: BlinkMode;
+  range?: [number, number]; // inclusive array indices the blink plays; default all frames
   initialIndex?: number;
 }
 
@@ -65,6 +69,8 @@ export function useBlink(n: number, opts: BlinkOptions = {}): Blink {
   const [rawIndex, setRawIndex] = useState(opts.initialIndex ?? 0);
   const [wantPlay, setWantPlay] = useState(false);
   const dir = useRef<1 | -1>(1);
+  const lo = n > 0 ? Math.min(Math.max(0, opts.range ? Math.min(opts.range[0], opts.range[1]) : 0), n - 1) : 0;
+  const hi = n > 0 ? Math.min(Math.max(lo, opts.range ? Math.max(opts.range[0], opts.range[1]) : n - 1), n - 1) : 0;
 
   const index = n > 0 ? Math.min(Math.max(0, rawIndex), n - 1) : 0;
   const playing = wantPlay && !reducedMotion && n > 1;
@@ -73,13 +79,14 @@ export function useBlink(n: number, opts: BlinkOptions = {}): Blink {
     if (!playing) return;
     const id = setInterval(() => {
       setRawIndex((i) => {
-        const [next, d] = nextBlinkIndex(Math.min(i, n - 1), n, mode, dir.current);
+        // Positions inside the loop range; a frame outside it joins the loop at the nearest end.
+        const [next, d] = nextBlinkIndex(Math.min(Math.max(i, lo), hi) - lo, hi - lo + 1, mode, dir.current);
         dir.current = d;
-        return next;
+        return lo + next;
       });
     }, intervalMs);
     return () => clearInterval(id);
-  }, [playing, n, mode, intervalMs]);
+  }, [playing, lo, hi, mode, intervalMs]);
 
   const setIndex = useCallback((i: number) => setRawIndex(n > 0 ? Math.min(Math.max(0, Math.round(i)), n - 1) : 0), [n]);
   const step = useCallback(

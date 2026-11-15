@@ -1,0 +1,11 @@
+.back {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--text);
+}

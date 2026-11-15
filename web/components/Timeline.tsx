@@ -18,8 +18,10 @@
 //   onionRange?: [a, b]; onOnionRangeChange?(r)         inclusive array indices for Color by time (2..7 frames);
 //                                                          the ONION track shows when onionRange is given;
 //                                                          FieldViewer overlayFrames = onionRangeFrames(range)
-//   realSpacing?: boolean; onRealSpacingChange?(v)      true gaps from mjd (log scale when max/min gap > 10);
-//                                                          the checkbox shows when the callback is given
+//   loopRange?: [a, b]; onLoopRangeChange?(r)           inclusive array indices the blink plays (default all);
+//                                                          two sliders show when the callback is given
+//   fps?: number; onFpsChange?(f)                       blink speed, one of BLINK_SPEEDS; the slider shows
+//                                                          when the callback is given
 //
 // Thumbnails: field.thumbs (one 48x48 WebP per frame, via loadThumbs) when there are as many as
 // frames; otherwise, while loading, and on error, the frame-derived canvas at `brightness`.
@@ -28,7 +30,7 @@ import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useId
 import { loadThumbs } from "@/lib/fields";
 import { makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB, Vision } from "@/lib/types";
-import type { BlinkMode } from "@/lib/useBlink";
+import { BLINK_SPEEDS, type BlinkMode } from "@/lib/useBlink";
 import { timeColors } from "@/lib/palettes";
 import { formatGap, rgbCss, stretchPoints } from "./FieldViewer";
 import styles from "./Timeline.module.css";
@@ -56,8 +58,10 @@ export interface TimelineProps {
   onLoopModeChange?(m: BlinkMode): void;
   onionRange?: [number, number];
   onOnionRangeChange?(r: [number, number]): void;
-  realSpacing?: boolean;
-  onRealSpacingChange?(v: boolean): void;
+  loopRange?: [number, number];
+  onLoopRangeChange?(r: [number, number]): void;
+  fps?: number;
+  onFpsChange?(f: number): void;
   /** Draw thumbnails from `frames` (a rebuilt wavelength band) instead of the all-band field.thumbs. */
   thumbsFromFrames?: boolean;
 }
@@ -92,23 +96,6 @@ export function clampOnion(r: [number, number], n: number): [number, number] {
   return [a, b];
 }
 
-/**
- * Left edge of each clip. Even: k * STEP. Real: the smallest mjd gap gets one STEP and the others
- * scale with their gap, linearly, or as 1 + log2(gap / min) when max/min > 10.
- */
-export function clipOffsets(field: Pick<Field, "frames">, n: number, real: boolean): { left: number[]; log: boolean } {
-  const even = Array.from({ length: n }, (_, k) => k * STEP);
-  if (!real || n < 2) return { left: even, log: false };
-  const gaps: number[] = [];
-  for (let k = 1; k < n; k++) gaps.push(field.frames[k].mjd - field.frames[k - 1].mjd);
-  if (gaps.some((g) => !(g > 0))) return { left: even, log: false };
-  const min = Math.min(...gaps);
-  const log = Math.max(...gaps) / min > 10;
-  const left = [0];
-  for (const g of gaps) left.push(left[left.length - 1] + STEP * (log ? 1 + Math.log2(g / min) : g / min));
-  return { left, log };
-}
-
 function nearestClip(x: number, left: number[]): number {
   let best = 0;
   let bd = Number.POSITIVE_INFINITY;
@@ -126,7 +113,7 @@ function shortUtc(utc: string): string {
   return utc.slice(5, 16).replace("T", " ");
 }
 
-function Thumb({ gray, w, h, bitmap }: { gray: Float32Array | null; w: number; h: number; bitmap?: ImageBitmap }) {
+export function Thumb({ gray, w, h, bitmap }: { gray: Float32Array | null; w: number; h: number; bitmap?: ImageBitmap }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const cw = bitmap ? bitmap.width : w;
   const ch = bitmap ? bitmap.height : h;
@@ -145,7 +132,7 @@ function Thumb({ gray, w, h, bitmap }: { gray: Float32Array | null; w: number; h
 
 export default function Timeline(props: TimelineProps) {
   const { field, frames, index, onIndexChange, marks = [], playing = false, onTogglePlay, reducedMotion = false, controlsSlot } = props;
-  const { loopMode, onLoopModeChange, realSpacing = false, onRealSpacingChange, onOnionRangeChange } = props;
+  const { loopMode, onLoopModeChange, onOnionRangeChange, onLoopRangeChange, onFpsChange } = props;
   const [W, H] = field.size;
   const n = frames.length;
   const vision = props.vision ?? "normal";
@@ -180,10 +167,18 @@ export default function Timeline(props: TimelineProps) {
   const clipId = (k: number) => `${uid}-clip-${k}`;
   const scrubbing = useRef(false);
 
-  const { left, log } = useMemo(() => clipOffsets(field, n, realSpacing), [field, n, realSpacing]);
+  const left = useMemo(() => Array.from({ length: n }, (_, k) => k * STEP), [n]);
   const total = n > 0 ? left[n - 1] + CLIP_W + 4 : 0;
   const margin = (k: number) => (k === 0 ? 0 : left[k] - left[k - 1] - CLIP_W);
   const onion = props.onionRange ? clampOnion(props.onionRange, n) : null;
+  const speedAt = (BLINK_SPEEDS as readonly number[]).indexOf(props.fps ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1]);
+  const loop: [number, number] | null = n > 0 ? [Math.min(n - 1, Math.max(0, props.loopRange?.[0] ?? 0)), Math.min(n - 1, Math.max(0, props.loopRange?.[1] ?? n - 1))] : null;
+  // Moving one end past the other drags the other end along, so at least one frame stays in the loop.
+  const moveLoop = (which: 0 | 1, k: number) => {
+    if (!loop || !onLoopRangeChange) return;
+    const v = Math.min(n - 1, Math.max(0, k));
+    onLoopRangeChange(which === 0 ? [v, Math.max(v, loop[1])] : [Math.min(v, loop[0]), v]);
+  };
   const onionRow = useRef<HTMLDivElement>(null);
   const markRow = useRef<HTMLDivElement>(null);
 
@@ -285,11 +280,28 @@ export default function Timeline(props: TimelineProps) {
             </button>
           )}
         </div>
-        {onRealSpacingChange && (
+        {onFpsChange && (
           <label className={styles.check}>
-            <input type="checkbox" checked={realSpacing} onChange={(e) => onRealSpacingChange(e.target.checked)} />
-            Real time spacing{realSpacing && log ? " (log scale)" : ""}
+            Speed
+            <input
+              type="range"
+              min={0}
+              max={BLINK_SPEEDS.length - 1}
+              step={1}
+              value={Math.max(0, speedAt)}
+              aria-label="Blink speed"
+              aria-valuetext={`${BLINK_SPEEDS[Math.max(0, speedAt)]} ${BLINK_SPEEDS[Math.max(0, speedAt)] === 1 ? "frame" : "frames"} per second`}
+              onChange={(e) => onFpsChange(BLINK_SPEEDS[Number(e.target.value)] ?? BLINK_SPEEDS[BLINK_SPEEDS.length - 1])}
+            />
+            {BLINK_SPEEDS[Math.max(0, speedAt)]} fps
           </label>
+        )}
+        {onLoopRangeChange && loop && n > 1 && (
+          <div className={styles.check} role="group" aria-label="Loop range">
+            <span>Loop frames {loop[0] + 1} to {loop[1] + 1}</span>
+            <input type="range" min={1} max={n} step={1} value={loop[0] + 1} aria-label="Loop start frame" aria-valuetext={`frame ${loop[0] + 1} of ${n}`} onChange={(e) => moveLoop(0, Number(e.target.value) - 1)} />
+            <input type="range" min={1} max={n} step={1} value={loop[1] + 1} aria-label="Loop end frame" aria-valuetext={`frame ${loop[1] + 1} of ${n}`} onChange={(e) => moveLoop(1, Number(e.target.value) - 1)} />
+          </div>
         )}
         <p className={styles.note}>{reducedMotion ? "Auto-play off (reduced motion). Step with ← →." : "Max 3 frames/s. Step with ← →."}</p>
         {controlsSlot ?? (

@@ -30,7 +30,7 @@ function stubFetch() {
 describe("EmbedViewer", () => {
   it("builds the /play link with the same view params", () => {
     expect(playHref("fixture", { spot: "fixture", frames: "0-2", vision: "mono", spacing: "real", junk: "x" })).toBe(
-      "/play?spot=fixture&frames=0-2&spacing=real&vision=mono",
+      "/play?spot=fixture&frames=0-2&vision=mono",
     );
   });
 

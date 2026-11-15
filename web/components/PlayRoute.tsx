@@ -1,5 +1,5 @@
 "use client";
-// /play with URL state: the view params (frames, spacing, vision) seed PlayScreen and every change
+// /play with URL state: the view params (frames, vision) seed PlayScreen and every change
 // is written back with window.history.replaceState, so the address restores the view without history spam.
 // ra, dec and fov are not read: the viewer has no pan or field-of-view state. Zoom (`scale`)
 // exists in PlayScreen but is not written to the URL.

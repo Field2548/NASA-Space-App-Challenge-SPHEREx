@@ -7,7 +7,7 @@ import * as fields from "@/lib/fields";
 import { timeColors as libTimeColors } from "@/lib/palettes";
 import { timeColors as reTimeColors } from "./timeColors";
 import { makeField, makeFrames, mockCanvas } from "./testFixtures";
-import Timeline, { clampOnion, clipOffsets, keyToIndex, onionRangeFrames } from "./Timeline";
+import Timeline, { clampOnion, keyToIndex, onionRangeFrames } from "./Timeline";
 
 beforeEach(() => {
   mockCanvas();
@@ -68,23 +68,38 @@ describe("Timeline", () => {
   });
 });
 
-describe("clipOffsets", () => {
-  const mk = (mjds: number[]) => ({ frames: mjds.map((mjd, k) => ({ i: k + 1, mjd })) }) as never;
-  it("is even unless real spacing is asked for", () => {
-    expect(clipOffsets(mk([0, 1, 5]), 3, false).left).toEqual([0, 120, 240]);
+describe("Timeline loop range and speed", () => {
+  it("has no Real time spacing option and spaces clips evenly", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
+    expect(screen.queryByRole("checkbox", { name: /Real time spacing/ })).toBeNull();
+    const margins = screen.getAllByRole("option").map((o) => (o as HTMLElement).style.marginLeft);
+    expect(margins).toEqual(["0px", "8px", "8px", "8px"]);
   });
-  it("scales true gaps linearly when max/min <= 10", () => {
-    const { left, log } = clipOffsets(mk([0, 1, 4]), 3, true);
-    expect(log).toBe(false);
-    expect(left).toEqual([0, 120, 480]);
+  it("loop range sliders report ordered 0-based ranges and keep one frame at least", () => {
+    const onRange = vi.fn();
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} loopRange={[1, 2]} onLoopRangeChange={onRange} />);
+    expect(screen.getByText("Loop frames 2 to 3")).toBeTruthy();
+    fireEvent.change(screen.getByRole("slider", { name: "Loop end frame" }), { target: { value: "4" } });
+    expect(onRange).toHaveBeenLastCalledWith([1, 3]);
+    fireEvent.change(screen.getByRole("slider", { name: "Loop start frame" }), { target: { value: "1" } });
+    expect(onRange).toHaveBeenLastCalledWith([0, 2]);
+    fireEvent.change(screen.getByRole("slider", { name: "Loop start frame" }), { target: { value: "4" } });
+    expect(onRange).toHaveBeenLastCalledWith([3, 3]); // start passes the end: the end follows
   });
-  it("goes logarithmic when max/min > 10", () => {
-    const { left, log } = clipOffsets(mk([0, 1, 17]), 3, true);
-    expect(log).toBe(true);
-    expect(left[2] - left[1]).toBeCloseTo(120 * (1 + Math.log2(16)), 9);
+  it("speed slider steps through the rates, with a readable value", () => {
+    const onFps = vi.fn();
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} fps={1} onFpsChange={onFps} />);
+    const s = screen.getByRole("slider", { name: "Blink speed" });
+    expect(s.getAttribute("aria-valuetext")).toBe("1 frame per second");
+    fireEvent.change(s, { target: { value: "3" } });
+    expect(onFps).toHaveBeenLastCalledWith(3);
+    fireEvent.change(s, { target: { value: "0" } });
+    expect(onFps).toHaveBeenLastCalledWith(0.5);
   });
-  it("falls back to even for non-increasing times", () => {
-    expect(clipOffsets(mk([0, 0, 1]), 3, true).left).toEqual([0, 120, 240]);
+  it("hides the loop and speed controls without their callbacks", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
+    expect(screen.queryByRole("slider", { name: "Blink speed" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Loop end frame" })).toBeNull();
   });
 });
 
@@ -136,13 +151,9 @@ describe("Timeline v1 completion", () => {
     expect(onRange).toHaveBeenLastCalledWith([1, 2]);
   });
 
-  it("no ONION track without onionRange; real spacing checkbox reports", async () => {
-    const user = userEvent.setup();
-    const onSpacing = vi.fn();
-    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onRealSpacingChange={onSpacing} />);
+  it("no ONION track without onionRange", () => {
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
     expect(screen.queryByText("ONION")).toBeNull();
-    await user.click(screen.getByRole("checkbox", { name: /Real time spacing/ }));
-    expect(onSpacing).toHaveBeenCalledWith(true);
   });
 });
 

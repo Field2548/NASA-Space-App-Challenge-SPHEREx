@@ -55,6 +55,43 @@ describe("useBlink", () => {
     expect(result.current.index).toBe(0);
   });
 
+  it("plays only inside the loop range and wraps within it", () => {
+    mockReducedMotion(false);
+    const { result } = renderHook(() => useBlink(6, { fps: 3, range: [1, 3] }));
+    act(() => result.current.play());
+    const seen: number[] = [];
+    for (let k = 0; k < 6; k++) {
+      act(() => vi.advanceTimersByTime(334));
+      seen.push(result.current.index);
+    }
+    expect(seen.every((i) => i >= 1 && i <= 3)).toBe(true);
+    expect(new Set(seen)).toEqual(new Set([1, 2, 3]));
+  });
+
+  it("ping-pongs inside the loop range", () => {
+    mockReducedMotion(false);
+    const { result } = renderHook(() => useBlink(6, { fps: 3, mode: "pingpong", range: [2, 4], initialIndex: 2 }));
+    act(() => result.current.play());
+    const seen: number[] = [];
+    for (let k = 0; k < 4; k++) {
+      act(() => vi.advanceTimersByTime(334));
+      seen.push(result.current.index);
+    }
+    expect(seen).toEqual([3, 4, 3, 2]);
+  });
+
+  it("changes speed live and never exceeds 3 fps", () => {
+    mockReducedMotion(false);
+    const { result, rerender } = renderHook(({ fps }) => useBlink(9, { fps }), { initialProps: { fps: 1 } });
+    act(() => result.current.play());
+    act(() => vi.advanceTimersByTime(2000));
+    expect(result.current.index).toBe(2);
+    rerender({ fps: 3 });
+    act(() => vi.advanceTimersByTime(1002));
+    expect(result.current.index).toBe(5);
+    expect(result.current.fps).toBeLessThanOrEqual(MAX_BLINK_FPS);
+  });
+
   it("does not auto-play under prefers-reduced-motion, but steps by hand", () => {
     mockReducedMotion(true);
     const { result } = renderHook(() => useBlink(4));

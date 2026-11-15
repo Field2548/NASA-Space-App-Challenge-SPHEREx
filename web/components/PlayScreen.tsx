@@ -29,18 +29,23 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId
 import { PROJECT_NAME } from "@/lib/brand";
 import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFieldIndex, loadFrames } from "@/lib/fields";
+import { loadVision } from "@/lib/settings";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
-import { type BlinkMode, useBlink } from "@/lib/useBlink";
+import { DEFAULT_MORPH, type MorphSettings } from "@/lib/morphology";
+import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
+import { type BlinkMode, MAX_BLINK_FPS, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
+import FrameContext from "./FrameContext";
 import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./FieldViewer";
 import InspectPanel from "./InspectPanel";
 import { InspectPopup } from "./InspectPopup";
 import LoginButton from "./LoginButton";
+import MorphologyControl from "./MorphologyControl";
+import ToneCurveEditor from "./ToneCurveEditor";
 import styles from "./PlayScreen.module.css";
 import { Scoreboard } from "./Scoreboard";
 import SubmitBar from "./SubmitBar";
 import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
-import VisionPicker from "./VisionPicker";
 import { fetchOverlay, type KnownOverlay, OVERLAY_UNAVAILABLE } from "./overlay";
 import { type ViewState } from "./viewState";
 import WavelengthSwitch, { useWavelengthFrames, type WavelengthSelection } from "./WavelengthSwitch";
@@ -156,6 +161,7 @@ export default function PlayScreen({ spot, loading = false, ...hooks }: PlayScre
           </svg>
           <span>{PROJECT_NAME}</span>
         </Link>
+        <Link href="/stages">Stages</Link>
         <div data-slot="auth" className={styles.auth}>
           <LoginButton label="Log in / Sign up" />
         </div>
@@ -209,7 +215,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const tools = toolsProp ?? ALL_TOOLS;
   const showOverlays = tools.has("overlays");
   const [W, H] = field.size;
-  const [vision, setVision] = useState<Vision>(initialView?.vision ?? "normal");
+  // Colour vision is set on /settings; a ?vision= value in the URL (parseView gives "normal" when absent) wins.
+  const [vision] = useState<Vision>(() => (initialView && initialView.vision !== "normal" ? initialView.vision : loadVision()));
   const [wavelength, setWavelength] = useState<WavelengthSelection>("all");
   // The exposures (up to ~1 MB) are fetched only once a band other than "all" is picked.
   const wlField = useMemo<Field>(
@@ -234,6 +241,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
+  const [morph, setMorph] = useState<MorphSettings>(DEFAULT_MORPH);
+  const [curve, setCurve] = useState<Curve>(DEFAULT_CURVE);
   // Game mounts after the field loads (client only), so window is there. On a phone the image fits the width.
   const fit = useMemo(() => fitScale(W, H, Math.min(900, (typeof window === "undefined" ? 1440 : window.innerWidth) - 40), 560), [W, H]);
   const [scale, setScale] = useState(fit);
@@ -249,15 +258,16 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [loopMode, setLoopMode] = useState<BlinkMode>("loop");
   const defaultOnion = useMemo(() => clampOnion([0, ONION_MAX - 1], frames.length), [frames.length]);
   const [onionRange, setOnionRange] = useState<[number, number]>(() => clampOnion(initialView?.frames ?? [0, ONION_MAX - 1], frames.length));
-  const [realSpacing, setRealSpacing] = useState(initialView?.realSpacing ?? false);
+  const [loopRange, setLoopRange] = useState<[number, number] | null>(null); // null: all frames
+  const [fps, setFps] = useState<number>(MAX_BLINK_FPS);
   const viewCb = useRef(onViewChange);
   useEffect(() => {
     viewCb.current = onViewChange;
   });
   useEffect(() => {
     const isDefault = onionRange[0] === defaultOnion[0] && onionRange[1] === defaultOnion[1];
-    viewCb.current?.({ frames: isDefault ? null : onionRange, realSpacing, vision });
-  }, [onionRange, defaultOnion, realSpacing, vision]);
+    viewCb.current?.({ frames: isDefault ? null : onionRange, vision });
+  }, [onionRange, defaultOnion, vision]);
   const [verdictIn, setVerdictIn] = useState(false);
   // The spot after this one in public/fields/index.json order (wrapping), fetched after the first verdict.
   const [nextSlug, setNextSlug] = useState<string | null>(null);
@@ -290,7 +300,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   }, [knownOverlay, knownUnlocked, knownLocal, fetchedKnown, spot]);
   const knownData = knownOverlay && knownUnlocked ? (knownLocal ?? fetchedKnown ?? null) : null;
   const knownMissing = knownOverlay && knownUnlocked && !knownLocal && fetchedKnown === null;
-  const blink = useBlink(frames.length, { mode: loopMode });
+  const blink = useBlink(frames.length, { mode: loopMode, fps, range: loopRange ?? undefined });
   const { pause } = blink;
 
   const emit = useCallback(
@@ -456,14 +466,11 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             </div>
           </section>
         )}
-        {tools.has("color-vision") && (
-          <section className="panel" data-part="PNL-05 // COLOR VISION">
-            <VisionPicker value={vision} onChange={setVision} />
-          </section>
-        )}
         {tools.has("brightness") && (
           <section className="panel" data-part="PNL-06 // BRIGHTNESS">
             <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
+            <MorphologyControl value={morph} onChange={setMorph} />
+            <ToneCurveEditor value={curve} onChange={setCurve} />
           </section>
         )}
       </aside>
@@ -504,6 +511,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               known={knownData}
               crosshair={pointer ? null : cursor}
               brightness={black}
+              morphology={morph}
+              curve={curve}
               scale={scale}
               inspectSlot={
                 // Tutorial only: InspectPopup takes no name, and the tutorial names its object from its own copy.
@@ -548,6 +557,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
             <span>{scale}×</span>
           </div>
         </div>
+        {!blink.playing && <FrameContext field={field} frames={shownFrames} index={blink.index} brightness={black} />}
       </main>
 
       {tools.has("mark") && (
@@ -607,8 +617,10 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           onLoopModeChange={tools.has("frames-spacing") ? setLoopMode : undefined}
           onionRange={tools.has("color-by-time") ? onionRange : undefined}
           onOnionRangeChange={tools.has("color-by-time") ? setOnionRange : undefined}
-          realSpacing={realSpacing}
-          onRealSpacingChange={tools.has("frames-spacing") ? setRealSpacing : undefined}
+          loopRange={loopRange ?? undefined}
+          onLoopRangeChange={tools.has("frames-spacing") ? setLoopRange : undefined}
+          fps={fps}
+          onFpsChange={tools.has("frames-spacing") ? setFps : undefined}
         />
       </footer>
     </div>

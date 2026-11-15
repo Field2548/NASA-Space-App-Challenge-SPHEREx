@@ -20,6 +20,7 @@ export default function SiteFooter() {
         Source code: GPL-3.0
       </a>
       <Link href="/licence">Licence</Link>
+      <Link href="/settings">Settings</Link>
     </footer>
   );
 }

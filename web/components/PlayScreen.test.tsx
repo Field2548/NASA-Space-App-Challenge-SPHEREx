@@ -3,7 +3,9 @@ import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } f
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InfoExplore } from "@/lib/inspectPopup";
 import type { CheckResponse, Field } from "@/lib/types";
+import { resetGuest } from "@/lib/guest";
 import { timeColors } from "@/lib/palettes";
+import { saveVision } from "@/lib/settings";
 import { blackToSlider } from "./BrightnessSlider";
 import { rgbCss } from "./FieldViewer";
 import { findTarget } from "./CoachMark";
@@ -57,6 +59,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  resetGuest();
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -137,16 +140,13 @@ describe("PlayScreen", () => {
     render(
       <PlayScreen
         spot="fixture"
-        initialView={{ frames: [0, 1], realSpacing: true, vision: "mono" }}
+        initialView={{ frames: [0, 1], vision: "mono" }}
         onViewChange={(v) => seen.push(v)}
       />,
     );
     await screen.findByTestId("field-canvas");
-    await waitFor(() => expect(seen.at(-1)).toEqual({ frames: [0, 1], realSpacing: true, vision: "mono" }));
-    const pick = screen.getByLabelText("Colour vision") as HTMLSelectElement;
-    expect(pick.value).toBe("mono");
-    fireEvent.change(pick, { target: { value: "deutan" } });
-    expect(seen.at(-1)).toEqual({ frames: [0, 1], realSpacing: true, vision: "deutan" });
+    await waitFor(() => expect(seen.at(-1)).toEqual({ frames: [0, 1], vision: "mono" }));
+    expect(screen.queryByLabelText("Colour vision")).toBeNull(); // moved to /settings
   });
 
   it("reports the default onion range as null", async () => {
@@ -154,7 +154,7 @@ describe("PlayScreen", () => {
     const seen: unknown[] = [];
     render(<PlayScreen spot="fixture" onViewChange={(v) => seen.push(v)} />);
     await screen.findByTestId("field-canvas");
-    await waitFor(() => expect(seen.at(-1)).toEqual({ frames: null, realSpacing: false, vision: "normal" }));
+    await waitFor(() => expect(seen.at(-1)).toEqual({ frames: null, vision: "normal" }));
   });
 
   it("has exactly one h1 in every state", async () => {
@@ -225,7 +225,7 @@ describe("PlayScreen wiring", () => {
     expect(screen.getByRole("button", { name: "Play blink" })).toBeTruthy();
   });
 
-  it("wires loop mode, the onion range and real spacing into the Timeline", async () => {
+  it("wires loop mode and the onion range into the Timeline, with no Real time spacing", async () => {
     await loadGame();
     fireEvent.click(screen.getByRole("button", { name: /Blink order: loop/ }));
     expect(screen.getByRole("button", { name: /Blink order: ping-pong/ })).toBeTruthy();
@@ -235,11 +235,32 @@ describe("PlayScreen wiring", () => {
     expect(screen.getByText("Color by time: 3 frames")).toBeTruthy();
     fireEvent.keyDown(end, { key: "ArrowLeft" });
     expect(screen.getByText("Color by time: 2 frames")).toBeTruthy();
-    const box = screen.getByRole("checkbox", { name: /Real time spacing/ }) as HTMLInputElement;
-    fireEvent.click(box);
-    expect(box.checked).toBe(true);
+    expect(screen.queryByText(/Real time spacing/)).toBeNull();
     expect(screen.getByRole("button", { name: "Play blink" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next frame" })).toBeTruthy();
+  });
+
+  it("shows the frame before and after the selected one, beside the viewer", async () => {
+    await loadGame();
+    const ctx = screen.getByRole("group", { name: "Frames around the selected one" });
+    expect(within(ctx).queryByText(/^−1/)).toBeNull(); // frame 1 has no frame before it
+    expect(within(ctx).getByText(/\+1 frame 2/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    expect(within(ctx).getByText(/−1 frame 1/)).toBeTruthy();
+    expect(within(ctx).getByText(/\+1 frame 3/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    expect(within(ctx).queryByText(/^\+1/)).toBeNull(); // last frame has none after it
+  });
+
+  it("limits the blink to the loop range and changes its speed", async () => {
+    await loadGame();
+    const end = screen.getByRole("slider", { name: "Loop end frame" }) as HTMLInputElement;
+    expect(end.value).toBe("3"); // default: all frames
+    fireEvent.change(end, { target: { value: "2" } });
+    expect(screen.getByText("Loop frames 1 to 2")).toBeTruthy();
+    const speed = screen.getByRole("slider", { name: "Blink speed" }) as HTMLInputElement;
+    fireEvent.change(speed, { target: { value: "0" } });
+    expect(speed.getAttribute("aria-valuetext")).toBe("0.5 frames per second");
   });
 
   it("coach-mark targets resolve to the play button and the frames track, not the footer", async () => {
@@ -274,7 +295,7 @@ describe("PlayScreen tools", () => {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     expect(screen.getByRole("slider", { name: "Onion range end" })).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Colour vision" })).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Colour vision" })).toBeNull(); // moved to /settings
     expect((screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -362,16 +383,27 @@ describe("PlayScreen tools (more)", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
   });
 
-  it("passes the chosen colour vision to the FieldViewer mark colours", async () => {
+  it("uses the colour vision saved on /settings for the FieldViewer mark colours", async () => {
+    saveVision("mono");
     const canvas = await loadGame();
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
     const stroke = () => document.querySelector("svg [data-frame] circle")?.getAttribute("stroke");
-    expect(stroke()).toBe(rgbCss(timeColors(3, "normal")[0]));
-    fireEvent.change(screen.getByRole("combobox", { name: "Colour vision" }), { target: { value: "mono" } });
     expect(stroke()).toBe(rgbCss(timeColors(3, "mono")[0]));
-    fireEvent.change(screen.getByRole("combobox", { name: "Colour vision" }), { target: { value: "tritan" } });
-    expect(stroke()).toBe(rgbCss(timeColors(3, "tritan")[0]));
     expect(stroke()).not.toBe(rgbCss(timeColors(3, "normal")[0]));
+  });
+
+  it("lets a ?vision= URL value win over the saved setting", async () => {
+    saveVision("mono");
+    stubFetch(true);
+    render(<PlayScreen spot="fixture" initialView={{ frames: null, vision: "tritan" }} />);
+    const canvas = await screen.findByTestId("field-canvas");
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    expect(document.querySelector("svg [data-frame] circle")?.getAttribute("stroke")).toBe(rgbCss(timeColors(3, "tritan")[0]));
+  });
+
+  it("links to the stage list from the header", async () => {
+    await loadGame();
+    expect(screen.getByRole("link", { name: "Stages" }).getAttribute("href")).toBe("/stages");
   });
 
   it("renders the wavelength switch only for a field with exposures", async () => {

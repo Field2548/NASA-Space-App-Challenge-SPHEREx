@@ -89,7 +89,6 @@ function Embedded({ field, frames, spot, params }: { field: Field; frames: Float
         playing={blink.playing}
         onTogglePlay={blink.toggle}
         reducedMotion={blink.reducedMotion}
-        realSpacing={view.realSpacing}
         onionRange={onion ?? undefined}
       />
       <Link href={playHref(spot, params)} className={styles.open} target="_top">
