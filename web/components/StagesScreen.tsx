@@ -24,7 +24,7 @@ import type { Field, FieldSummary } from "@/lib/types";
 import { GROUPS } from "@/lib/stageOrder";
 import BackLink from "./BackLink";
 import { SkyMap } from "./SkyMap";
-import { flyFovForSpot } from "./skymap/geometry";
+import { difficultyStyle, flyFovForSpot } from "./skymap/geometry";
 import styles from "./StagesScreen.module.css";
 
 type Status = "new" | "tried" | "solved";
@@ -163,7 +163,7 @@ export default function StagesScreen() {
               <ol className={styles.listItems}>
                 {groups.map((g) => (
                   <li key={g.difficulty}>
-                    <h2 className={styles.groupHead}>
+                    <h2 className={styles.groupHead} style={{ color: `var(${difficultyStyle(g.difficulty).cssVar})` }}>
                       <span>{g.label}</span>
                       <span className={styles.count}>{`${g.stages.filter((s) => s.stage.status === "solved").length}/${g.stages.length}`}</span>
                     </h2>
@@ -173,10 +173,13 @@ export default function StagesScreen() {
                           <button
                             type="button"
                             data-testid={`list-${stage.spot.slug}`}
+                            data-status={stage.status}
+                            style={{ "--diff-color": `var(${difficultyStyle(g.difficulty).cssVar})` } as CSSProperties}
                             aria-pressed={selected === stage.spot.slug}
                             onClick={() => fromList(stage)}
                           >
-                            {`Stage ${n}, ${stage.spot.title}. ${STATUS_LABEL[stage.status]}${stage.spot.slug === nextSlug ? ", next" : ""}`}
+                            {/* Colour = difficulty; a stage not played yet is dimmed instead of labelled. */}
+                            {`Stage ${n}, ${stage.spot.title}.${stage.status === "new" ? "" : ` ${STATUS_LABEL[stage.status]}`}${stage.spot.slug === nextSlug ? ", next" : ""}`}
                           </button>
                         </li>
                       ))}
