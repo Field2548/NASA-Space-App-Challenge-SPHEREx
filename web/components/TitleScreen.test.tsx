@@ -21,7 +21,7 @@ describe("TitleScreen", () => {
     expect(h1s).toHaveLength(1);
     expect(h1s[0].textContent).toBe(PROJECT_NAME);
     expect(screen.getByRole("link", { name: "Start training" }).getAttribute("href")).toBe("/tutorial");
-    expect(screen.getByRole("link", { name: "Skip to game" }).getAttribute("href")).toBe("/play?spot=eros");
+    expect(screen.queryByRole("link", { name: "Skip to game" })).toBeNull(); // removed; Stages is the way in
     expect(screen.getByRole("link", { name: "Stages" }).getAttribute("href")).toBe("/stages");
     expect(screen.getByRole("link", { name: "Explore the sky" }).getAttribute("href")).toBe("/map");
     const login = screen.getByRole("button", { name: "Log in" }) as HTMLButtonElement;
