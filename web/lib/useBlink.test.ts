@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { blinkIntervalMs, MAX_BLINK_FPS, nextBlinkIndex, useBlink } from "./useBlink";
+import { blinkIntervalMs, MAX_BLINK_FPS, nextBlinkIndex, useBlink, wrapIndex } from "./useBlink";
 
 function mockReducedMotion(reduce: boolean) {
   window.matchMedia = vi.fn().mockImplementation((q: string) => ({
@@ -28,11 +28,17 @@ describe("blinkIntervalMs", () => {
   });
 });
 
-describe("nextBlinkIndex", () => {
-  it("loops and ping-pongs", () => {
-    expect(nextBlinkIndex(2, 3, "loop", 1)).toEqual([0, 1]);
-    expect(nextBlinkIndex(2, 3, "pingpong", 1)).toEqual([1, -1]);
-    expect(nextBlinkIndex(0, 3, "pingpong", -1)).toEqual([1, 1]);
+describe("nextBlinkIndex and wrapIndex", () => {
+  it("loops forward only", () => {
+    expect(nextBlinkIndex(2, 3)).toBe(0);
+    expect(nextBlinkIndex(0, 3)).toBe(1);
+    expect(nextBlinkIndex(0, 1)).toBe(0);
+  });
+  it("wraps stepping round both ends", () => {
+    expect(wrapIndex(2, 1, 3)).toBe(0);
+    expect(wrapIndex(0, -1, 3)).toBe(2);
+    expect(wrapIndex(1, -7, 3)).toBe(0);
+    expect(wrapIndex(0, 1, 1)).toBe(0);
   });
 });
 
@@ -68,18 +74,6 @@ describe("useBlink", () => {
     expect(new Set(seen)).toEqual(new Set([1, 2, 3]));
   });
 
-  it("ping-pongs inside the loop range", () => {
-    mockReducedMotion(false);
-    const { result } = renderHook(() => useBlink(6, { fps: 3, mode: "pingpong", range: [2, 4], initialIndex: 2 }));
-    act(() => result.current.play());
-    const seen: number[] = [];
-    for (let k = 0; k < 4; k++) {
-      act(() => vi.advanceTimersByTime(334));
-      seen.push(result.current.index);
-    }
-    expect(seen).toEqual([3, 4, 3, 2]);
-  });
-
   it("changes speed live and never exceeds 3 fps", () => {
     mockReducedMotion(false);
     const { result, rerender } = renderHook(({ fps }) => useBlink(9, { fps }), { initialProps: { fps: 1 } });
@@ -102,9 +96,11 @@ describe("useBlink", () => {
     expect(result.current.playing).toBe(false);
     expect(result.current.index).toBe(0);
     act(() => result.current.step(1));
-    act(() => result.current.step(10));
+    act(() => result.current.step(2));
     expect(result.current.index).toBe(3);
+    act(() => result.current.step(1));
+    expect(result.current.index).toBe(0); // wraps past the last frame
     act(() => result.current.step(-1));
-    expect(result.current.index).toBe(2);
+    expect(result.current.index).toBe(3); // and back past the first
   });
 });

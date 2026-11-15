@@ -39,3 +39,22 @@ export function pickFrames(pool: FrameMeta[], o: PickOptions): number[] {
   }
   return picked.map((j) => sorted[j].i);
 }
+
+/**
+ * Array indices (into `pool`, time order) of `count` frames spread evenly over the pool's time span, always
+ * including the first and last burst. count >= pool.length gives every frame. Used by the timeline's
+ * "Frames" control; the frames keep their own numbers (FrameMeta.i).
+ */
+export function visibleFrameIndices(pool: FrameMeta[], count: number): number[] {
+  const n = pool.length;
+  const all = Array.from({ length: n }, (_, i) => i);
+  if (count >= n || n < 3) return all;
+  const c = Math.max(2, Math.floor(count));
+  const picked = pickFrames(pool, { count: c, spacing: "even", minGapHours: 0 })
+    .map((num) => pool.findIndex((f) => f.i === num))
+    .filter((j) => j >= 0)
+    .sort((a, b) => a - b);
+  if (picked.length === c && new Set(picked).size === c) return picked;
+  // The greedy picker ran dry (very uneven bursts): fall back to evenly spaced positions.
+  return Array.from(new Set(Array.from({ length: c }, (_, k) => Math.round((k * (n - 1)) / (c - 1)))));
+}

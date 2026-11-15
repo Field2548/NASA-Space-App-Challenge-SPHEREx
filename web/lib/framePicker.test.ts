@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickFrames } from "./framePicker";
+import { pickFrames, visibleFrameIndices } from "./framePicker";
 import type { FrameMeta } from "./types";
 
 const pool = (days: number[]): FrameMeta[] =>
@@ -49,5 +49,26 @@ describe("pickFrames", () => {
   it("count 1 and empty pool", () => {
     expect(pickFrames(p, { count: 1, spacing: "even", minGapHours: 1 })).toEqual([1]);
     expect(pickFrames([], { count: 3, spacing: "even", minGapHours: 1 })).toEqual([]);
+  });
+});
+
+describe("visibleFrameIndices", () => {
+  const p = pool([0, 1, 2, 3, 4, 5]);
+  it("gives every frame for the full count and spreads a subset over the whole span", () => {
+    expect(visibleFrameIndices(p, 6)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(visibleFrameIndices(p, 9)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(visibleFrameIndices(p, 2)).toEqual([0, 5]);
+    const three = visibleFrameIndices(p, 3);
+    expect(three[0]).toBe(0);
+    expect(three[2]).toBe(5);
+  });
+  it("always returns the requested number of distinct frames in time order", () => {
+    const uneven = pool([0, 0.01, 0.02, 0.03, 10, 10.01]);
+    for (let c = 2; c <= 6; c++) {
+      const ids = visibleFrameIndices(uneven, c);
+      expect(ids).toHaveLength(c);
+      expect(ids).toEqual([...ids].sort((a, b) => a - b));
+      expect(ids[0]).toBe(0);
+    }
   });
 });

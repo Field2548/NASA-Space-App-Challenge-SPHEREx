@@ -34,7 +34,7 @@
   position: relative;
   display: grid;
   grid-template-columns: var(--left-w, 330px) minmax(0, 1fr) var(--right-w, 360px);
-  grid-template-rows: 1fr 170px;
+  grid-template-rows: 1fr 226px;
   grid-template-areas:
     "left center right"
     "bottom bottom bottom";
@@ -257,7 +257,7 @@
 .resizer {
   position: absolute;
   top: 0;
-  bottom: 170px;
+  bottom: 226px;
   width: 8px;
   z-index: 3;
   cursor: col-resize;
