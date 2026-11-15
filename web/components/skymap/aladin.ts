@@ -23,7 +23,7 @@ export interface AladinInstance {
   removeOverlay(layer: AladinCatalog | AladinOverlay): void;
 }
 
-export type AladinEvent = "mouseMove" | "click" | "zoomChanged" | "objectClicked";
+export type AladinEvent = "mouseMove" | "click" | "zoomChanged" | "positionChanged" | "objectClicked";
 
 export interface AladinSource<D> {
   ra: number;

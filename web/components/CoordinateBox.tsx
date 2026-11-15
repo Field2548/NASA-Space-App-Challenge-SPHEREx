@@ -17,6 +17,8 @@ export interface CoordinateBoxProps {
   onGo: (p: { ra: number; dec: number; label: string }) => void;
   onPlay: (slug: string) => void;
   onQuickLook?: (p: { ra: number; dec: number }) => void;
+  /** Text of the onQuickLook button (default "Quick look (live)"). */
+  quickLookLabel?: string;
   onRequest?: (p: { ra: number; dec: number }) => void;
   /** Ready spots; loaded from fields/index.json when not given. */
   spots?: FieldSummary[];
@@ -58,7 +60,7 @@ async function resolveName(name: string, signal: AbortSignal): Promise<ResolveOk
 
 const understood = (ra: number, dec: number) => `RA ${formatRA(ra)}  Dec ${formatDec(dec)}`;
 
-export function CoordinateBox({ onGo, onPlay, onQuickLook, onRequest, spots, className }: CoordinateBoxProps) {
+export function CoordinateBox({ onGo, onPlay, onQuickLook, quickLookLabel, onRequest, spots, className }: CoordinateBoxProps) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<Result>({ kind: "idle" });
   const [loaded, setLoaded] = useState<FieldSummary[] | null>(null);
@@ -236,7 +238,7 @@ export function CoordinateBox({ onGo, onPlay, onQuickLook, onRequest, spots, cla
             <>
               {onQuickLook && (
                 <button type="button" onClick={() => onQuickLook({ ra: at.ra, dec: at.dec })}>
-                  Quick look (live)
+                  {quickLookLabel ?? "Quick look (live)"}
                 </button>
               )}
               {onRequest && (

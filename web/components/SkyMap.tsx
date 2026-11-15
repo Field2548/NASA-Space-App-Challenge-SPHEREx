@@ -51,7 +51,27 @@ export interface SkyMapProps {
   onClickSky?: (p: { ra: number; dec: number; fov?: number }) => void;
   overlay?: { cells: { corners: [number, number][]; value: number }[]; max: number; label: string } | null;
   className?: string;
+  /** Ready-spot reticles, their list and preview card (default on; /map turns them off). */
+  showSpots?: boolean;
+  /** Solved patches, drawn only once the view is PATCH_SHOW_FOV or closer. */
+  patches?: SkyPatch[] | null;
+  /** The patch the player picked: an amber square. */
+  picked?: { corners: [number, number][] } | null;
+  /** View centre (ICRS) and field of view, after the view settles. */
+  onView?: (v: { ra: number; dec: number; fov: number }) => void;
 }
+
+/** A solved patch on the map: outline, matched known objects and players' reports. */
+export interface SkyPatch {
+  id: string;
+  corners: [number, number][];
+  objects: { ra: number; dec: number }[];
+  reports: { ra: number; dec: number }[];
+  mine?: boolean;
+}
+
+/** Solved patches show at this field of view (degrees) or closer. */
+export const PATCH_SHOW_FOV = 3;
 
 type MapState = "loading" | "ready" | "failed";
 
@@ -86,7 +106,18 @@ const chip: CSSProperties = {
   fontSize: 12,
 };
 
-export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, className }: SkyMapProps) {
+export function SkyMap({
+  onPlay,
+  target,
+  onPointer,
+  onClickSky,
+  overlay,
+  className,
+  showSpots = true,
+  patches,
+  picked,
+  onView,
+}: SkyMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
   const playRef = useRef<HTMLButtonElement>(null);
@@ -103,9 +134,9 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
   }, []);
 
   // Latest callbacks for Aladin's listeners, which are registered once.
-  const cbRef = useRef({ onPlay, onPointer, onClickSky });
+  const cbRef = useRef({ onPlay, onPointer, onClickSky, onView });
   useEffect(() => {
-    cbRef.current = { onPlay, onPointer, onClickSky };
+    cbRef.current = { onPlay, onPointer, onClickSky, onView };
   });
 
   const [spots, setSpots] = useState<FieldSummary[] | null>(null);
@@ -261,9 +292,26 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
             cbRef.current.onClickSky?.({ ra: e.ra, dec: e.dec, fov: f });
           }
         });
+        // onView after the view settles (a drag or zoom fires many events).
+        let viewTimer: ReturnType<typeof setTimeout> | null = null;
+        const viewSoon = () => {
+          if (viewTimer) clearTimeout(viewTimer);
+          viewTimer = setTimeout(() => {
+            if (cancelled) return;
+            try {
+              const [ra, dec] = a.getRaDec();
+              const f = a.getFov()[0];
+              if ([ra, dec, f].every(Number.isFinite)) cbRef.current.onView?.({ ra, dec, fov: f });
+            } catch {
+              /* view not ready */
+            }
+          }, 400);
+        };
         a.on("zoomChanged", (f: number) => {
           if (!cancelled && Number.isFinite(f)) setFov(f);
+          viewSoon();
         });
+        a.on("positionChanged", viewSoon);
 
         aladinRef.current = a;
         libRef.current = lib;
@@ -290,7 +338,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
   useEffect(() => {
     const a = aladinRef.current;
     const lib = libRef.current;
-    if (mapState !== "ready" || !a || !lib || !spots?.length) return;
+    if (!showSpots || mapState !== "ready" || !a || !lib || !spots?.length) return;
     const labelFont = `12px ${getComputedStyle(document.body).fontFamily}`;
     const cats: AladinCatalog[] = [];
     for (const d of DIFFICULTY_ORDER) {
@@ -334,7 +382,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         }
       }
     };
-  }, [mapState, spots]);
+  }, [mapState, spots, showSpots]);
 
   // Fly to the target.
   const tRa = target?.ra;
@@ -398,6 +446,81 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       }
     };
   }, [mapState, overlay]);
+
+  // Solved patches (green outline, cyan known objects, amber reports) once zoomed in close.
+  const patchesShown = fov <= PATCH_SHOW_FOV;
+  useEffect(() => {
+    const a = aladinRef.current;
+    const lib = libRef.current;
+    if (mapState !== "ready" || !a || !lib || !patchesShown || !patches?.length) return;
+    const layers: (AladinOverlay | AladinCatalog)[] = [];
+    try {
+      const outline = lib.graphicOverlay({ name: "Solved patches", lineWidth: 2 });
+      a.addOverlay(outline);
+      layers.push(outline);
+      outline.addFootprints(
+        patches
+          .filter((p) => p.corners.length >= 3)
+          .map((p) =>
+            lib.polygon(p.corners, {
+              color: p.mine ? "#a7f3d0" : "#34d399",
+              fill: true,
+              fillColor: "rgba(52, 211, 153, 0.12)",
+              lineWidth: 2,
+            }),
+          ),
+      );
+      const known = patches.flatMap((p) => p.objects);
+      if (known.length) {
+        const cat = lib.catalog({ name: "Known objects found", shape: "circle", sourceSize: 10, color: "#67e8f9" });
+        a.addCatalog(cat);
+        layers.push(cat);
+        cat.addSources(known.map((o) => lib.source(o.ra, o.dec, {})));
+      }
+      const reported = patches.flatMap((p) => p.reports);
+      if (reported.length) {
+        const cat = lib.catalog({ name: "Players' reports", shape: "cross", sourceSize: 10, color: "#fbbf24" });
+        a.addCatalog(cat);
+        layers.push(cat);
+        cat.addSources(reported.map((o) => lib.source(o.ra, o.dec, {})));
+      }
+    } catch (e) {
+      console.error("SkyMap: could not draw the solved patches", e);
+    }
+    return () => {
+      for (const layer of layers) {
+        try {
+          a.removeOverlay(layer);
+        } catch {
+          /* map already gone */
+        }
+      }
+    };
+  }, [mapState, patches, patchesShown]);
+
+  // The picked patch: an amber square.
+  useEffect(() => {
+    const a = aladinRef.current;
+    const lib = libRef.current;
+    if (mapState !== "ready" || !a || !lib || !picked || picked.corners.length < 3) return;
+    let layer: AladinOverlay | null = null;
+    try {
+      layer = lib.graphicOverlay({ name: "Picked patch", lineWidth: 2 });
+      a.addOverlay(layer);
+      layer.addFootprints([lib.polygon(picked.corners, { color: "#fbbf24", lineWidth: 2 })]);
+    } catch (e) {
+      console.error("SkyMap: could not draw the picked patch", e);
+    }
+    return () => {
+      if (layer) {
+        try {
+          a.removeOverlay(layer);
+        } catch {
+          /* map already gone */
+        }
+      }
+    };
+  }, [mapState, picked]);
 
   // Loading bar: count HiPS tiles as the browser finishes them (Aladin has no tile event).
   // Keyed by attempt, so a retry starts from zero without a reset inside the effect.
@@ -578,7 +701,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       )}
 
       {/* Keyboard and screen-reader route to the spots (the canvas markers are mouse-only). */}
-      {!failed && spots && spots.length > 0 && (
+      {showSpots && !failed && spots && spots.length > 0 && (
         <details
           style={{ ...chip, position: "absolute", left: 12, bottom: 40, maxWidth: 300, padding: "4px 10px" }}
         >
