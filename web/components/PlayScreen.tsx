@@ -460,7 +460,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
           </section>
         )}
         {tools.has("wavelength") && field.has?.exposures === true && (
-          <section className="panel" data-part="PNL-03 // WAVELENGTH">
+          <section className="panel" data-part="PNL-03 // WAVELENGTH" data-tutorial-target="wavelength">
             <WavelengthSwitch field={field} value={wavelength} onChange={setWavelength} fewerThanThree={wl.fewerThanThree} />
             {wavelength !== "all" && !wl.frames && (
               <p className={styles.small} role="status" data-testid="wavelength-status">
@@ -495,12 +495,12 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
           </section>
         )}
         {tools.has("brightness") && (
-          <section className="panel" data-part="PNL-05 // MORPHOLOGY">
+          <section className="panel" data-part="PNL-05 // MORPHOLOGY" data-tutorial-target="morphology">
             <MorphologyControl value={morph} onChange={setMorph} />
           </section>
         )}
         {tools.has("brightness") && (
-          <section className="panel" data-part="PNL-06 // BRIGHTNESS">
+          <section className="panel" data-part="PNL-06 // BRIGHTNESS" data-tutorial-target="brightness">
             <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
             <ToneCurveEditor value={curve} onChange={setCurve} />
           </section>
@@ -592,7 +592,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
             {notice ? <span className={styles.notice}>{notice}</span> : null}
             {cursor ? ` Crosshair x ${cursor[0]} y ${cursor[1]}.` : ""}
           </p>
-          <div className={styles.zoom} role="group" aria-label="Zoom">
+          <div className={styles.zoom} role="group" aria-label="Zoom" data-tutorial-target="zoom">
             <button type="button" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(MAX_SCALE, s + 1))} disabled={scale >= MAX_SCALE}>
               +
             </button>
@@ -612,7 +612,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
           </button>
           {scoreOpen && (
             <>
-              <section className="panel" data-part="PNL-07 // ANSWER">
+              <section className="panel" data-part="PNL-07 // ANSWER" data-tutorial-target="answer-panel">
                 <p className={styles.small}>
                   {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
                 </p>
@@ -629,7 +629,7 @@ function Game({ spot, field: fullField, frames, onEvent, markFrames, markHint, f
         </aside>
       )}
 
-      <footer className={styles.bottom} data-tutorial-target="timeline">
+      <footer className={styles.bottom} data-tutorial-target="timeline" data-tutorial-avoid="">
         <Timeline
           field={field}
           frames={shownFrames}
