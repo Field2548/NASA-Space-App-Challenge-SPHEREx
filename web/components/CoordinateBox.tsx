@@ -9,12 +9,12 @@ import { Dices } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { formatDec, formatRA, parseCoordinates } from "@/lib/coords";
 import type { ApiError, FieldSummary } from "@/lib/types";
-import { difficultyStyle, pickRandom, spotCovering } from "./skymap/geometry";
+import { difficultyStyle, spotCovering } from "./skymap/geometry";
 import { SpotGlyph } from "./skymap/markers";
 import { loadSpotsOnce } from "./skymap/spots";
 
 export interface CoordinateBoxProps {
-  onGo: (p: { ra: number; dec: number; label: string }) => void;
+  onGo: (p: { ra: number; dec: number; label: string; source?: "typed" | "resolved" | "dice" }) => void;
   onPlay: (slug: string) => void;
   onQuickLook?: (p: { ra: number; dec: number }) => void;
   /** Text of the onQuickLook button (default "Quick look (live)"). */
@@ -93,7 +93,7 @@ export function CoordinateBox({ onGo, onPlay, onQuickLook, quickLookLabel, onReq
 
   const go = (ra: number, dec: number, label: string, source: "typed" | "resolved" | "dice") => {
     setResult({ kind: "ok", ra, dec, label, source });
-    onGo({ ra, dec, label });
+    onGo({ ra, dec, label, source });
   };
 
   const submit = async (e: FormEvent) => {
@@ -121,15 +121,13 @@ export function CoordinateBox({ onGo, onPlay, onQuickLook, quickLookLabel, onReq
     }
   };
 
+  // A random place anywhere on the sky (uniform on the sphere), not only the ready spots.
   const dice = () => {
     abortRef.current?.abort();
-    const s = pickRandom(ready);
-    if (!s) {
-      setResult({ kind: "error", message: "The list of ready spots has not loaded yet." });
-      return;
-    }
-    setText(`${s.ra.toFixed(4)} ${s.dec.toFixed(4)}`);
-    go(s.ra, s.dec, s.title, "dice");
+    const ra = Math.random() * 360;
+    const dec = (Math.asin(2 * Math.random() - 1) * 180) / Math.PI;
+    setText(`${ra.toFixed(4)} ${dec.toFixed(4)}`);
+    go(ra, dec, understood(ra, dec), "dice");
   };
 
   const at = result.kind === "ok" ? result : null;
@@ -187,8 +185,8 @@ export function CoordinateBox({ onGo, onPlay, onQuickLook, quickLookLabel, onReq
         <button
           type="button"
           onClick={dice}
-          aria-label="Jump to a random ready spot"
-          title="Random ready spot"
+          aria-label="Jump to a random place on the sky"
+          title="Random place"
           style={{ padding: 6, lineHeight: 0 }}
         >
           <Dices size={16} aria-hidden="true" />

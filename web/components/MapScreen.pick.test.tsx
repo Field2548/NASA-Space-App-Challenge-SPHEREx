@@ -57,9 +57,10 @@ describe("MapScreen patch pick", () => {
     expect(last.push).toHaveBeenCalledWith(`/play?patch=${id}`);
   });
 
-  it("Random patch picks a valid patch and flies there", () => {
+  it("the dice picks a patch at a random place on the sky and flies there; no Random patch button", () => {
     render(<MapScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Random patch" }));
+    expect(screen.queryByRole("button", { name: "Random patch" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Jump to a random place on the sky" }));
     const heading = screen.getByRole("heading", { name: /^Patch p11-\d+$/ });
     const id = heading.textContent!.replace("Patch ", "");
     const p = patchFromPoint(last.props!.target!.ra, last.props!.target!.dec);
@@ -82,11 +83,12 @@ describe("MapScreen patch pick", () => {
     expect(screen.getByText(/Already solved: 1 known object, 0 reports/)).toBeTruthy();
   });
 
-  it("says solved patches are offline when the server has none to give", async () => {
+  it("shows no offline note when the server has no solved patches to give", async () => {
     fetchMock.mockImplementation(async () => Response.json({ patches: [], offline: true }));
     render(<MapScreen />);
     await act(async () => last.props?.onView?.({ ra: 40, dec: -10, fov: 1 }));
     act(() => last.props?.onClickSky?.({ ra: 40, dec: -10, fov: 1 }));
-    expect(screen.getByText(/offline/)).toBeTruthy();
+    expect(screen.queryByText(/offline/)).toBeNull();
+    expect(screen.getByText("Nobody has solved this patch yet.")).toBeTruthy();
   });
 });
