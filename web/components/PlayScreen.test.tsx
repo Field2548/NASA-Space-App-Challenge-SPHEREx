@@ -64,6 +64,9 @@ afterEach(() => {
 
 // What the stubbed GET /api/info answers (the server, not the client, decides the lock).
 const info = vi.hoisted(() => ({ reply: {} as InfoExplore }));
+const overlayReply = vi.hoisted(() => ({ body: null as object | null }));
+const overlayCalls = () =>
+  (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/overlay"));
 const board = { scope: "spot", slug: null, source: "db", updated_at: "2026-01-01T00:00:00Z", rows: [], me: null };
 const infoCalls = () =>
   (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/info"));
@@ -79,6 +82,7 @@ function stubFetch(ok: boolean, over: Partial<Field> = {}) {
       if (!ok) return new Response("nope", { status: 404 });
       if (url.startsWith("/api/info")) return new Response(JSON.stringify(info.reply), { status: 200 });
       if (url.startsWith("/api/leaderboard")) return new Response(JSON.stringify(board), { status: 200 });
+      if (url.startsWith("/api/overlay")) return overlayReply.body ? new Response(JSON.stringify(overlayReply.body), { status: 200 }) : new Response("no", { status: 404 });
       if (url.endsWith("field.json")) return new Response(JSON.stringify(field), { status: 200 });
       return new Response(bytes, { status: 200 });
     }),
@@ -255,21 +259,85 @@ describe("PlayScreen wiring", () => {
 const ALLOWED_AT_LEVEL_0 = ["Log in / Sign up", "Zoom in", "Zoom out", "Previous frame", "Play blink", "Next frame"];
 
 describe("PlayScreen tools", () => {
-  it("shows every built tool by default, but not the undrawn Known asteroids toggle", async () => {
+  it("shows every built tool by default; Known asteroids is there but locked during a round", async () => {
     await loadGame();
     for (const name of [/Inspect off/, "Color by time", "Submit", /Blink order/]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     expect(screen.getByRole("slider", { name: "Onion range end" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Colour vision" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Known asteroids" })).toBeNull();
+    expect((screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("shows Known asteroids only when tools explicitly include overlays", async () => {
+  it("shows Known asteroids only when tools include overlays", async () => {
     await loadGame({ tools: new Set(["overlays"]) });
     expect(screen.getByRole("button", { name: "Known asteroids" })).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "Colour vision" })).toBeNull();
   });
+});
+
+describe("Known asteroids overlay", () => {
+  const body = {
+    asteroids: [{ name: "(2015 HT246)", positions: [{ frame: 1, x: 5.5, y: 3.5, vmag: 22 }, { frame: 2, x: 9.5, y: 4.5, vmag: 22 }] }],
+    stars: [{ name: "Gaia DR3 1", source: "gaia", x: 2, y: 2 }],
+  };
+  const submitMarks = async (canvas: HTMLCanvasElement) => {
+    fireEvent.click(canvas, { clientX: 5, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Next frame" }));
+    fireEvent.click(canvas, { clientX: 15, clientY: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+  };
+
+  it("fetches nothing and names nothing before a verdict; a locked verdict keeps it locked", async () => {
+    overlayReply.body = body;
+    const locked: CheckResponse = { ...known, verdict: { ...known.verdict, kind: "candidate", message: "Not yet." }, unlocked: false, reveal: undefined };
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(locked), { status: 200 })) as unknown as typeof fetch });
+    const toggle = screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement;
+    fireEvent.click(toggle);
+    expect(overlayCalls()).toEqual([]);
+    expect(document.body.textContent).not.toContain("HT246");
+    await submitMarks(canvas);
+    await screen.findByTestId("verdict");
+    expect(toggle.disabled).toBe(true);
+    expect(overlayCalls()).toEqual([]);
+    expect(document.querySelector('[data-testid="known-diamond"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("HT246");
+  });
+
+  it("after an unlocked verdict the toggle fetches explore once and draws diamonds at the shown frame", async () => {
+    overlayReply.body = body;
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
+    await submitMarks(canvas);
+    await screen.findByTestId("verdict");
+    const toggle = screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement;
+    await vi.waitFor(() => expect(toggle.disabled).toBe(false));
+    fireEvent.click(toggle);
+    await vi.waitFor(() => expect(document.querySelector('[data-testid="known-diamond"]')).not.toBeNull());
+    expect(overlayCalls()).toEqual(["/api/overlay?spot=fixture&mode=explore"]);
+    const d = document.querySelectorAll('[data-testid="known-diamond"]');
+    expect(d.length).toBe(1);
+    const frame = Number(d[0].getAttribute("data-frame"));
+    expect(d[0].getAttribute("data-x")).toBe(frame === 1 ? "5.5" : "9.5");
+    expect(document.querySelectorAll('[data-testid="known-star"]').length).toBe(1);
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    expect(overlayCalls().length).toBe(1);
+  });
+
+  it("an unavailable overlay shows the plain message", async () => {
+    overlayReply.body = null;
+    const canvas = await loadGame({ fetcher: vi.fn(async () => new Response(JSON.stringify(known), { status: 200 })) as unknown as typeof fetch });
+    await submitMarks(canvas);
+    await screen.findByTestId("verdict");
+    const toggle = screen.getByRole("button", { name: "Known asteroids" }) as HTMLButtonElement;
+    await vi.waitFor(() => expect(toggle.disabled).toBe(false));
+    fireEvent.click(toggle);
+    await screen.findByText("Known asteroids are not available for this spot right now.");
+    expect(document.querySelector('[data-testid="known-diamond"]')).toBeNull();
+  });
+});
+
+describe("PlayScreen tools (more)", () => {
 
   it("shows no placeholder and names no object in round mode", async () => {
     await loadGame();
@@ -279,7 +347,7 @@ describe("PlayScreen tools", () => {
     for (const p of ["more tools", "wavelength switch", "vision picker", "coordinate box", "others' work", "not drawn yet"]) {
       expect(text.toLowerCase()).not.toContain(p);
     }
-    for (const s of ["image-tools", "wavelength", "color-vision", "coordinate-box", "show-work", "scoreboard", "overlays"]) {
+    for (const s of ["image-tools", "wavelength", "color-vision", "coordinate-box", "show-work", "scoreboard"]) {
       expect(document.querySelector(`[data-slot="${s}"]`)).toBeNull();
     }
     expect(document.querySelectorAll("h1")).toHaveLength(1);

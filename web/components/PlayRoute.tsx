@@ -1,7 +1,8 @@
 "use client";
 // /play with URL state: the view params (frames, spacing, vision) seed PlayScreen and every change
 // is written back with router.replace, so the address restores the view without history spam.
-// ra, dec and fov are not read: the viewer has no pan or field-of-view state yet.
+// ra, dec and fov are not read: the viewer has no pan or field-of-view state. Zoom (`scale`)
+// exists in PlayScreen but is not written to the URL.
 
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";

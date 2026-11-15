@@ -20,6 +20,8 @@
 //   vision?: Vision                  colour-vision mode for the default colours (default "normal")
 //   inspectSlot?: ReactNode          slot drawn beside the image (Inspect popup, SERVER/DATA fill it)
 //   crosshair?: [x, y] | null        keyboard crosshair drawn in the marks SVG (data-testid="kb-cursor")
+//   known?: KnownOverlay | null      known asteroids (amber diamonds, shown frame only) and stars (teal rings), BP 8.18;
+//                                    a diamond's name is the canvas tooltip and sits in a screen-reader list
 
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
@@ -28,6 +30,7 @@ import type { Field, Mark, RGB, Vision } from "@/lib/types";
 import { pixelToSky } from "@/lib/wcs";
 import { timeColors } from "@/lib/palettes";
 import styles from "./FieldViewer.module.css";
+import { asteroidsInFrame, type KnownOverlay } from "./overlay";
 
 export const rgbCss = ([r, g, b]: RGB) => `rgb(${r} ${g} ${b})`;
 
@@ -53,6 +56,8 @@ export interface FieldViewerProps {
   cursor?: { x: number; y: number };
   /** Same as cursor as an [x, y] tuple (PlayScreen's keyboard crosshair); wins over cursor. */
   crosshair?: [number, number] | null;
+  /** Known-asteroid overlay; diamonds are drawn for the shown frame only. */
+  known?: KnownOverlay | null;
 }
 
 /** Largest integer scale that fits the box, at least 1. */
@@ -148,6 +153,10 @@ export default function FieldViewer(props: FieldViewerProps) {
   const toPixel = (e: MouseEvent<HTMLCanvasElement>) =>
     clientToPixel(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect(), W, H);
 
+  const known = props.known;
+  const diamonds = useMemo(() => (known && meta ? asteroidsInFrame(known, meta.i) : []), [known, meta]);
+  const hoverName = hover ? diamonds.find((d) => Math.abs(d.x - hover[0]) <= 1.5 && Math.abs(d.y - hover[1]) <= 1.5)?.name : undefined;
+
   const onPointerMove = (e: MouseEvent<HTMLCanvasElement>) => {
     const p = toPixel(e);
     setHover((h) => (h && h[0] === p[0] && h[1] === p[1] ? h : p));
@@ -208,6 +217,7 @@ export default function FieldViewer(props: FieldViewerProps) {
             className={styles.canvas}
             style={{ cursor: mode === "inspect" ? "help" : "crosshair" }}
             data-testid="field-canvas"
+            title={hoverName}
             onPointerMove={onPointerMove}
             onPointerLeave={() => setHover(null)}
             onClick={onClick}
@@ -229,6 +239,28 @@ export default function FieldViewer(props: FieldViewerProps) {
                 </g>
               );
             })}
+            {known?.stars.map((s, i) => (
+              <circle key={`star-${i}`} data-testid="known-star" cx={(s.x + 0.5) * scale} cy={(s.y + 0.5) * scale} r={Math.max(5, scale * 1.2)} fill="none" stroke="#00B3A4" strokeWidth={1.5} />
+            ))}
+            {diamonds.map((d, i) => {
+              const cx = (d.x + 0.5) * scale;
+              const cy = (d.y + 0.5) * scale;
+              const r = Math.max(5, scale * 1.2);
+              return (
+                <polygon
+                  key={`ast-${i}`}
+                  data-testid="known-diamond"
+                  data-frame={meta?.i}
+                  data-x={d.x}
+                  data-y={d.y}
+                  points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`}
+                  fill="#E69F00"
+                  fillOpacity={0.35}
+                  stroke={colors[k] ? rgbCss(colors[k]) : "#E69F00"}
+                  strokeWidth={2}
+                />
+              );
+            })}
             {cur && (
               <g data-testid="kb-cursor" stroke="var(--text, #fff)" strokeWidth={1} fill="none">
                 <path d={`M${(cur.x + 0.5) * scale} 0V${H * scale}M0 ${(cur.y + 0.5) * scale}H${W * scale}`} opacity={0.6} />
@@ -239,6 +271,13 @@ export default function FieldViewer(props: FieldViewerProps) {
         </div>
         {inspectSlot}
       </div>
+      {diamonds.length > 0 && (
+        <ul className="sr-only" aria-label="Known asteroids in this frame">
+          {diamonds.map((d, i) => (
+            <li key={i}>{d.name}</li>
+          ))}
+        </ul>
+      )}
 
       <div className={styles.status}>
         <span className={styles.mode} data-testid="mode-status" aria-live="polite">

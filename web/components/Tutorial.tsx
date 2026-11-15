@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { REVEAL_INSPECT_ON, TUTORIAL, type TutorialLevel } from "@/lib/copy/tutorial";
+import { EROS_OVERLAY, REVEAL_INSPECT_ON, TUTORIAL, type TutorialLevel } from "@/lib/copy/tutorial";
 import { GUEST_KEY, type GuestData, loadGuest, saveGuest } from "@/lib/guest";
 import { usePrefersReducedMotion } from "@/lib/useBlink";
 import CoachMark from "./CoachMark";
@@ -148,7 +148,6 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
   let text = inspectAlreadyOn ? REVEAL_INSPECT_ON : (step?.text ?? "");
   if (step?.doneWhen === "play-pressed" && reducedMotion) text = `${text} ${REDUCED_MOTION_NOTE}`;
   if (step?.doneWhen === "mark-placed") text = `${text} ${EROS_HINT}`;
-  if (step?.doneWhen === "overlay-toggled") text = `${text} (Preview: the toggle works; the diamonds arrive in a later build.)`;
 
   return (
     <div className={styles.root}>
@@ -192,7 +191,7 @@ export default function Tutorial({ levels = TUTORIAL, fetcher }: TutorialProps) 
           </Link>
         </CoachMark>
       )}
-      <PlayScreen spot={level.spot} onEvent={onEvent} markFrames={level.spot === "eros" ? EROS_FRAMES : undefined} markHint={level.spot === "eros" ? EROS_HINT : undefined} fetcher={fetcher} showTitle objectName={level.objectName} tools={tools} />
+      <PlayScreen spot={level.spot} onEvent={onEvent} markFrames={level.spot === "eros" ? EROS_FRAMES : undefined} markHint={level.spot === "eros" ? EROS_HINT : undefined} fetcher={fetcher} showTitle objectName={level.objectName} tools={tools} knownLocal={level.spot === "eros" ? EROS_OVERLAY : undefined} />
     </div>
   );
 }

@@ -125,7 +125,12 @@ describe("Tutorial", () => {
     expect(loadGuest().tutorial).toMatchObject({ level: 1, step: 2 });
     fireEvent.keyDown(window, { key: "i" });
     expect(coach().textContent).toContain("Known asteroids");
+    expect(document.querySelector('[data-testid="known-diamond"]')).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Known asteroids" }));
+    // Frame 2 is shown (Next frame clicked above): Eros at its JPL position, no fetch for it.
+    const dia = document.querySelectorAll('[data-testid="known-diamond"]');
+    expect(dia.length).toBe(1);
+    expect(dia[0].getAttribute("data-x")).toBe("54.03");
     expect(coach().textContent).toContain("Training done");
     expect(loadGuest().tutorial.done).toEqual([0, 1]);
   });
@@ -206,7 +211,7 @@ describe("Tutorial", () => {
     expect(coach().textContent).toContain(TUTORIAL[1].steps[2].text);
     fireEvent.click(screen.getByRole("button", { name: "Skip step" }));
     expect(coach().textContent).toContain(TUTORIAL[1].steps[3].text);
-    expect(coach().textContent).toContain("Preview");
+    expect(coach().textContent).not.toContain("Preview");
     expect(loadGuest().tutorial).toMatchObject({ level: 1, step: 3, done: [0] });
   });
 });

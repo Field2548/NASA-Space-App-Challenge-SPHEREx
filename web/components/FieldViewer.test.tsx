@@ -47,6 +47,31 @@ describe("helpers", () => {
   });
 });
 
+describe("FieldViewer known overlay", () => {
+  const known = {
+    asteroids: [{ name: "(433) Eros", positions: [{ frame: 1, x: 2, y: 3 }, { frame: 2, x: 7, y: 5 }] }],
+    stars: [{ name: "Gaia", x: 1, y: 1 }],
+  };
+  it("draws the shown frame's diamond at the mark transform, amber fill, and a ring per star", () => {
+    setup({ known });
+    const d = screen.getAllByTestId("known-diamond");
+    expect(d).toHaveLength(1);
+    expect(d[0].getAttribute("data-frame")).toBe("2");
+    expect(d[0].getAttribute("points")?.split(" ")[0]).toBe(`${(7 + 0.5) * 4},${(5 + 0.5) * 4 - 5}`);
+    expect(d[0].getAttribute("fill")).toBe("#E69F00");
+    expect(screen.getAllByTestId("known-star")).toHaveLength(1);
+  });
+  it("names the diamond on hover and in a list; draws nothing without the prop", () => {
+    const { canvas } = setup({ known });
+    fireEvent.pointerMove(canvas, { clientX: 100 + 4 * 7 + 1, clientY: 50 + 4 * 5 + 1 });
+    expect(canvas.getAttribute("title")).toBe("(433) Eros");
+    expect(screen.getByRole("list", { name: "Known asteroids in this frame" }).textContent).toBe("(433) Eros");
+    cleanup();
+    setup();
+    expect(screen.queryAllByTestId("known-diamond")).toHaveLength(0);
+  });
+});
+
 describe("FieldViewer", () => {
   it("click marks the native pixel under the pointer with frame and tDays", () => {
     const { onMark, onInspect, canvas } = setup();

@@ -18,10 +18,11 @@
 //
 // Tools: `tools` lists the parts shown (ALL_TOOLS on /play). The tutorial passes a growing set
 // so parts unlock one by one; a hidden tool also ignores its keyboard shortcut. "Known
-// asteroids" draws nothing yet, so it shows only when the caller passes `tools` with "overlays"
-// (the tutorial's overlay step), never with the /play default.
+// asteroids" (BP 8.18) is locked during a round (spoiler rule) and opens after an unlocked
+// verdict; the tutorial (showTitle) is never a round. Opening it fetches /api/overlay (explore)
+// once; the tutorial passes `knownLocal` (Eros) and fetches nothing.
 //
-// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools?; initialView?; onViewChange? }
+// Props: { spot?: string; loading?: boolean; onEvent?; markFrames?; markHint?; fetcher?; showTitle?; tools?; initialView?; onViewChange?; knownLocal? }
 
 import Link from "next/link";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -40,6 +41,7 @@ import { Scoreboard } from "./Scoreboard";
 import SubmitBar from "./SubmitBar";
 import Timeline, { clampOnion, ONION_MAX, onionRangeFrames } from "./Timeline";
 import VisionPicker from "./VisionPicker";
+import { fetchOverlay, type KnownOverlay, OVERLAY_UNAVAILABLE } from "./overlay";
 import { type ViewState } from "./viewState";
 import WavelengthSwitch, { useWavelengthFrames, type WavelengthSelection } from "./WavelengthSwitch";
 
@@ -105,6 +107,8 @@ export interface PlayScreenProps {
   initialView?: ViewState;
   /** Called when vision, onion range or spacing change (/play writes them back to the URL). */
   onViewChange?(v: ViewState): void;
+  /** Known objects drawn locally instead of fetched (the tutorial's Eros). */
+  knownLocal?: KnownOverlay;
 }
 
 /** Heading that does not give the answer away: the field's sky position. */
@@ -200,9 +204,9 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange, knownLocal }: GameProps) {
   const tools = toolsProp ?? ALL_TOOLS;
-  const showOverlays = toolsProp?.has("overlays") ?? false;
+  const showOverlays = tools.has("overlays");
   const [W, H] = field.size;
   const [vision, setVision] = useState<Vision>(initialView?.vision ?? "normal");
   const [wavelength, setWavelength] = useState<WavelengthSelection>("all");
@@ -229,7 +233,8 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
-  const fit = useMemo(() => fitScale(W, H, 900, 560), [W, H]);
+  // Game mounts after the field loads (client only), so window is there. On a phone the image fits the width.
+  const fit = useMemo(() => fitScale(W, H, Math.min(900, (typeof window === "undefined" ? 1440 : window.innerWidth) - 40), 560), [W, H]);
   const [scale, setScale] = useState(fit);
   // Inspected pixel plus its screen point (InspectPopup opens beside it).
   const [inspected, setInspected] = useState<{ x: number; y: number; click: { x: number; y: number } } | null>(null);
@@ -253,6 +258,19 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     viewCb.current?.({ frames: isDefault ? null : onionRange, realSpacing, vision });
   }, [onionRange, defaultOnion, realSpacing, vision]);
   const [verdictIn, setVerdictIn] = useState(false);
+  // undefined: not fetched yet; null: unavailable. Fetched once, only after the spot is unlocked.
+  const [fetchedKnown, setFetchedKnown] = useState<KnownOverlay | null | undefined>(undefined);
+  const knownUnlocked = showTitle || verdictIn;
+  useEffect(() => {
+    if (!knownOverlay || !knownUnlocked || knownLocal || fetchedKnown !== undefined) return;
+    let alive = true;
+    fetchOverlay(spot, "explore").then((o) => alive && setFetchedKnown(o));
+    return () => {
+      alive = false;
+    };
+  }, [knownOverlay, knownUnlocked, knownLocal, fetchedKnown, spot]);
+  const knownData = knownOverlay && knownUnlocked ? (knownLocal ?? fetchedKnown ?? null) : null;
+  const knownMissing = knownOverlay && knownUnlocked && !knownLocal && fetchedKnown === null;
   const blink = useBlink(frames.length, { mode: loopMode });
   const { pause } = blink;
 
@@ -395,21 +413,25 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
         {showOverlays && (
           <section className="panel" data-part="PNL-04 // OVERLAYS">
             <div data-slot="overlays">
-              {/* Tutorial only until DATA ships the overlays: the toggle works, nothing is drawn yet. */}
               <button
                 type="button"
-                aria-pressed={knownOverlay}
+                aria-pressed={knownOverlay && knownUnlocked}
+                disabled={!knownUnlocked}
                 onClick={() => {
                   setKnownOverlay((v) => !v);
                   emit("overlay-toggled", marks);
                 }}
                 className={styles.wide}
                 data-tutorial-target="overlay-known-asteroids"
-                title="Preview: JPL's predicted spots (diamonds) arrive in a later build."
+                title={knownUnlocked ? "JPL's predicted spots (diamonds) and catalogue stars (rings)." : "Available after you submit."}
               >
                 Known asteroids
               </button>
-              {knownOverlay && <span className={styles.small}>Preview: the diamonds are not drawn yet.</span>}
+              {knownMissing && (
+                <span className={styles.small} role="status">
+                  {OVERLAY_UNAVAILABLE}
+                </span>
+              )}
             </div>
           </section>
         )}
@@ -458,6 +480,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               onInspect={inspectAt}
               overlay={overlay}
               overlayFrames={onionRangeFrames(onionRange)}
+              known={knownData}
               crosshair={pointer ? null : cursor}
               brightness={black}
               scale={scale}
