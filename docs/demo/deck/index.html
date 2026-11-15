@@ -236,15 +236,16 @@ function annotate(slideId, items) {
 }
 // ---- Slide 4 (hunt) ----
 {
-  const M = shot("s4a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [64, 235], scale: 0.88 });
-  const T = shot("s4b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 468], scale: 1.3 });
-  const C = shot("s4c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1400, 815], scale: 1.3 });
-  document.getElementById("s4b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1400px; top:408px; font-size:28px;">Plain frame: where is it?</div>`);
+  const M = shot("s4a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 820], at: [364, 235], scale: 0.77 });
+  const T = shot("s4b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1490, 468], scale: 1.22 });
+  const C = shot("s4c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 272, 300, 185], at: [1490, 815], scale: 1.22 });
+  document.getElementById("s4b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1490px; top:408px; font-size:28px;">Plain frame: where?</div>`);
   annotate("s4", [
     { n: 1, box: M.r([122, 693, 591, 142]), at: M.p(790, 790), cap: "Flip through the frames", side: "r" },
-    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(345, 262), cap: "Colour<br>by time", side: "r" },
-    { n: 3, box: C.r([606, 282, 205, 170]), at: [1425, 745], cap: "Coloured dots<br>= the mover", side: "r" },
-    { n: 4, box: M.r([1106, 163, 309, 34]), at: [1400, 352], cap: "Mark it, then Submit", side: "r" },
+    { n: 2, box: M.r([25, 174, 279, 33]), at: [335, 300], cap: "Stack", side: "l" },
+    { n: 3, box: M.r([25, 221, 279, 33]), at: [335, 440], cap: "Shift: line up a slow mover", side: "l", maxw: 215 },
+    { n: 4, box: C.r([606, 282, 205, 170]), at: [1520, 752], cap: "Stack: dots<br>= the mover", side: "r", maxw: 300 },
+    { n: 5, box: M.r([1106, 117, 309, 34]), at: [1505, 301], cap: "Mark it, then Submit", side: "r", maxw: 250 },
   ]);
   { const b = M.r([598, 268, 230, 200]); document.getElementById("s4svg").insertAdjacentHTML("beforeend", `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="none" stroke="#ffb000" stroke-width="5"/>`); }
 }
@@ -253,14 +254,14 @@ function annotate(slideId, items) {
   const B = shot("s5a", { src: "img/play_f1.jpg", baseW: 1440, crop: [560, 262, 300, 200], at: [64, 236], scale: 1.35 });
   const A = shot("s5b", { src: "img/play_color.jpg", baseW: 1440, crop: [560, 262, 300, 200], at: [520, 236], scale: 1.35 });
   document.getElementById("s5a").insertAdjacentHTML("beforeend", `<div class="chip" style="left:64px; top:180px;">Before: plain frame</div>`);
-  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:520px; top:180px; border-color:var(--amber); color:var(--amber);">After: Color by time</div>`);
-  const L = shot("s5c", { src: "img/tool_color.jpg", baseW: 1440, crop: [0, 72, 330, 650], at: [64, 590], scale: 0.7 });
+  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:520px; top:180px; border-color:var(--amber); color:var(--amber);">After: Stack</div>`);
+  const L = shot("s5c", { src: "img/tool_color.jpg", baseW: 1440, crop: [0, 72, 330, 640], at: [64, 590], scale: 0.7 });
   const Bt = shot("s5d", { src: "img/tool_color.jpg", baseW: 1440, crop: [0, 925, 800, 255], at: [900, 790], scale: 0.9 });
   annotate("s5", [
     { n: 1, box: L.r([25, 89, 279, 35]), at: [350, 610], cap: "Inspect any pixel (key I)", side: "r" },
-    { n: 2, box: L.r([16, 240, 297, 160]), at: [350, 750], cap: "Filter by wavelength band", side: "r" },
-    { n: 3, box: L.r([25, 441, 279, 33]), at: [350, 850], cap: "Known asteroids: opens after you submit", side: "r", maxw: 470 },
-    { n: 4, box: L.r([25, 665, 279, 50]), at: [350, 1010], cap: "Brightness: hide the faint noise", side: "r", maxw: 420 },
+    { n: 2, box: L.r([25, 221, 279, 33]), at: [350, 725], cap: "Shift: line up a slow mover", side: "r", maxw: 420 },
+    { n: 3, box: L.r([16, 457, 297, 160]), at: [350, 880], cap: "Filter by wavelength band", side: "r" },
+    { n: 4, box: L.r([25, 658, 279, 33]), at: [350, 1000], cap: "Known asteroids: opens after you submit", side: "r", maxw: 470 },
     { n: 5, box: Bt.r([17, 931, 184, 32]), at: [1000, 700], cap: "Blink or step through frames", side: "r" },
     { n: 6, box: Bt.r([120, 1057, 595, 56]), at: [1580, 905], cap: "Choose frame ranges", side: "r", maxw: 230 },
   ]);
