@@ -255,6 +255,7 @@ describe("onion helpers", () => {
     expect(clampOnion([2, 2], 5)).toEqual([2, 3]);
     expect(clampOnion([4, 4], 5)).toEqual([3, 4]);
     expect(clampOnion([0, 20], 12)).toEqual([0, 6]);
+    expect(clampOnion([0, 20], 12, 12)).toEqual([0, 11]); // colour-blind-safe setting off: every frame
   });
 });
 
@@ -281,14 +282,14 @@ describe("Timeline v1 completion", () => {
     const user = userEvent.setup();
     const onRange = vi.fn();
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} onionRange={[0, 2]} onOnionRangeChange={onRange} />);
-    const end = screen.getByRole("slider", { name: "Color by time end frame" });
+    const end = screen.getByRole("slider", { name: "Stack end frame" });
     expect(end.getAttribute("aria-valuenow")).toBe("3");
     end.focus();
     await user.keyboard("{ArrowRight}");
     expect(onRange).toHaveBeenLastCalledWith([0, 3]);
     await user.keyboard("{ArrowRight}");
     expect(onRange).toHaveBeenLastCalledWith([0, 3]); // props are fixed, so the same step repeats
-    const start = screen.getByRole("slider", { name: "Color by time start frame" });
+    const start = screen.getByRole("slider", { name: "Stack start frame" });
     start.focus();
     await user.keyboard("{ArrowRight}{ArrowRight}{ArrowRight}");
     expect(onRange).toHaveBeenLastCalledWith([1, 2]);

@@ -37,6 +37,8 @@ export interface PatchStore {
   tileDensity(order: number, tileOrder: number, tile: number): Promise<[number, number, number][] | null>;
   /** Up to `limit` patches inside a tile with what was done to each. Null when the query fails. */
   tilePatches(tileOrder: number, tile: number, limit: number): Promise<TilePatch[] | null>;
+  /** One player's own patches (solved or reported). Null when the query fails. */
+  minePatches(userId: string): Promise<TilePatch[] | null>;
 }
 
 /** One patch in a tile: no user, no names. */
@@ -165,6 +167,26 @@ export function supabaseStore(sb: SupabaseClient): PatchStore {
           .map((r) => [Number(r.ipix), Number(r.solves), Number(r.reports)] as [number, number, number])
           .filter(([i, s, r]) => Number.isFinite(i) && s + r > 0)
           .sort((a, b) => a[0] - b[0]);
+      } catch {
+        return null;
+      }
+    },
+    async minePatches(userId) {
+      try {
+        const [s, r] = await Promise.all([
+          sb.from("patch_solves").select("patch_id").eq("user_id", userId).limit(LIMIT),
+          sb.from("patch_reports").select("patch_id").eq("user_id", userId).limit(LIMIT),
+        ]);
+        if (s.error || r.error) return null;
+        const by = new Map<string, TilePatch>();
+        const get = (id: string): TilePatch => {
+          const e = by.get(id) ?? { id, solved: false, reported: false };
+          by.set(id, e);
+          return e;
+        };
+        for (const x of s.data ?? []) get(x.patch_id as string).solved = true;
+        for (const x of r.data ?? []) get(x.patch_id as string).reported = true;
+        return [...by.values()];
       } catch {
         return null;
       }

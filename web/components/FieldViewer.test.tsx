@@ -174,7 +174,7 @@ describe("FieldViewer cursor and readout label", () => {
     expect(screen.queryByTestId("kb-cursor")).toBeNull();
   });
 
-  it("labels the hover value as S/N (frame k) under Color by time", () => {
+  it("labels the hover value as S/N (frame k) under Stack", () => {
     const { canvas } = setup({ overlay: "colorByTime" });
     fireEvent.pointerMove(canvas, { clientX: 100 + 4 * 7 + 1, clientY: 50 + 4 * 3 + 1 });
     expect(screen.getByTestId("hover-readout").textContent).toContain("S/N (frame 2) 6.0");

@@ -1,7 +1,7 @@
 "use client";
 
-// Right-panel scoreboard: "This spot" / "All time", a "Show me at top" checkbox, and a
-// collapse-to-tab toggle. Fetches /api/leaderboard (contract: docs/contracts/api.md section 7).
+// Right-panel scoreboard: "This spot" / "All time", a "Show me at top" checkbox.
+// Fetches /api/leaderboard (contract: docs/contracts/api.md section 7).
 // Never shows emails: the API sends none.
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
@@ -13,16 +13,14 @@ type Scope = "spot" | "all";
 export type ScoreboardProps = {
   slug?: string | null;
   refreshKey?: number;
-  defaultCollapsed?: boolean;
   className?: string;
 };
 
 const POLL_MS = 30_000;
 
-export function Scoreboard({ slug = null, refreshKey = 0, defaultCollapsed = false, className }: ScoreboardProps) {
+export function Scoreboard({ slug = null, refreshKey = 0, className }: ScoreboardProps) {
   const panelId = useId();
   const hasSlug = Boolean(slug);
-  const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [tab, setTab] = useState<Scope>(hasSlug ? "spot" : "all");
   const [pinMe, setPinMe] = useState(false);
   const [view, setView] = useState<{ key: string; board: Board } | null>(null);
@@ -59,14 +57,13 @@ export function Scoreboard({ slug = null, refreshKey = 0, defaultCollapsed = fal
     void load();
   }, [load, refreshKey]);
 
-  // Poll every 30 s while expanded and the page is visible.
+  // Poll every 30 s while the page is visible.
   useEffect(() => {
-    if (!expanded) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void load();
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [expanded, load]);
+  }, [load]);
 
   const current = view && view.key === viewKey ? view.board : null;
   const rows = current ? arrangeRows(current, pinMe) : [];
@@ -82,41 +79,20 @@ export function Scoreboard({ slug = null, refreshKey = 0, defaultCollapsed = fal
     cursor: disabled ? "not-allowed" : "pointer",
   });
 
-  const toggleStyle: CSSProperties = expanded
-    ? { width: "100%", textAlign: "left", borderRadius: 0, padding: "var(--space-2)", fontSize: 12 }
-    : {
-        width: 36,
-        minHeight: 160,
-        borderRadius: 0,
-        padding: "var(--space-2)",
-        fontSize: 12,
-        writingMode: "vertical-rl",
-        transform: "rotate(180deg)",
-      };
-
   return (
     <div
       className={className}
       style={{
         display: "flex",
-        flexDirection: expanded ? "column" : "row",
-        width: expanded ? 240 : 36,
+        flexDirection: "column",
+        width: 240,
         maxWidth: "100%",
         flexShrink: 0,
       }}
     >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={expanded ? panelId : undefined}
-        title={expanded ? "click to minimize" : "click to expand"}
-        onClick={() => setExpanded((e) => !e)}
-        style={toggleStyle}
-      >
-        Scoreboard
-      </button>
+      <div style={{ padding: "var(--space-2)", fontSize: 12 }}>Scoreboard</div>
 
-      {expanded && (
+      {
         <div id={panelId} className="panel" style={{ flex: 1, minWidth: 0 }}>
           <div role="group" aria-label="Scope" style={{ display: "flex", gap: "var(--space-1)" }}>
             <button
@@ -228,7 +204,7 @@ export function Scoreboard({ slug = null, refreshKey = 0, defaultCollapsed = fal
             </table>
           )}
         </div>
-      )}
+      }
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ciede2000, simulateCvd, srgbToLab, timeColors, type Lab } from "./palettes";
+import { ciede2000, OKABE_ITO, simulateCvd, srgbToLab, stackColors, timeColors, type Lab } from "./palettes";
 import type { RGB } from "./types";
 
 // Sharma, Wu, Dalal (2005) supplementary test data.
@@ -77,5 +77,19 @@ describe("timeColors", () => {
       expect(min, `${v} n=${n}`).toBeGreaterThanOrEqual(10);
     }
     console.log(`min dE00 ${v} ${mins.join(" ")}`);
+  });
+});
+
+describe("stackColors", () => {
+  it("safe with 10 frames: Okabe-Ito over the Stack range, grey outside", () => {
+    const c = stackColors(10, [2, 8], "normal", true);
+    expect(c).toHaveLength(10);
+    expect(c.slice(2, 9)).toEqual(OKABE_ITO);
+    expect(c[0]).toEqual([128, 128, 128]);
+    expect(c[9]).toEqual([128, 128, 128]);
+  });
+  it("not safe, or 7 frames or fewer: the per-frame timeColors", () => {
+    expect(stackColors(10, [0, 9], "normal", false)).toEqual(timeColors(10, "normal"));
+    expect(stackColors(5, [1, 3], "tritan", true)).toEqual(timeColors(5, "tritan"));
   });
 });

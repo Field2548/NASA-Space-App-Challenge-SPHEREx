@@ -41,10 +41,6 @@
   min-height: 0;
 }
 
-.scoreClosed {
-  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr) 40px;
-}
-
 /* No scoreboard yet (tutorial level 0): the right column goes away. */
 .noRight {
   grid-template-columns: var(--left-w, 330px) minmax(0, 1fr);
@@ -190,12 +186,6 @@
   padding: 0;
 }
 
-.collapse {
-  align-self: flex-end;
-  font-size: 10px;
-  padding: var(--space-1) var(--space-2);
-}
-
 .small {
   margin: 0;
   font-size: 12px;
@@ -220,7 +210,6 @@
   }
 
   .body,
-  .scoreClosed,
   .noRight {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;

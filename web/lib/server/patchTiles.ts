@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { PATCH_ORDER } from "@/lib/patch";
 import { cellCount, MAX_ORDER_SPAN, MAX_TILE_ORDER, MIN_PATCH_TILE_ORDER } from "@/lib/hpxTiles";
+import { userFromRequest } from "@/lib/server/db";
 import { ApiFail, parse, queryObject } from "@/lib/server/http";
 import { patchStore, type PatchStore } from "@/lib/server/patchStore";
 import { rateLimit } from "@/lib/server/rateLimit";
@@ -35,6 +36,7 @@ export type TileQuery = z.infer<typeof TileQuery>;
 
 export interface PatchTileDeps {
   store: () => PatchStore | null;
+  user?: (request: Request) => Promise<{ id: string } | null>;
 }
 const realDeps: PatchTileDeps = { store: patchStore };
 
@@ -43,6 +45,13 @@ const OFFLINE = { "Cache-Control": "no-store" };
 
 export async function runPatchTiles(request: Request, deps: PatchTileDeps = realDeps): Promise<Response> {
   rateLimit(request, "patch-tiles", 240);
+  // ?who=me: the caller's own patches (bearer token), ids and flags only. Never cached, never anyone else's.
+  if (new URL(request.url).searchParams.get("who") === "me") {
+    const user = await (deps.user ?? userFromRequest)(request);
+    const own = deps.store();
+    const mine = user && own ? await own.minePatches(user.id) : [];
+    return NextResponse.json({ patches: mine ?? [] }, { headers: OFFLINE });
+  }
   const q = parse(TileQuery, queryObject(request));
   const store = deps.store();
 
