@@ -75,7 +75,7 @@ export type PlayTool =
   | "color-by-time" // the button and its onion range on the timeline
   | "overlays"
   | "brightness"
-  | "frames-spacing" // loop order and real spacing on the timeline
+  | "frames-spacing" // loop order, loop range and blink speed on the timeline
   | "wavelength"
   | "color-vision"
   | "coordinates" // coordinate box

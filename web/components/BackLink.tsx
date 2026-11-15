@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { hasInSitePrevious } from "@/lib/navStack";
 import styles from "./BackLink.module.css";
 
 export default function BackLink() {
@@ -13,7 +14,8 @@ export default function BackLink() {
       href="/"
       className={styles.back}
       onClick={(e) => {
-        const sameSite = document.referrer.startsWith(window.location.origin) && window.history.length > 1;
+        // In-app moves (lib/navStack), or a full page load whose referrer is this site.
+        const sameSite = hasInSitePrevious() || (document.referrer.startsWith(window.location.origin) && window.history.length > 1);
         if (!sameSite) return;
         e.preventDefault();
         router.back();
