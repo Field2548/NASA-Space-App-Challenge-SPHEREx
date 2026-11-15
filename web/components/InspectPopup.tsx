@@ -68,9 +68,11 @@ export interface InspectPopupProps {
   onClose: () => void;
   spectrumSlot?: ReactNode;
   lightCurveSlot?: ReactNode;
+  /** Ask /api/info by sky position, not by spot (a picked patch is not a ready spot). */
+  byPosition?: boolean;
 }
 
-export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectrumSlot, lightCurveSlot }: InspectPopupProps) {
+export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectrumSlot, lightCurveSlot, byPosition = false }: InspectPopupProps) {
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const hintId = `${baseId}-hint`;
@@ -130,7 +132,13 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
   const [result, setResult] = useState<{ key: string; data: InfoExplore | null } | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
-    const url = `/api/info?spot=${encodeURIComponent(field.slug)}&x=${px}&y=${py}&mode=${mode}`;
+    const where = byPosition
+      ? (() => {
+          const [r, d] = pixelToSky(field.wcs, field.size[1], px, py);
+          return `ra=${r.toFixed(6)}&dec=${d.toFixed(6)}&patch=1`;
+        })()
+      : `spot=${encodeURIComponent(field.slug)}&x=${px}&y=${py}`;
+    const url = `/api/info?${where}&mode=${mode}`;
     fetch(url, { credentials: "same-origin", signal: ctl.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -145,7 +153,7 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
         if (!ctl.signal.aborted) setResult({ key: reqKey, data: null });
       });
     return () => ctl.abort();
-  }, [field.slug, px, py, mode, reqKey]);
+  }, [field.slug, field.wcs, field.size, px, py, mode, reqKey, byPosition]);
 
   const current = result && result.key === reqKey ? result : null;
   const info = current?.data ?? null;

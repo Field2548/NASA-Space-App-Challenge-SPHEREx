@@ -41,6 +41,8 @@ export type InfoQuery = {
   ra?: number;
   dec?: number;
   mode?: string;
+  /** "1" from a picked patch: the always-open default does not apply there. */
+  patch?: string;
 };
 
 // ------------------------------------------------------------------ file shapes
@@ -392,7 +394,8 @@ export async function answerInfo(
 ): Promise<Record<string, unknown>> {
   // User decision 2026-11-15: Inspect shows everything from the start, in a round too
   // ("on inspect, unlocked all information"). The mode is still read but no longer locks.
-  const open = inspectAlwaysOpen();
+  // A picked patch keeps the lock: its brief says no object name before a correct answer.
+  const open = inspectAlwaysOpen() && q.patch !== "1";
   const asked = open || q.mode === "explore";
   const hits = await locate(q, root);
 

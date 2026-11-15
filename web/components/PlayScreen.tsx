@@ -40,6 +40,8 @@ import FieldViewer, { fitScale, type ViewerMode, type ViewerOverlay } from "./Fi
 import InspectPanel from "./InspectPanel";
 import { InspectPopup } from "./InspectPopup";
 import MorphologyControl from "./MorphologyControl";
+import PatchPlay, { type PickedHooks } from "./PatchPlay";
+import type { Patch } from "@/lib/patch";
 import ToneCurveEditor from "./ToneCurveEditor";
 import styles from "./PlayScreen.module.css";
 import { Scoreboard } from "./Scoreboard";
@@ -95,6 +97,10 @@ export const ALL_TOOLS: ReadonlySet<PlayTool> = new Set<PlayTool>([
 
 export interface PlayScreenProps {
   spot?: string;
+  /** A patch picked on the sky map (/play?patch=p11-N or ?ra=&dec=); `spot` wins when both are set. */
+  patch?: Patch;
+  /** The address asked for a patch that is not one (a bad id or position). */
+  badPatch?: boolean;
   loading?: boolean; // Suspense fallback while ?spot= is read
   onEvent?(name: PlayEvent, detail: PlayEventDetail): void;
   /** Only these FrameMeta.i values accept a mark; others show markHint instead. */
@@ -121,7 +127,13 @@ export function neutralTitle(field: Pick<Field, "ra" | "dec">): string {
   return `Field at RA ${formatRA(field.ra)} Dec ${formatDec(field.dec)}`;
 }
 
-type GameProps = Omit<PlayScreenProps, "spot" | "loading"> & { spot: string; field: Field; frames: Float32Array[] };
+type GameProps = Omit<PlayScreenProps, "spot" | "loading" | "patch" | "badPatch"> & {
+  spot: string;
+  field: Field;
+  frames: Float32Array[];
+  /** A picked patch: its own checker, Inspect by sky position, no stage scoreboard. */
+  picked?: PickedHooks;
+};
 
 export const MAX_SCALE = 32;
 
@@ -130,7 +142,7 @@ export function upsertMark(marks: Mark[], m: Mark): Mark[] {
   return [...marks.filter((x) => x.frame !== m.frame), m].sort((a, b) => a.frame - b.frame);
 }
 
-export default function PlayScreen({ spot, loading = false, ...hooks }: PlayScreenProps) {
+export default function PlayScreen({ spot, patch, badPatch = false, loading = false, ...hooks }: PlayScreenProps) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
   useEffect(() => {
@@ -164,6 +176,14 @@ export default function PlayScreen({ spot, loading = false, ...hooks }: PlayScre
       </header>
       {loading ? (
         <EmptyState title="LOADING" text="Reading the spot from the address…" />
+      ) : !spot && patch ? (
+        <PatchPlay
+          key={patch.id}
+          patch={patch}
+          renderGame={(g) => <Game key={patch.id} spot={patch.id} field={g.field} frames={g.frames} {...hooks} knownLocal={g.knownLocal} picked={g.picked} />}
+        />
+      ) : !spot && badPatch ? (
+        <EmptyState title="NO SUCH PATCH" text="That address is not a point on the sky. Pick a patch on the sky map." />
       ) : !spot ? (
         <EmptyState title="NO SPOT SELECTED" text="Pick a spot from the sky map, or open /play?spot=fixture." />
       ) : !current ? (
@@ -207,7 +227,7 @@ export function arrowStep(key: string, big: boolean): [number, number] | null {
 
 const distinctFrames = (ms: Mark[]) => new Set(ms.map((m) => m.frame)).size;
 
-function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange, knownLocal }: GameProps) {
+function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, showTitle = false, objectName, tools: toolsProp, initialView, onViewChange, knownLocal, picked }: GameProps) {
   const tools = toolsProp ?? ALL_TOOLS;
   const showOverlays = tools.has("overlays");
   const [W, H] = field.size;
@@ -347,6 +367,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
     if (res.unlocked) setRevealTitle(res.spot_reveal?.title ?? res.verdict.object_name ?? field.title);
     if (res.unlocked && res.reveal) setRevealName(res.spot_reveal?.title ?? res.verdict.object_name ?? null);
     setVerdicts((v) => v + 1);
+    picked?.onResult(res);
     onEvent?.("submitted", { markedFrames: distinctFrames(marks), unlocked: res.unlocked === true });
     if (res.reveal && canInspect) {
       inspectAt(Math.round(res.reveal.x), Math.round(res.reveal.y));
@@ -522,6 +543,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
               y={inspected.y}
               click={inspected.click}
               mode={verdictIn ? "explore" : "round"}
+              byPosition={picked !== undefined}
               onClose={() => setInspected(null)}
             />
           )}
@@ -554,13 +576,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
                   {marks.length} mark{marks.length === 1 ? "" : "s"} in {frames.length} frames.{verdictIn ? "" : " Mark the mover in at least 2 frames."}
                 </p>
                 {markHint && <p className={styles.small}>{markHint}</p>}
-                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} />
+                <SubmitBar spot={spot} marks={marks} fetcher={fetcher} tutorial={showTitle} onResult={onResult} submitter={picked?.submit} />
                 <button type="button" onClick={() => setMarks([])} disabled={marks.length === 0} className={styles.wide}>
                   Clear marks
                 </button>
               </section>
               {/* Not in the tutorial (showTitle): it is training, not a scored round. */}
-              {!showTitle && <Scoreboard slug={spot} refreshKey={verdicts} />}
+              {!showTitle && !picked && <Scoreboard slug={spot} refreshKey={verdicts} />}
             </>
           )}
         </aside>
