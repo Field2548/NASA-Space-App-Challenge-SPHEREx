@@ -15,6 +15,7 @@ import { makeField, mockCanvas } from "./testFixtures";
 // The default 1 s findBy/waitFor budget ran out under a busy machine (load ~20) in full parallel runs.
 configure({ asyncUtilTimeout: 5000 });
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>

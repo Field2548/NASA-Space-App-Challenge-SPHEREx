@@ -7,6 +7,7 @@ import { placeCard } from "./CoachMark";
 import { makeField, mockCanvas } from "./testFixtures";
 import Tutorial, { backPos, EROS_HINT, nextPos, resumePos, toolsAt } from "./Tutorial";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>
