@@ -4,8 +4,8 @@ File format: docs/contracts/field-schema.md section 8 (the contract; keep both i
 Input is a data/bands_<slug>/ folder (cube.fits + bands.csv). Output is
 out_dir/spectrum/index.json and out_dir/spectrum/t_<tx>_<ty>.u16.
 
-Needs numpy and astropy only. Quantizing reuses export_web.quantize_plane, so the cube
-follows the same rule as the single exposures.
+Needs numpy and astropy only. Tiles are linear (value * scale + offset, section 8); the
+single exposures use asinh, which the web's tile decoder does not read.
 """
 import csv
 import json
@@ -54,6 +54,19 @@ def clipped_noise(plane):
         return float(np.std(sigma_clip(vals, sigma=3, maxiters=5, masked=True).compressed()))
 
 
+def quantize_linear(plane, noise):
+    """One band -> (u16 array, scale, offset). MJy/sr = value * scale + offset, value 0..65534,
+    65535 = no data. The step is noise / 2, widened only as far as the band's own min..max
+    needs (a bright star in the field), so nothing is clipped."""
+    lo, hi = float(np.nanmin(plane)), float(np.nanmax(plane))
+    scale = max(noise / 2, (hi - lo) / (NODATA - 2) * (1 + 1e-6))
+    scale = float(f"{scale:.6g}")
+    scale = max(scale, (hi - lo) / (NODATA - 2) * (1 + 1e-9))      # rounding must not clip
+    offset = min(float(f"{lo:.6g}"), lo)
+    q = np.clip(np.rint((plane - offset) / scale), 0, NODATA - 1)
+    return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), scale, offset
+
+
 def export_spectrum_tiles(bands_folder, out_dir, tile=32):
     """Write out_dir/spectrum/index.json and out_dir/spectrum/t_<tx>_<ty>.u16; return the index.
 
@@ -61,11 +74,9 @@ def export_spectrum_tiles(bands_folder, out_dir, tile=32):
     (Eros has 100). Each entry keeps its real SPHEREx band number (1..102) in "band", so the
     list index is NOT the band number. Rows are top-down (the FITS rows are flipped here, once).
     Each band has its own linear scale and offset (MJy/sr = value * scale + offset) chosen as in
-    export_web.quantize_plane: step at most noise / 2, and if the range is too wide the brightest
-    pixels clip to 65534 and that band gets "clipped": true. 65535 means no data, and also pads
+    quantize_linear: step noise / 2, or wider if the band's own range needs it; nothing clips. 65535 means no data, and also pads
     the edge tiles. Old tiles in the spectrum folder are removed first."""
     from astropy.io import fits
-    from export_web import quantize_plane
     with fits.open(os.path.join(bands_folder, "cube.fits")) as hdul:
         cube = np.asarray(hdul[0].data, dtype=np.float64)[:, ::-1, :]        # rows top-down
     with open(os.path.join(bands_folder, "bands.csv"), newline="") as f:
@@ -79,13 +90,11 @@ def export_spectrum_tiles(bands_folder, out_dir, tile=32):
         if r["wavelength_um"] == "" or not np.isfinite(cube[i]).any():
             continue                                   # no image for this band
         noise = float(f"{clipped_noise(cube[i]):.5g}")      # the stored value is the one used
-        q, scale, offset, clipped = quantize_plane(cube[i], max(noise, 1e-9))
+        q, scale, offset = quantize_linear(cube[i], max(noise, 1e-9))
         entry = {"band": int(r["band"]), "detector": int(r["detector"]),
                  "wavelength_um": float(r["wavelength_um"]), "bandwidth_um": float(r["bandwidth_um"]),
                  "date_obs": r["date_obs"][:19], "scale": scale, "offset": offset,
                  "noise": noise}
-        if clipped:
-            entry["clipped"] = True
         keep.append(i)
         entries.append(entry)
         planes.append(q)

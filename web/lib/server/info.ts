@@ -2,9 +2,10 @@
 // Contract: docs/contracts/api.md sections 2 and 6. Build prompt: section 8.16 (radii, lock).
 //
 // The server decides the mode (api.md section 2). A position inside a ready spot is answered in
-// full (explore) only when the caller asked for explore AND the signed unlock cookie covers that
-// spot. Everything else gets the locked shape, which has exactly the keys mode, locked, position.
-// Positions outside every ready spot are always explore, with live lookups skipped for now.
+// full (explore) only when the caller asked for explore AND the signed unlock cookie covers every
+// ready spot whose picture contains it. Everything else gets the locked shape, which has exactly the keys mode, locked, position.
+// Positions outside every ready spot are always explore: SIMBAD and Gaia are asked live (liveCatalog.ts),
+// JPL is skipped because there is no observation time here.
 //
 // Files read (all server-only, never served): web/data/catalog/<slug>.json (pre-made catalog),
 // web/data/answers/<slug>.json (the reveal block only), web/public/fields/index.json and
@@ -16,13 +17,13 @@ import { z } from "zod";
 import { angularSeparationDeg } from "@/components/skymap/geometry";
 import { loadAnswerKey } from "@/lib/scoring";
 import { ApiFail } from "@/lib/server/http";
+import { GAIA_RADIUS_ARCSEC, type LiveDeps, lookupLive, SIMBAD_RADIUS_ARCSEC } from "@/lib/server/liveCatalog";
 import { isUnlocked } from "@/lib/server/unlock";
 import type { FieldWcs } from "@/lib/types";
 import { pixelToSky, skyToPixel } from "@/lib/wcs";
 
-/** Radii from BUILD_PROMPT 8.16 (api.md section 6). */
-export const SIMBAD_RADIUS_ARCSEC = 9;
-export const GAIA_RADIUS_ARCSEC = 6;
+/** The radii (BUILD_PROMPT 8.16) live in liveCatalog.ts. Re-exported for the callers that used them here. */
+export { GAIA_RADIUS_ARCSEC, SIMBAD_RADIUS_ARCSEC };
 export const SOLAR_RADIUS_PX = 2;
 /** A pixel may sit this far outside the picture (api.md section 3, MARK_MARGIN_PX). */
 const MARGIN_PX = 2;
@@ -40,6 +41,8 @@ export type InfoQuery = {
   ra?: number;
   dec?: number;
   mode?: string;
+  /** "1" from a picked patch: the always-open default does not apply there. */
+  patch?: string;
 };
 
 // ------------------------------------------------------------------ file shapes
@@ -170,11 +173,36 @@ const bad = (message: string) => new ApiFail("bad_request", message);
 type Located = { slug: string; field: SpotField; x: number; y: number; ra: number; dec: number };
 
 /**
- * Work out where the call points. A spot plus x, y is used as given (after the 2 px margin
- * check). Otherwise ra, dec is converted into each ready spot's picture; the first one that
- * contains it wins. Returns null when the position is outside every ready spot.
+ * Pixels of guard band around every ready spot's picture (all four sides). Pixel centres sit at
+ * integers, so the picture covers [-0.5, W-0.5). A catalog lookup reaches SIMBAD_RADIUS_ARCSEC
+ * (9 arcsec, 1.46 px) around its position, so a live lookup just outside the picture could return
+ * a star that lies inside the spot. Every position within ceil(radius / pixel) + 1 px of the
+ * picture is therefore treated as inside the spot, and never asked live.
  */
-async function locate(q: InfoQuery, root?: string): Promise<Located | null> {
+export function guardBandPx(pixelArcsec: number): number {
+  return Math.ceil(SIMBAD_RADIUS_ARCSEC / pixelArcsec) + 1;
+}
+
+/** True when pixel (x, y) is on the picture or in its guard band. */
+function inBand(field: SpotField, x: number, y: number): boolean {
+  const [w, h] = field.size;
+  const g = guardBandPx(field.pixel_arcsec);
+  return x >= -0.5 - g && x < w - 0.5 + g && y >= -0.5 - g && y < h - 0.5 + g;
+}
+
+/** The nearest pixel on the picture, for catalog searches of a position in the guard band. */
+function clampToPicture(field: SpotField, x: number, y: number): { x: number; y: number } {
+  const [w, h] = field.size;
+  return { x: Math.min(Math.max(x, 0), w - 1), y: Math.min(Math.max(y, 0), h - 1) };
+}
+
+/**
+ * Work out where the call points. A spot plus x, y is used as given (after the 2 px margin
+ * check), giving one entry. Otherwise ra, dec is converted into every ready spot's picture and
+ * each spot whose picture or guard band (see guardBandPx) contains it is returned, in index order.
+ * An empty list means the position is outside every ready spot.
+ */
+async function locate(q: InfoQuery, root?: string): Promise<Located[]> {
   if (q.spot !== undefined) {
     if (q.x === undefined || q.y === undefined) {
       throw bad("A spot needs x and y, the pixel on its picture.");
@@ -188,21 +216,22 @@ async function locate(q: InfoQuery, root?: string): Promise<Located | null> {
       throw bad("That pixel is more than 2 px outside the picture.");
     }
     const [ra, dec] = pixelToSky(field.wcs as FieldWcs, h, x, y);
-    return { slug: q.spot, field, x, y, ra, dec };
+    return [{ slug: q.spot, field, x, y, ra, dec }];
   }
   if (q.x !== undefined || q.y !== undefined) throw bad("x and y need a spot.");
   if (q.ra === undefined || q.dec === undefined) {
     throw bad("Give either spot with x and y, or ra and dec.");
   }
+  const found: Located[] = [];
   for (const slug of await readySpotSlugs(root)) {
     const field = await readSpotField(slug, root);
-    const [w, h] = field.size;
+    const h = field.size[1];
     const p = skyToPixel(field.wcs as FieldWcs, h, q.ra, q.dec);
-    if (p && p[0] >= 0 && p[0] < w && p[1] >= 0 && p[1] < h) {
-      return { slug, field, x: p[0], y: p[1], ra: q.ra, dec: q.dec };
+    if (p && inBand(field, p[0], p[1])) {
+      found.push({ slug, field, x: p[0], y: p[1], ra: q.ra, dec: q.dec });
     }
   }
-  return null;
+  return found;
 }
 
 /** Nearest SIMBAD objects within 9 arcsec of the sky position, nearest first. */
@@ -295,14 +324,35 @@ function sourceStatus(block: { status?: string } | undefined, hits: number): Sou
 
 const SKIPPED = { simbad: "skipped", gaia: "skipped", jpl: "skipped" } as const;
 
+/** SIMBAD's coordinate search page for a position. */
+function simbadCoordLink(ra: number, dec: number) {
+  return {
+    label: "SIMBAD",
+    url: `https://simbad.cds.unistra.fr/simbad/sim-coo?Coord=${ra}%20${dec}&Radius=${SIMBAD_RADIUS_ARCSEC}&Radius.unit=arcsec`,
+  };
+}
+
 // ------------------------------------------------------------------ the answer
+
+/** Inspect answers in full for every caller (no unlock cookie needed). INSPECT_LOCK=1 restores the old lock. */
+function inspectAlwaysOpen(): boolean {
+  return process.env.INSPECT_LOCK !== "1";
+}
 
 function lockedBody(position: Record<string, number>) {
   return { mode: "round", locked: true, position };
 }
 
-async function exploreReady(loc: Located, root?: string): Promise<Record<string, unknown>> {
-  const [catalog, key] = await Promise.all([readCatalog(loc.slug, root), loadAnswerKey(loc.slug, root)]);
+async function exploreReady(asked: Located, root?: string): Promise<Record<string, unknown>> {
+  const [catalog, key] = await Promise.all([readCatalog(asked.slug, root), loadAnswerKey(asked.slug, root)]);
+  // The catalog is searched at the nearest pixel on the picture (a position in the guard band or
+  // a little outside it is answered like an edge pixel). The answer echoes the position asked.
+  const near = clampToPicture(asked.field, asked.x, asked.y);
+  const [sra, sdec] =
+    near.x === asked.x && near.y === asked.y
+      ? [asked.ra, asked.dec]
+      : pixelToSky(asked.field.wcs as FieldWcs, asked.field.size[1], near.x, near.y);
+  const loc: Located = { ...asked, x: near.x, y: near.y, ra: sra, dec: sdec };
   const simbad = catalog ? simbadNear(catalog, loc.ra, loc.dec) : [];
   const gaia = catalog ? gaiaNear(catalog, loc) : null;
   const solar = catalog ? solarSystemNear(catalog, loc.x, loc.y) : [];
@@ -314,15 +364,13 @@ async function exploreReady(loc: Located, root?: string): Promise<Record<string,
       }
     : SKIPPED;
   const links = [
-    ...(simbad.length
-      ? [{ label: "SIMBAD", url: `https://simbad.cds.unistra.fr/simbad/sim-coo?Coord=${loc.ra}%20${loc.dec}&Radius=${SIMBAD_RADIUS_ARCSEC}&Radius.unit=arcsec` }]
-      : []),
+    ...(simbad.length ? [simbadCoordLink(loc.ra, loc.dec)] : []),
     IRSA_LINK,
   ];
   return {
     mode: "explore",
     locked: false,
-    position: { ra: round(loc.ra, 6), dec: round(loc.dec, 6), x: loc.x, y: loc.y },
+    position: { ra: round(asked.ra, 6), dec: round(asked.dec, 6), x: asked.x, y: asked.y },
     sources,
     simbad,
     gaia,
@@ -336,31 +384,46 @@ async function exploreReady(loc: Located, root?: string): Promise<Record<string,
 
 /**
  * The response for one call (api.md sections 2 and 6). `root` is the app folder (tests pass a
- * temporary one); by default the process working directory.
+ * temporary one); by default the process working directory. `live` lets tests inject the fetch.
  */
-export async function answerInfo(request: Request, q: InfoQuery, root?: string): Promise<Record<string, unknown>> {
-  const asked = q.mode === "explore";
-  const loc = await locate(q, root);
+export async function answerInfo(
+  request: Request,
+  q: InfoQuery,
+  root?: string,
+  live?: LiveDeps,
+): Promise<Record<string, unknown>> {
+  // User decision 2026-11-15: Inspect shows everything from the start, in a round too
+  // ("on inspect, unlocked all information"). The mode is still read but no longer locks.
+  // This holds for a picked patch (patch=1) as well.
+  const open = inspectAlwaysOpen();
+  const asked = open || q.mode === "explore";
+  const hits = await locate(q, root);
 
-  if (!loc) {
-    // Outside every ready spot: explore is always granted. Live SIMBAD, Gaia and JPL lookups
-    // are not built yet, so they answer "skipped" with empty lists.
+  if (hits.length === 0) {
+    // Outside every ready spot and its guard band: explore is always granted, and only then is anything asked live.
+    // A round answer returns before any network call. JPL is skipped: this lookup has no time.
     const position = { ra: q.ra as number, dec: q.dec as number };
     if (!asked) return lockedBody(position);
+    const found = await lookupLive(position.ra, position.dec, live);
     return {
       mode: "explore",
       locked: false,
       position,
-      sources: SKIPPED,
-      simbad: [],
-      gaia: null,
+      sources: { simbad: found.simbad.status, gaia: found.gaia.status, jpl: "skipped" },
+      simbad: found.simbad.rows,
+      gaia: found.gaia.row,
       solar_system: [],
-      links: [IRSA_LINK],
+      links: [...(found.simbad.rows.length ? [simbadCoordLink(position.ra, position.dec)] : []), IRSA_LINK],
     };
   }
 
-  const granted = asked && isUnlocked(request, loc.slug);
-  const position = { ra: round(loc.ra, 6), dec: round(loc.dec, 6), x: loc.x, y: loc.y };
+  // Inside ready spots: locked unless the cookie covers EVERY spot that contains the position.
+  // The answer is built from the first containing spot the cookie covers.
+  const first = hits[0];
+  const position = { ra: round(first.ra, 6), dec: round(first.dec, 6), x: first.x, y: first.y };
+  if (open) return exploreReady(first, root);
+  const covered = (h: Located) => isUnlocked(request, h.slug);
+  const granted = asked && hits.every(covered);
   if (!granted) return lockedBody(position);
-  return exploreReady(loc, root);
+  return exploreReady(hits.find(covered) as Located, root);
 }

@@ -116,7 +116,9 @@ export const DIFFICULTY_STYLE: Record<Difficulty, DifficultyStyle> = {
     fallback: "#ff2e88",
     glyph: "M12 7V17M7 12H17M8.5 8.5L15.5 15.5M15.5 8.5L8.5 15.5",
   },
-  control: { word: "Control", cssVar: "--text-dim", fallback: "#8fa3bd", glyph: "M9 9L15 15M15 9L9 15" },
+  tool: { word: "Tool test", cssVar: "--cyan", fallback: "#00e1ff", glyph: "M12 7L17 12L12 17L7 12ZM12 10L14 12L12 14L10 12Z" },
+  // A control field must look like any other spot: its label and style must not give away "nothing moves".
+  control: { word: "Medium", cssVar: "--amber", fallback: "#ffb000", glyph: "M12 8L16 12L12 16L8 12Z" },
 };
 
 export function difficultyStyle(d: Difficulty): DifficultyStyle {

@@ -1,0 +1,116 @@
+{
+ "slug": "wise0855",
+ "title": "Test your tool on WISE 0855",
+ "kind": "spot",
+ "difficulty": "tool",
+ "ra": 133.76,
+ "dec": -7.2422,
+ "fov_deg": 0.1,
+ "pixel_arcsec": 6.15,
+ "size": [
+  59,
+  59
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   133.76,
+   -7.2422
+  ],
+  "crpix": [
+   30.0,
+   30.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60801.447878,
+   "utc": "2025-05-06T10:44:56",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60979.789308,
+   "utc": "2025-10-31T18:56:36",
+   "hours_since_prev": 4280.19,
+   "n_bands": 12,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 60986.923483,
+   "utc": "2025-11-07T22:09:48",
+   "hours_since_prev": 171.22,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61153.438695,
+   "utc": "2026-04-23T10:31:43",
+   "hours_since_prev": 3996.37,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61161.589106,
+   "utc": "2026-05-01T14:08:18",
+   "hours_since_prev": 195.61,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0171,
+  "offset": -4.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 332.675
+ },
+ "psf_fwhm_px": 1.647,
+ "has": {
+  "exposures": true,
+  "spectrum": false
+ }
+}

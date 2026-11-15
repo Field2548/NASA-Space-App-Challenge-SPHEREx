@@ -53,7 +53,7 @@ Schema from BUILD_PROMPT 6.2, verbatim, plus the marked additions.
 | --- | --- |
 | `title` | neutral on purpose: `Field in <constellation of the spot centre>`. The object's name is in the answer key only (`reveal`, section 6) |
 | `kind` | `spot` for every ready spot (`fixture` for the test spot). The real kind is in the answer key only |
-| `difficulty` | `easy`, `medium`, `hard`, `boss`. The control spot is listed as `medium` so it cannot be recognised; its real difficulty is in the answer key only |
+| `difficulty` | `easy`, `medium`, `hard`, `boss`, `tool` (star tool tests, listed as their own group after Boss). The control spot is listed as `medium` so it cannot be recognised; its real difficulty is in the answer key only |
 | `frames[].i` | frame number, **from 1**, in time order. Plane `i - 1` of `frames.u16`. |
 | `frames[].mjd` | mean time of the frame (MJD, UTC). `utc` is the same time as ISO text. |
 | `frames[].hours_since_prev` | 0 for the first frame |
@@ -117,6 +117,7 @@ Never import this from client code and never copy it under `public/`.
 | `nothing_moves` | `true` for the control spot: the right answer is "Nothing moved" |
 | `noise_bar_sigma` | the field's noise bar for the bot search (stacked S/N). `null` if no bot search was run. Never report a bot match without it. |
 | `objects[].positions` | one entry per frame, in the top-down grid (section 1). `in_grid` is false when the object is outside the picture in that frame (Eros leaves after frame 3; `x, y` are then outside `0..W-1`). Optional `snr`: measured S/N there (max of the 3 x 3 pixels), absent when out of the grid, `null` when there is no data. Optional `change_snr`: the same 3 x 3 maximum taken in the frame minus the median of the other frames (`motion_frames.residuals`), so stars cancel. Use `change_snr`, not `snr`, to say whether the object itself is seen in a frame: `snr` also counts a background star that happens to lie under the path. |
+| `objects[].kind` `star` | a tool-test star (`pipeline/star_targets.py`, difficulty `tool`). Position per frame = SIMBAD J2000 position + proper motion + annual parallax at the frame's mid-exposure time, not JPL. Extra position keys: `measured_x`, `measured_y` (flux-weighted centroid in a 5 x 5 window of the frame, only if the peak is at least 5 sigma) and `offset_px` (distance to the expected position). Extra object keys: `role` (`mover`, `variable` or `static`; `static` is Elias 16 in `taurus-ice`, which neither moves nor varies and ships the spectrum cube), `total_motion_px` (first to last frame), `brightness` (per frame: `flux_ratio_vs_earlier_frame`, a map from earlier frame number to `n_pairs`, median `flux_ratio` and `scatter` of exposure pairs whose wavelengths agree within 4 percent and are both detected at 3 sigma; and each exposure's wavelength, aperture flux in mJy, error and flags). A star seen only at long wavelengths (WISE 0855) also has per-position `longband_x`, `longband_y`, `longband_snr`, `longband_n`, `longband_offset_px` from the stack of exposures above 3.4 micron and `saturation` (counts of exposures with OVERFLOW or NONLINEAR flags within 3 px of the star, and the peak). A `variable` star does not move: the answer is the star whose brightness changes. |
 | `objects[].v*_px_per_day` | straight-line fit to the positions of all frames, top-down (positive `vy` = moving down = south). A summary only: score against `positions`, because fast objects do not move in a straight line. |
 | `reveal` | the real title, kind and difficulty of the spot (for the control spot: `control`). Public files never carry these (issue #10). The server sends it as `spot_reveal` once the spot is unlocked for that player (`unlocked` or `practice` is `true`), never on a wrong answer to a locked spot (`docs/contracts/api.md` sections 2 and 3) |
 | `bot.candidates` | from `candidates.csv`, already converted: `y = H - 1 - y_csv`, `vy = -vy_csv`. `x, y` is the position at `t_ref_mjd` (the mean of the frame times); position in frame `i` is `x + vx * (mjd_i - t_ref_mjd)`, same for y. |
@@ -126,17 +127,18 @@ Never import this from client code and never copy it under `public/`.
 
 ## 7. `exposures.u16` + `exposures.json` (phase 2, optional)
 
-`exposures.u16`: `K x H x W` little-endian Uint16, rows top-down, `65535` = no data. Each exposure has its **own** `scale` and `offset`; values are surface brightness in MJy/sr after zodiacal-light and background subtraction: `MJy/sr = value * scale + offset`. Written only for `precision: "float"` spots whose cutouts were available (`has.exposures`). About 1 MB for a 119 px spot.
+`exposures.u16`: `K x H x W` little-endian Uint16, rows top-down, `65535` = no data. Values are surface brightness in MJy/sr after zodiacal-light and background subtraction, stored with an asinh stretch so that faint sky and very bright sources (Eros reaches 320 MJy/sr, 25000 times the noise) share one plane without clipping. Each exposure has its **own** `soft` and `step`: `MJy/sr = soft * sinh((value - 32767) * step)`. The encoder is `value = round(asinh(x / soft) / step) + 32767`, with `soft` = the plane's `noise` and `step = asinh(max|x| / soft) / 32767`, so the brightest pixel maps to the end of the range. Near the sky the rounding step is about `noise * step`, a few ten-thousandths of the noise; at the brightest pixel the relative error is about `step` (0.03 percent). Written only for `precision: "float"` spots whose cutouts were available (`has.exposures`). About 1 MB for a 119 px spot.
 
 ```json
 {
-  "file": "exposures.u16", "size": [119, 119], "count": 34, "units": "MJy/sr", "nodata": 65535,
+  "file": "exposures.u16", "size": [119, 119], "count": 34, "units": "MJy/sr",
+  "encoding": "asinh", "nodata": 65535,
   "wavelength_grid": 8,
   "exposures": [
     { "k": 0, "frame": 1, "mjd": 60865.750596, "utc": "2025-07-09T18:00:51", "detector": 3,
       "obs_id": "2025W28_1B_0502_1", "file": "2025W28_1B_0502_1_D3.fits",
       "source": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/...",
-      "scale": 0.0006442, "offset": -0.3108, "noise": 0.012676, "clipped": false,
+      "soft": 0.012676, "step": 0.000331, "noise": 0.012676, "clipped": false,
       "bandwidth_um": 0.0537,
       "wavelength_um": [[null, null, null, 2.1357, 2.1328, 2.1299, 2.127, 2.1241]] } ]
 }
@@ -145,15 +147,16 @@ Never import this from client code and never copy it under `public/`.
 - `k` is the plane index in `exposures.u16`. `frame` is the frame number (from 1) this exposure belongs to. Exposures are listed frame by frame; a frame has `n_bands` of them.
 - `mjd` / `utc` is the start of the exposure (`DATE-OBS`). `source` is the full IRSA image the cutout came from (provenance), or `null`.
 - `noise` is the sigma-clipped standard deviation of the plane, in MJy/sr.
-- `scale` is at most `noise / 2`. If the plane's range is too wide for that, the brightest pixels are clipped to `65534` and `clipped` is `true` (their real value is higher).
-- `wavelength_um` is an 8 x 8 grid (8 rows top-down, each 8 columns): the wavelength seen at the centre of each of 8 x 8 equal cells of the spot. Cell `(cx, cy)` is centred on pixel `((cx + 0.5) * W / 8 - 0.5, (cy + 0.5) * H / 8 - 0.5)`. Interpolate bilinearly. `null` = the exposure does not cover that cell. `bandwidth_um` is the band width at the centre of the spot (`null` if not covered).
+- `soft` equals `noise`. Nothing is clipped, so `clipped` is always `false` (kept in the file for older readers).
+- Older files (no top-level `encoding`) use a linear `scale` and `offset` per exposure instead: `MJy/sr = value * scale + offset`. Readers accept both forms: linear when `scale` is present, asinh otherwise.
+- `wavelength_um` is an 8 x 8 grid (8 rows top-down, each 8 columns): the wavelength seen at the centre of each of 8 x 8 equal cells of the spot. Cell `(cx, cy)` is centred on pixel `((cx + 0.5) * W / 8 - 0.5, (cy + 0.5) * H / 8 - 0.5)`. Interpolate bilinearly; at the edges (outside the outermost cell centres) clamp to the nearest cell centre, never extrapolate. `null` = the exposure does not cover that cell. `bandwidth_um` is the band width at the centre of the spot (`null` if not covered).
 
 **Rebuilding a frame from exposures** (what the wavelength switch does; reference code is `rebuild_frame` in `pipeline/export_web.py`, the same maths as `build_frame` in `motion_frames.py`):
 
-1. Pick the exposures of one frame that pass the filter (detector or wavelength).
+1. Pick the exposures of one frame that pass the filter (detector or wavelength). A frame with no exposure passing the filter is skipped (no frame is built for it).
 2. Turn each plane into noise units: `plane / noise`.
-3. Per pixel: with 3 or more planes, a 3-sigma-clipped mean (centre = median, spread = 1.4826 x median absolute deviation, repeat until nothing more is clipped); with 1 or 2 planes, the plain mean ignoring NaN (show the "fewer than 3" notice: cosmic rays are not removed).
-4. Divide the result by its own noise (sigma-clipped standard deviation, 2.5 sigma, 5 rounds).
+3. Per pixel: with 3 or more planes (all selected planes count, also those that are NaN at this pixel), a 3-sigma-clipped mean: centre = median, sigma = 1.4826 x median absolute deviation; a value is clipped only when it is more than 3 sigma from the median, and never when that sigma is 0; at most 5 rounds (astropy's default), not "until nothing more is clipped". With 1 or 2 planes, the plain mean ignoring NaN (show the "fewer than 3" notice: cosmic rays are not removed).
+4. Divide the result by its own noise: the standard deviation (population, divisor N) of the finite pixels after sigma clipping at 2.5 sigma around the median, 5 rounds.
 5. Blank every pixel that is NaN in any of the frames shown, then use one shared stretch.
 
 Noise guard: a plane whose given noise is not a finite positive number is skipped (not used, not counted in `planesUsed`), and if the rebuilt frame's own noise is not a finite positive number the frame is returned undivided, so a constant plane never gives Infinity or NaN-filled output.

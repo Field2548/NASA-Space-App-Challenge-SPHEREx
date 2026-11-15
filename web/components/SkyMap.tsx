@@ -21,12 +21,18 @@ import { Minus, Plus, RotateCw, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { formatDec, formatRA } from "@/lib/coords";
 import { FIELDS_BASE } from "@/lib/fields";
+import { edgeUrl } from "@/lib/hipsProxy";
 import type { Difficulty, FieldSummary } from "@/lib/types";
 import {
   findHipsUrl,
   HIPS_ID,
   HIPS_NAME,
+  IRSA_HIPS,
+  IRSA_HIPS_ID,
+  IRSA_HIPS_NAME,
+  IRSA_SLICE_ARG,
   loadAladin,
+  releaseAladin,
   type AladinCatalog,
   type AladinInstance,
   type AladinOverlay,
@@ -41,10 +47,35 @@ export interface SkyMapProps {
   onPlay: (slug: string) => void;
   target?: { ra: number; dec: number; fov?: number } | null;
   onPointer?: (p: { ra: number; dec: number } | null) => void;
-  onClickSky?: (p: { ra: number; dec: number }) => void;
+  /** fov: the map's field of view (degrees) at the click. */
+  onClickSky?: (p: { ra: number; dec: number; fov?: number }) => void;
   overlay?: { cells: { corners: [number, number][]; value: number }[]; max: number; label: string } | null;
   className?: string;
+  /** Ready-spot reticles, their list and preview card (default on; /map turns them off). */
+  showSpots?: boolean;
+  /** Solved patches, drawn only once the view is PATCH_SHOW_FOV or closer. */
+  patches?: SkyPatch[] | null;
+  /** The patch the player picked: an amber square. */
+  picked?: { corners: [number, number][] } | null;
+  /** View centre (ICRS) and field of view, after the view settles. */
+  onView?: (v: { ra: number; dec: number; fov: number }) => void;
+  /** A parent that owns the spot card (/stages): a marker click calls this and the map's own list and card stay off. */
+  onSpot?: (slug: string) => void;
+  /** Extra word per spot slug (Solved, Tried, NEXT), added to the marker label. */
+  spotMarks?: Record<string, string>;
 }
+
+/** A solved patch on the map: outline, matched known objects and players' reports. */
+export interface SkyPatch {
+  id: string;
+  corners: [number, number][];
+  objects: { ra: number; dec: number }[];
+  reports: { ra: number; dec: number }[];
+  mine?: boolean;
+}
+
+/** Solved patches show at this field of view (degrees) or closer. */
+export const PATCH_SHOW_FOV = 3;
 
 type MapState = "loading" | "ready" | "failed";
 
@@ -54,7 +85,12 @@ const DEFAULT_FLY_FOV = 1.5;
 const FLY_SECONDS = 1.6;
 const NO_POINTER = "RA --h--m--.--s  Dec ---°--′--.-″";
 
-const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard", "expert", "boss", "control"];
+/** HEALPix order 0 has 12 tiles: the whole sky at its coarsest. */
+const FIRST_TILES = 12;
+/** Hide the loading bar after this long even if tiles are still coming. */
+const TILE_WAIT_MS = 12000;
+
+const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard", "expert", "boss", "tool", "control"];
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -74,25 +110,48 @@ const chip: CSSProperties = {
   fontSize: 12,
 };
 
-export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, className }: SkyMapProps) {
+export function SkyMap({
+  onPlay,
+  target,
+  onPointer,
+  onClickSky,
+  overlay,
+  className,
+  showSpots = true,
+  patches,
+  picked,
+  onView,
+  onSpot,
+  spotMarks,
+}: SkyMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
   const playRef = useRef<HTMLButtonElement>(null);
   const aladinRef = useRef<AladinInstance | null>(null);
   const libRef = useRef<AladinStatic | null>(null);
   const objectClickRef = useRef(false);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Latest callbacks for Aladin's listeners, which are registered once.
-  const cbRef = useRef({ onPlay, onPointer, onClickSky });
+  const cbRef = useRef({ onPlay, onPointer, onClickSky, onView, onSpot });
   useEffect(() => {
-    cbRef.current = { onPlay, onPointer, onClickSky };
+    cbRef.current = { onPlay, onPointer, onClickSky, onView, onSpot };
   });
 
   const [spots, setSpots] = useState<FieldSummary[] | null>(null);
   const [spotsFailed, setSpotsFailed] = useState(false);
   const [mapState, setMapState] = useState<MapState>("loading");
   const [failReason, setFailReason] = useState("");
+  const [programReady, setProgramReady] = useState(false); // Aladin Lite loaded; still waiting on CDS
   const [attempt, setAttempt] = useState(0);
+  const [fromIrsa, setFromIrsa] = useState(false); // CDS down: the base layer is IRSA's SPHEREx DR1 HiPS
   const [selected, setSelected] = useState<FieldSummary | null>(null);
   const [fov, setFov] = useState(360);
   const listId = useId();
@@ -120,11 +179,16 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     if (!el) return;
     const ctl = new AbortController();
     let cancelled = false;
+    let raf = 0;
+    let dblZoom: (() => void) | null = null;
     const fail = (why: string) => {
       if (cancelled) return;
       cancelled = true;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       aladinRef.current = null;
-      el.replaceChildren();
+      // Aladin cannot be destroyed; free its WebGL contexts so the hidden map stops drawing.
+      releaseAladin(el);
       setFailReason(why);
       setMapState("failed");
     };
@@ -133,7 +197,9 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       let lib: AladinStatic;
       let url: string | null;
       try {
-        [lib, url] = await Promise.all([loadAladin(), findHipsUrl(ctl.signal)]);
+        const libP = loadAladin();
+        void libP.then(() => !cancelled && setProgramReady(true), () => {});
+        [lib, url] = await Promise.all([libP, findHipsUrl(ctl.signal)]);
       } catch (e) {
         if (ctl.signal.aborted) return;
         const msg = String(e);
@@ -146,14 +212,17 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       }
       if (cancelled) return;
       if (!url) {
-        fail("The SPHEREx sky picture from CDS (Strasbourg) is not answering right now.");
+        fail("The SPHEREx sky picture (CDS Strasbourg and IRSA) is not answering right now.");
         return;
       }
       try {
-        const survey = lib.HiPS(HIPS_ID, {
-          url,
-          name: HIPS_NAME,
-          errorCallback: () => fail("The SPHEREx sky picture from CDS (Strasbourg) stopped answering."),
+        const irsa = url === IRSA_HIPS;
+        setFromIrsa(irsa);
+        const survey = lib.HiPS(irsa ? IRSA_HIPS_ID : HIPS_ID, {
+          // Tiles go through the site's edge cache (app/api/hips); the probe above used the source.
+          url: edgeUrl(url, window.location.origin),
+          name: irsa ? IRSA_HIPS_NAME : HIPS_NAME,
+          errorCallback: () => fail(`The SPHEREx sky picture from ${irsa ? "IRSA" : "CDS (Strasbourg)"} stopped answering.`),
         });
         const a = lib.aladin(el, {
           survey,
@@ -179,10 +248,16 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           showReticle: false,
           log: false,
         });
+        // IRSA's cube opens on its middle band, a blank dichroic channel (its properties file).
+        // IRSA_SLICE_ARG makes Aladin fetch tile suffix _3 (0.81 um), which matches the credit label.
+        // Aladin applies the slice only once the layer is attached, so set it again after that.
+        if (irsa) {
+          survey.setSliceNumber?.(IRSA_SLICE_ARG);
+          for (const ms of [0, 300, 1500]) setTimeout(() => !cancelled && survey.setSliceNumber?.(IRSA_SLICE_ARG), ms);
+        }
         a.gotoRaDec(GALACTIC_CENTER[0], GALACTIC_CENTER[1]);
         a.setFoV(360);
 
-        let raf = 0;
         let pending: { ra: number; dec: number } | null = null;
         a.on("mouseMove", (e: { x: number; y: number }) => {
           let p: { ra: number; dec: number } | null = null;
@@ -196,6 +271,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           if (!raf) {
             raf = requestAnimationFrame(() => {
               raf = 0;
+              if (cancelled) return;
               if (statusRef.current) {
                 statusRef.current.textContent = pending
                   ? `RA ${formatRA(pending.ra)}  Dec ${formatDec(pending.dec)}`
@@ -206,17 +282,55 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           }
         });
         a.on("click", (e: { ra: number; dec: number; isDragging?: boolean }) => {
+          if (cancelled) return;
           if (objectClickRef.current) {
             objectClickRef.current = false;
             return;
           }
           if (e.isDragging) return;
           setSelected(null);
-          if (Number.isFinite(e.ra) && Number.isFinite(e.dec)) cbRef.current.onClickSky?.({ ra: e.ra, dec: e.dec });
+          if (Number.isFinite(e.ra) && Number.isFinite(e.dec)) {
+            let f: number | undefined;
+            try {
+              f = a.getFov()[0];
+            } catch {
+              f = undefined;
+            }
+            cbRef.current.onClickSky?.({ ra: e.ra, dec: e.dec, fov: f });
+          }
         });
+        // onView after the view settles (a drag or zoom fires many events).
+        let viewTimer: ReturnType<typeof setTimeout> | null = null;
+        const viewSoon = () => {
+          if (viewTimer) clearTimeout(viewTimer);
+          viewTimer = setTimeout(() => {
+            if (cancelled) return;
+            try {
+              const [ra, dec] = a.getRaDec();
+              const f = a.getFov()[0];
+              if ([ra, dec, f].every(Number.isFinite)) cbRef.current.onView?.({ ra, dec, fov: f });
+            } catch {
+              /* view not ready */
+            }
+          }, 400);
+        };
         a.on("zoomChanged", (f: number) => {
-          if (Number.isFinite(f)) setFov(f);
+          if (!cancelled && Number.isFinite(f)) setFov(f);
+          viewSoon();
         });
+        a.on("positionChanged", viewSoon);
+        // Double click zooms in one step, like a street map (Aladin's own double click only recentres
+        // on the point, so together they zoom into it). A single click never zooms.
+        dblZoom = () => {
+          if (cancelled) return;
+          try {
+            const f = a.getFov()[0];
+            if (Number.isFinite(f)) a.zoomToFoV(f / 2, 0.35);
+          } catch {
+            /* view not ready */
+          }
+        };
+        el.addEventListener("dblclick", dblZoom);
 
         aladinRef.current = a;
         libRef.current = lib;
@@ -230,8 +344,13 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     return () => {
       cancelled = true;
       ctl.abort();
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+      if (dblZoom) el.removeEventListener("dblclick", dblZoom);
       aladinRef.current = null;
-      el.replaceChildren();
+      releaseAladin(el);
     };
   }, [attempt]);
 
@@ -239,7 +358,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
   useEffect(() => {
     const a = aladinRef.current;
     const lib = libRef.current;
-    if (mapState !== "ready" || !a || !lib || !spots?.length) return;
+    if (!showSpots || mapState !== "ready" || !a || !lib || !spots?.length) return;
     const labelFont = `12px ${getComputedStyle(document.body).fontFamily}`;
     const cats: AladinCatalog[] = [];
     for (const d of DIFFICULTY_ORDER) {
@@ -256,16 +375,23 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         labelColor: color,
         labelFont,
         onClick: (src: AladinSource<unknown>) => {
+          if (!mountedRef.current) return;
           objectClickRef.current = true;
-          setTimeout(() => (objectClickRef.current = false), 0);
+          if (clickTimer.current) clearTimeout(clickTimer.current);
+          clickTimer.current = setTimeout(() => {
+            objectClickRef.current = false;
+            clickTimer.current = null;
+          }, 0);
           const slug = (src.data as { slug?: string } | undefined)?.slug;
           const hit = spotsRef.current.find((s) => s.slug === slug);
-          if (hit) setSelected(hit);
+          if (!hit) return;
+          if (cbRef.current.onSpot) cbRef.current.onSpot(hit.slug);
+          else setSelected(hit);
         },
       });
       a.addCatalog(cat);
       cat.addSources(
-        rows.map((s) => lib.source(s.ra, s.dec, { slug: s.slug, label: `${s.title} · ${difficultyStyle(d).word}` })),
+        rows.map((s) => lib.source(s.ra, s.dec, { slug: s.slug, label: `${s.title} · ${difficultyStyle(d).word}${spotMarks?.[s.slug] ? ` · ${spotMarks[s.slug]}` : ""}` })),
       );
       cats.push(cat);
     }
@@ -278,7 +404,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
         }
       }
     };
-  }, [mapState, spots]);
+  }, [mapState, spots, showSpots, spotMarks]);
 
   // Fly to the target.
   const tRa = target?.ra;
@@ -343,16 +469,128 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
     };
   }, [mapState, overlay]);
 
-  // Focus Play when a card opens; Esc closes it.
+  // Solved patches (green outline, cyan known objects, amber reports) once zoomed in close.
+  const patchesShown = fov <= PATCH_SHOW_FOV;
   useEffect(() => {
-    if (!selected) return;
-    playRef.current?.focus({ preventScroll: true });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelected(null);
+    const a = aladinRef.current;
+    const lib = libRef.current;
+    if (mapState !== "ready" || !a || !lib || !patchesShown || !patches?.length) return;
+    const layers: (AladinOverlay | AladinCatalog)[] = [];
+    try {
+      const outline = lib.graphicOverlay({ name: "Solved patches", lineWidth: 2 });
+      a.addOverlay(outline);
+      layers.push(outline);
+      outline.addFootprints(
+        patches
+          .filter((p) => p.corners.length >= 3)
+          .map((p) =>
+            lib.polygon(p.corners, {
+              color: p.mine ? "#a7f3d0" : "#34d399",
+              fill: true,
+              fillColor: "rgba(52, 211, 153, 0.12)",
+              lineWidth: 2,
+            }),
+          ),
+      );
+      const known = patches.flatMap((p) => p.objects);
+      if (known.length) {
+        const cat = lib.catalog({ name: "Known objects found", shape: "circle", sourceSize: 10, color: "#67e8f9" });
+        a.addCatalog(cat);
+        layers.push(cat);
+        cat.addSources(known.map((o) => lib.source(o.ra, o.dec, {})));
+      }
+      const reported = patches.flatMap((p) => p.reports);
+      if (reported.length) {
+        const cat = lib.catalog({ name: "Players' reports", shape: "cross", sourceSize: 10, color: "#fbbf24" });
+        a.addCatalog(cat);
+        layers.push(cat);
+        cat.addSources(reported.map((o) => lib.source(o.ra, o.dec, {})));
+      }
+    } catch (e) {
+      console.error("SkyMap: could not draw the solved patches", e);
+    }
+    return () => {
+      for (const layer of layers) {
+        try {
+          a.removeOverlay(layer);
+        } catch {
+          /* map already gone */
+        }
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected]);
+  }, [mapState, patches, patchesShown]);
+
+  // The picked patch: an amber square.
+  useEffect(() => {
+    const a = aladinRef.current;
+    const lib = libRef.current;
+    if (mapState !== "ready" || !a || !lib || !picked || picked.corners.length < 3) return;
+    let layer: AladinOverlay | null = null;
+    try {
+      layer = lib.graphicOverlay({ name: "Picked patch", lineWidth: 2 });
+      a.addOverlay(layer);
+      layer.addFootprints([lib.polygon(picked.corners, { color: "#fbbf24", lineWidth: 2 })]);
+    } catch (e) {
+      console.error("SkyMap: could not draw the picked patch", e);
+    }
+    return () => {
+      if (layer) {
+        try {
+          a.removeOverlay(layer);
+        } catch {
+          /* map already gone */
+        }
+      }
+    };
+  }, [mapState, picked]);
+
+  // Loading bar: count HiPS tiles as the browser finishes them (Aladin has no tile event).
+  // Keyed by attempt, so a retry starts from zero without a reset inside the effect.
+  const [tiles, setTiles] = useState({ attempt: -1, seen: 0, timedOut: false });
+  const tilesSeen = tiles.attempt === attempt ? tiles.seen : 0;
+  const tilesTimedOut = tiles.attempt === attempt && tiles.timedOut;
+  useEffect(() => {
+    if (mapState !== "ready") return;
+    const setTilesSeen = (seen: number) => setTiles((t) => ({ attempt, seen, timedOut: t.attempt === attempt && t.timedOut }));
+    const setTilesTimedOut = (timedOut: boolean) =>
+      setTiles((t) => ({ attempt, seen: t.attempt === attempt ? t.seen : 0, timedOut }));
+    if (typeof PerformanceObserver === "undefined") {
+      const t0 = setTimeout(() => setTilesTimedOut(true), 0);
+      return () => clearTimeout(t0);
+    }
+    let seen = 0;
+    const obs = new PerformanceObserver((list) => {
+      // responseStatus (where the browser has it) leaves out missing tiles.
+      const n = list
+        .getEntries()
+        .filter((e) => /Npix\d+/.test(e.name) && ((e as { responseStatus?: number }).responseStatus ?? 200) < 400).length;
+      if (n) {
+        seen += n;
+        setTilesSeen(seen);
+      }
+    });
+    try {
+      obs.observe({ type: "resource", buffered: true });
+    } catch {
+      setTilesTimedOut(true);
+    }
+    const t = setTimeout(() => setTilesTimedOut(true), TILE_WAIT_MS);
+    return () => {
+      obs.disconnect();
+      clearTimeout(t);
+    };
+  }, [mapState, attempt]);
+
+  // Focus Play when a card opens and give focus back to whatever opened it when it closes.
+  const cardOpen = selected !== null;
+  useEffect(() => {
+    if (!cardOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    playRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [cardOpen]);
 
   const choose = (s: FieldSummary) => {
     setSelected(s);
@@ -366,6 +604,18 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
 
   const ready = mapState === "ready";
   const failed = mapState === "failed";
+  const progress = ready
+    ? tilesSeen >= FIRST_TILES || tilesTimedOut
+      ? 1
+      : 0.5 + (0.5 * tilesSeen) / FIRST_TILES
+    : programReady
+      ? 0.35
+      : 0.1;
+  const loadingText = ready
+    ? `Drawing the sky: ${Math.min(tilesSeen, FIRST_TILES)} of ${FIRST_TILES} tiles. A coarse sky shows first, sharper tiles follow as you zoom.`
+    : programReady
+      ? "Finding the SPHEREx sky picture (IRSA or CDS)…"
+      : "Loading the sky map program…";
 
   return (
     <div
@@ -381,20 +631,50 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       }}
     >
       {/* Aladin draws into this div. It stays mounted so a retry can reuse it. */}
-      <div
-        ref={mapRef}
-        onPointerLeave={leave}
+      <section
         aria-label="Sky map. Use the ready spots list to reach spots with the keyboard."
-        role="application"
         style={{ position: "absolute", inset: 0, visibility: failed ? "hidden" : "visible" }}
-      />
+      >
+        <div ref={mapRef} onPointerLeave={leave} style={{ position: "absolute", inset: 0 }} />
+      </section>
 
-      {mapState === "loading" && (
+      {!failed && progress < 1 && (
         <div
           role="status"
-          style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--text-dim)" }}
+          aria-live="polite"
+          style={{
+            position: "absolute",
+            left: "50%",
+            transform: "translateX(-50%)",
+            ...(ready ? { bottom: 16 } : { top: "45%" }),
+            width: "min(420px, 80%)",
+            padding: "10px 14px",
+            borderRadius: 14,
+            background: "color-mix(in srgb, var(--bg-0) 80%, transparent)",
+            color: "var(--text-dim)",
+            fontFamily: "var(--font-body-stack)",
+            fontSize: 13,
+            pointerEvents: "none",
+          }}
         >
-          <span>[####------] loading the SPHEREx sky</span>
+          <div>{loadingText}</div>
+          <div
+            role="progressbar"
+            aria-label="Sky map loading"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress * 100)}
+            style={{ marginTop: 6, height: 6, borderRadius: 999, background: "rgba(255,255,255,.12)", overflow: "hidden" }}
+          >
+            <div
+              style={{
+                width: `${Math.round(progress * 100)}%`,
+                height: "100%",
+                background: "var(--accent)",
+                transition: "width 300ms ease-out",
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -443,7 +723,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       )}
 
       {/* Keyboard and screen-reader route to the spots (the canvas markers are mouse-only). */}
-      {!failed && spots && spots.length > 0 && (
+      {showSpots && !onSpot && !failed && spots && spots.length > 0 && (
         <details
           style={{ ...chip, position: "absolute", left: 12, bottom: 40, maxWidth: 300, padding: "4px 10px" }}
         >
@@ -483,6 +763,12 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
       {selected && (
         <section
           aria-labelledby={cardTitleId}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setSelected(null);
+            }
+          }}
           className="panel"
           data-part="SPT-01 // READY SPOT"
           style={{ position: "absolute", right: 16, top: 72, width: 240, padding: "var(--space-3)" }}
@@ -589,7 +875,7 @@ export function SkyMap({ onPlay, target, onPointer, onClickSky, overlay, classNa
           pointerEvents: "none",
         }}
       >
-        SPHEREx QR2 HiPS: CDS
+        {fromIrsa ? "SPHEREx DR1 HiPS (0.81 µm): IRSA" : "SPHEREx QR2 HiPS: CDS"}
       </div>}
     </div>
   );

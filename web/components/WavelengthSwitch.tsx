@@ -33,6 +33,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { decodeExposureValue } from "@/lib/spectra";
 import type { Field } from "@/lib/types";
 
 // ---------------------------------------------------------------------------------------------
@@ -68,8 +69,10 @@ export interface ExposureInfo {
   obs_id: string;
   file: string;
   source: string | null;
-  scale: number;
-  offset: number;
+  soft?: number; // asinh encoding: MJy/sr = soft * sinh((value - 32767) * step)
+  step?: number;
+  scale?: number; // older linear encoding (used when present): MJy/sr = value * scale + offset
+  offset?: number;
   noise: number; // sigma-clipped std of the plane, MJy/sr
   clipped: boolean;
   bandwidth_um: number | null;
@@ -81,6 +84,7 @@ export interface ExposuresJson {
   size: [number, number];
   count: number;
   units: string;
+  encoding?: string;
   nodata: number;
   wavelength_grid: number;
   exposures: ExposureInfo[];
@@ -101,7 +105,7 @@ export function decodeExposures(buffer: ArrayBuffer, info: ExposuresJson): Float
     const base = e.k * plane * 2;
     for (let i = 0; i < plane; i++) {
       const v = view.getUint16(base + 2 * i, true);
-      f[i] = v === info.nodata ? NaN : v * e.scale + e.offset;
+      f[i] = v === info.nodata ? NaN : decodeExposureValue(v, e);
     }
     out[e.k] = f;
   }

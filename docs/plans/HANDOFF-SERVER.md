@@ -104,3 +104,36 @@ Still open, in order:
 5. GAME: approval of PR #6; issue #12 (tracing line, footer slot, where SkyMap, CoordinateBox, Scoreboard, AuthDialog and InspectPopup mount); then delete `/skymap-demo` and `/server-demo`. GAME's own guest store (on `web-game`) and `web/lib/auth.ts` must be reconciled.
 6. Human: Supabase project, Vercel link, `UNLOCK_SECRET` (issue #3 items 1, 2, 13). Then run the migration and `supabase/tests/rls_probe.sql` on the real project; nothing has run on real Supabase.
 7. Phase 5: licence audit (Mamajek table has no stated licence), preview deploy, production deploy after a human yes.
+
+## Update 06:45 (newest; overrides earlier sections where they differ)
+
+- **PR #6 is merged into `web`** (GAME approved after their own run and route probes). Everything up to commit d771b80 is on `web`.
+- **PR #13 is open** (reviewer GAME): live SIMBAD and Gaia lookups in `/api/info` outside ready spots, and the `/server-demo` page without the hard-coded Eros answer (GAME found it in a public chunk). vitest 382, tsc, eslint, build clean.
+- Read GAME's PR #9 from the API side and commented there: their own `web/app/status/page.tsx` and `package.json` changes will conflict with `web`; their guest store keeps results, not marks, so it cannot feed `/api/complete`; the tutorial heading names Eros before the marks. Their tests and build were NOT run on our side (npm ci failed in the scratch copy).
+- Running when this was written: an adversarial review of everything built after 04:30 (sonnet sub-agent, read-only; findings not applied yet) and a haiku batch: shared guess budget for `/api/complete`, overlapping ready spots in `/api/info`.
+- `pipeline/tests/test_process_requests.py` is in DATA's folder; asked DATA on the board for an ok.
+- CDS (SIMBAD, HiPS) still answered 404 at 06:29. The sky map has still never been seen; the SIMBAD query is untested against the real service.
+- Scratch folders `scratchpad\PR9` (half-installed, a sub-agent could not remove it) and `scratchpad\game` (still a registered git worktree) are left over; harmless to the repo. `git worktree prune` and deleting them needs the owner's ok.
+
+## Update 07:00 (newest)
+
+- A second adversarial review (sonnet) ran over everything built after 04:30. It could not read a ready spot's name, type, distance or title without the signed cookie by any route. It found and a fix batch closed: a lock leak for positions up to ~1.5 px outside a ready picture's edge (live lookup returned stars inside the spot), guest points lost when a guest logs in and replays before `/api/complete`, a replay store that one bad entry blocked, a spoofable and resettable rate limiter, repeat candidates inflating density, request-queue spam, unchecked link schemes. Contract is now 1.3. vitest 466 passed (27 files), tsc, eslint, build clean; the migration runs from scratch in PGlite and `supabase/tests/rls_probe.sql` passes.
+- One change made by the orchestrator after the fix batch, **not covered by a probe**: in `record_find` the 50-rows-per-user-per-spot cap no longer blocks a first correct answer. The migration still runs in PGlite; the "correct answer after 50 wrong ones is saved and paid" case itself was not run.
+- Not reached by the review: `SkyMap`, `CoordinateBox`, `components/skymap/*`, `lib/scoreboard.ts`, `lib/statusLabel.ts`, `lib/server/bot.ts`; a real PostgREST call of the two `density` overloads.
+- `saveGuestSubmission` (web/lib/auth.ts) has no caller: guest answers are not kept until GAME's submit bar calls it (told GAME on PR #9).
+- Accepted known leak (issue #10, all three agents): the slugs `eros`, `hektor`, `makemake`, `eris` name the objects in URLs and file paths. Say so in the deploy notes.
+
+## Update 11:10 (newest; the human is back and gave the Supabase and Vercel details)
+
+**Supabase is real now.** Project ref `jkktqhjcukclqwlltrvd`. Secrets are in `web/.env.local` on the first machine only (git-ignored) and in the Vercel project; never in git or on GitHub. A new person needs the human to share them again.
+- Migration `supabase/migrations/20261115000000_init.sql` is applied (`npx supabase db push --db-url ...`; the direct `db.<ref>.supabase.co` host does not resolve over IPv4, use the session pooler `aws-1-ap-southeast-2.pooler.supabase.com:5432`, user `postgres.<ref>`).
+- `supabase/tests/rls_probe.sql` passes on the real database (11 probes, rolled back).
+- End-to-end run with a throwaway account against the real database (then deleted, all tables empty): wrong answer 0 points and locked; correct Eros 150 with first-finder bonus, saved; repeat is practice; `/api/complete` pays a replayed spot once; scoreboard shows the player and the bot (1750); the find is stored at the spot centre; a direct insert into `finds` by the player is refused (403); spot request saved and de-duplicated.
+- Env var names the code reads: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (holds the new-style publishable key), `SUPABASE_SERVICE_ROLE_KEY` (holds the new-style secret key), `UNLOCK_SECRET`, `CRON_SECRET`.
+
+**Vercel.** Logged in as `msipsb`; project `onion-sky` (root `web/`, linked via `web/.vercel`, git-ignored); the five env vars are set for preview and production.
+- **MISTAKE, awaiting the human's decision (issue #3 item 9):** the first `vercel deploy` of a new project is promoted to production automatically, so https://onion-sky.vercel.app has been public since about 10:55 without the required yes. It is `web` at 838a5da, built before the secret key was set (so it does not save finds yet). Do NOT deploy again and do NOT remove it until the human answers. For a real preview on an existing project use `vercel deploy` (now safe: production already exists) or `--target preview`.
+
+**Waiting on the human:** keep or take down the deployment; turn off "Confirm email" in Supabase Auth; yes or no to deleting `/server-demo` and `/skymap-demo` (gated deletion; GAME has mounted the real components at `/map` and `/play`).
+
+**Still open:** a review of the sky map, scoreboard and bot-score code is running (sonnet, read-only); the sky map has still never been seen working (CDS HiPS and SIMBAD answered 404 all day, also from Vercel); licence audit before any intended production deploy (Mamajek table has no stated licence); `docs/DEMO.md` and the final checklist on the board.

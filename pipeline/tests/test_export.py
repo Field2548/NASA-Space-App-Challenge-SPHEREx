@@ -215,13 +215,32 @@ def test_exposures_layout(slug):
         assert sorted({e["detector"] for e in mine}) == fr["detectors"]
         assert all(abs(e["mjd"] - fr["mjd"]) < 0.02 for e in mine)       # within one burst
     for e in info["exposures"]:
-        assert e["scale"] <= e["noise"] / 2 * 1.0001 and e["noise"] > 0
+        assert e["noise"] > 0 and ("scale" in e or (e["soft"] == e["noise"] and e["step"] > 0))
         grid = e["wavelength_um"]
         assert len(grid) == 8 and all(len(row) == 8 for row in grid)
         vals = [v for row in grid for v in row if v is not None]
         assert vals and all(0.7 < v < 5.1 for v in vals)                 # SPHEREx: 0.75-5.0 um
         assert max(vals) - min(vals) < 0.6          # one detector position, a narrow range
         assert np.isfinite(planes[e["k"]]).mean() > 0.2
+
+
+def test_asinh_plane_roundtrip_has_no_clipping_and_old_rows_still_decode():
+    """soft * sinh((value - 32767) * step): faint sky within a tiny fraction of the noise, the
+    brightest pixel (25000 sigma) kept, NaN -> 65535; a linear row (scale/offset) still decodes."""
+    noise = 0.0127
+    plane = np.random.default_rng(0).normal(0, noise, (40, 40))
+    plane[3, 4], plane[5, 6], plane[7, 8] = 320.0, -2.0, np.nan
+    q, soft, step, clipped = ew.quantize_plane(plane, noise)
+    assert clipped is False and q[7, 8] == ew.NODATA and np.sum(q == ew.NODATA) == 1
+    row = {"soft": soft, "step": step}
+    back = ew.decode_exposure(q, row)
+    assert np.isnan(back[7, 8])
+    ok = np.isfinite(plane)
+    sky = ok & (np.abs(plane) < 5 * noise)
+    assert np.abs(back - plane)[sky].max() < 0.01 * noise
+    assert abs(back[3, 4] - 320.0) / 320.0 < 1e-3 and abs(back[5, 6] + 2.0) / 2.0 < 1e-3
+    lin = ew.decode_exposure(np.array([0, 10, ew.NODATA]), {"scale": 0.5, "offset": -1.0})
+    assert lin[0] == -1.0 and lin[1] == 4.0 and np.isnan(lin[2])
 
 
 @pytest.mark.parametrize("slug", EXPOSURE_SLUGS)
@@ -485,7 +504,7 @@ def test_public_title_kind_difficulty():
             field = json.load(f)
         assert field["title"].startswith("Field in ")
         assert field["kind"] == "spot"
-        assert field["difficulty"] in ("easy", "medium", "hard", "boss")
+        assert field["difficulty"] in ("easy", "medium", "hard", "boss", "tool")
         entry = index[slug]
         assert (entry["title"], entry["kind"], entry["difficulty"]) == \
             (field["title"], field["kind"], field["difficulty"])
@@ -577,3 +596,20 @@ def test_candidate_status_on_made_up_numbers():
     short = {"id": "901", "positions": [dict(p, in_grid=p["frame"] >= 4) for p in obj["positions"]]}
     assert st(cand(14, 18, 2, -1), mjds, t_ref, [short]) == {
         "status": "known", "object_id": "901", "near_object_frames": [4, 5]}
+
+
+def test_eros_answer_key_matches_recorded_horizons_reply():
+    """The key is where JPL Horizons puts Eros for SPHEREx as observer at mid-exposure
+    (reply recorded in ref/horizons_eros.json), mapped through the field's own WCS."""
+    from astropy.coordinates import SkyCoord
+    from astropy.wcs import WCS
+    with open(os.path.join(HERE, "ref", "horizons_eros.json"), encoding="utf-8") as f:
+        ref = json.load(f)
+    field, _, ans = load("eros")
+    c = field["wcs"]
+    w = WCS(naxis=2)
+    w.wcs.ctype, w.wcs.crval, w.wcs.crpix, w.wcs.cdelt = c["ctype"], c["crval"], c["crpix"], c["cdelt"]
+    x, y = w.world_to_pixel(SkyCoord(ref["RA"], ref["DEC"], unit="deg"))
+    y = field["size"][1] - 1 - y                  # the key is top-down, the WCS above bottom-up
+    for p, xk, yk in zip(ans["objects"][0]["positions"], x, y):
+        assert abs(p["x"] - xk) < 0.02 and abs(p["y"] - yk) < 0.02

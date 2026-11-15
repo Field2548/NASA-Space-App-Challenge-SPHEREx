@@ -1,0 +1,215 @@
+.root {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 12px;
+}
+
+.buttons {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.buttons button {
+  padding: var(--space-1) var(--space-3);
+  font-size: 12px;
+}
+
+.buttons button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.slot {
+  flex: 1;
+  border: 1px dashed var(--line);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: var(--space-2);
+  letter-spacing: 0.08em;
+}
+
+.tracks {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  grid-template-rows: 1fr auto auto;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  min-height: 0;
+}
+
+.trackLabel {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  align-self: center;
+}
+
+.clips {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  padding: 2px;
+  touch-action: none;
+  user-select: none;
+}
+
+.clip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--line);
+  background: var(--bg-0);
+  cursor: pointer;
+}
+
+.clip[data-dimmed="true"] {
+  opacity: 0.4;
+}
+
+.loopBracket {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px solid var(--cyan);
+  pointer-events: none;
+}
+
+.loopHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: var(--cyan);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.loopHandle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.current {
+  outline: 1px solid var(--text);
+  outline-offset: 1px;
+}
+
+.thumbBox {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.thumb {
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.clipText {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 2px var(--space-1);
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.clipText b {
+  color: var(--text);
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: 2px;
+  background: var(--magenta);
+  pointer-events: none;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.inOnion {
+  background: var(--bg-1, var(--bg-0));
+}
+
+.onionRow {
+  overflow: hidden;
+  padding: 0 2px;
+  min-height: 20px;
+}
+
+.onionLane {
+  position: relative;
+  height: 20px;
+}
+
+.onionBar {
+  position: absolute;
+  top: 8px;
+  height: 4px;
+  background: var(--cyan);
+  opacity: 0.6;
+}
+
+.handle {
+  position: absolute;
+  top: 1px;
+  width: 10px;
+  height: 18px;
+  background: var(--cyan);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.markRow {
+  overflow: hidden;
+  display: flex;
+  padding: 0 2px;
+  min-height: 18px;
+}
+
+.markCell {
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.markDot {
+  min-width: 18px;
+  height: 18px;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}

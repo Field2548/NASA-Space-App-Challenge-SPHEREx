@@ -12,15 +12,15 @@
    "positions": [
     {
      "frame": 1,
-     "x": 21.8,
-     "y": 25.78,
+     "x": 21.79,
+     "y": 25.79,
      "in_grid": true,
      "snr": 1.8,
      "change_snr": 2.1
     },
     {
      "frame": 2,
-     "x": 24.5,
+     "x": 24.49,
      "y": 26.93,
      "in_grid": true,
      "snr": 5.9,
@@ -28,7 +28,7 @@
     },
     {
      "frame": 3,
-     "x": 29.43,
+     "x": 29.42,
      "y": 29.13,
      "in_grid": true,
      "snr": 12.2,
@@ -36,23 +36,23 @@
     },
     {
      "frame": 4,
-     "x": 32.41,
-     "y": 30.52,
+     "x": 32.4,
+     "y": 30.53,
      "in_grid": true,
      "snr": 9.7,
      "change_snr": 5.7
     },
     {
      "frame": 5,
-     "x": 36.82,
-     "y": 32.67,
+     "x": 36.81,
+     "y": 32.68,
      "in_grid": true,
      "snr": 21.0,
      "change_snr": 10.6
     }
    ],
    "vx_px_per_day": 5.534,
-   "vy_px_per_day": 2.535
+   "vy_px_per_day": 2.537
   }
  ],
  "bot": {

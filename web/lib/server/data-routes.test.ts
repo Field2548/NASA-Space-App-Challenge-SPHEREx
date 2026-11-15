@@ -7,8 +7,10 @@ import { GET as density } from "@/app/api/density/route";
 import { GET as keepalive } from "@/app/api/keepalive/route";
 import { GET as leaderboard } from "@/app/api/leaderboard/route";
 import { GET as listRequests, POST as postRequest } from "@/app/api/request-spot/route";
-import { BOT_NAME, botScore, mergeBot } from "@/lib/server/bot";
+import { loadAnswerKey } from "@/lib/scoring";
+import { BOT_NAME, botScore, botScoreForSpot, mergeBot } from "@/lib/server/bot";
 import { resetRateLimit } from "@/lib/server/rateLimit";
+import { encodeUnlocked, UNLOCK_COOKIE } from "@/lib/server/unlock";
 
 const KEYS = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -55,9 +57,21 @@ describe("GET /api/leaderboard without a database", () => {
   it("defaults to scope=all and builds a per-spot bot row", async () => {
     const all = await (await leaderboard(get("/api/leaderboard"))).json();
     expect(all.scope).toBe("all");
-    const eris = await (await leaderboard(get("/api/leaderboard?scope=spot&slug=eris"))).json();
+    const cookie = `${UNLOCK_COOKIE}=${encodeUnlocked(["eris"])}`;
+    const eris = await (await leaderboard(get("/api/leaderboard?scope=spot&slug=eris", { cookie }))).json();
     expect(eris).toMatchObject({ scope: "spot", slug: "eris", source: "snapshot" });
     expect(eris.rows[0]).toMatchObject({ is_bot: true, score: 1000 });
+  });
+  it("hides the per-spot bot row until the caller has solved that spot", async () => {
+    // The bot's score on a spot says whether something moves there (0 on the control field).
+    const other = `${UNLOCK_COOKIE}=${encodeUnlocked(["hektor"])}`;
+    for (const slug of ["eris", "cygnus", "hektor"]) {
+      const headers: Record<string, string> = slug === "hektor" ? {} : { cookie: other };
+      const res = await leaderboard(get(`/api/leaderboard?scope=spot&slug=${slug}`, headers));
+      const body = await res.json();
+      expect(body.rows.some((r: { is_bot: boolean }) => r.is_bot)).toBe(false);
+      expect(res.headers.get("cache-control")).toMatch(/private|no-store/);
+    }
   });
   it("the committed snapshot agrees with botScore", async () => {
     const file = JSON.parse(readFileSync("public/leaderboard-snapshot.json", "utf8"));
@@ -229,7 +243,12 @@ describe("botScore against the real answer keys", () => {
   it("scores each ready spot by the known objects its candidates match", async () => {
     const bot = await botScore();
     const per = Object.fromEntries(bot.spots.map((s) => [s.slug, s]));
-    expect(Object.keys(per).sort()).toEqual(["cygnus", "eris", "eros", "hektor", "makemake"]);
+    expect(Object.keys(per).sort()).toEqual([
+      "barnard", "cygnus", "eps-indi-b", "eris", "eros", "hektor", "makemake", "r-dra", "rw-aur", "taurus-ice", "wise0855",
+    ]);
+    for (const slug of ["barnard", "eps-indi-b", "wise0855", "rw-aur", "r-dra", "taurus-ice"]) {
+      expect(per[slug]).toMatchObject({ score: 0, above_bar: 0, matched: 0 });
+    }
     expect(per.eris).toMatchObject({ score: 1000, above_bar: 2, matched: 1 });
     expect(per.hektor).toMatchObject({ score: 250, above_bar: 3, matched: 1 });
     expect(per.makemake).toMatchObject({ score: 500, above_bar: 1, matched: 1 });
@@ -242,6 +261,21 @@ describe("botScore against the real answer keys", () => {
     expect(bot.above_bar).toBe(6);
     expect(bot.matched).toBe(3);
     expect(bot.accuracy).toBe(0.5);
+  });
+  it("counts a known object once when two candidates land on it", async () => {
+    const key = await loadAnswerKey("eris");
+    const field = await import("@/lib/scoring").then((m) => m.loadFieldForScoring("eris"));
+    expect(key && field).toBeTruthy();
+    const k = key!;
+    const first = k.bot.candidates.find((c) => c.rank === 1)!;
+    const twin = { ...first, rank: 99 };
+    const doubled = { ...k, bot: { ...k.bot, candidates: [...k.bot.candidates, twin] } };
+    const once = botScoreForSpot(k, field!);
+    const twice = botScoreForSpot(doubled, field!);
+    expect(twice.above_bar).toBe(once.above_bar + 1);
+    expect(twice.matched).toBe(once.matched);
+    expect(twice.score).toBe(once.score);
+    expect(twice.matches).toHaveLength(1);
   });
   it("can be limited to some spots, and has null accuracy with no candidates", async () => {
     const one = await botScore(["eris"]);

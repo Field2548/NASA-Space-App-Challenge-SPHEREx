@@ -5,10 +5,10 @@ export type RGB = [number, number, number]; // 0..255
 
 export type Vision = "normal" | "protan" | "deutan" | "tritan" | "mono";
 
-export type Difficulty = "easy" | "medium" | "hard" | "boss" | "expert" | "control";
+export type Difficulty = "easy" | "medium" | "hard" | "boss" | "expert" | "tool" | "control"; // "control": legacy, public files no longer use it (issue #10)
 
 // field.json kinds are DATA's (field-schema.md section 2); "quicklook" is browser-only.
-export type FieldKind = "asteroid" | "dwarf-planet" | "control" | "star" | "fixture" | "quicklook";
+export type FieldKind = "asteroid" | "dwarf-planet" | "control" | "star" | "fixture" | "quicklook" | "spot";
 
 /** One burst (about 4 exposures, about 8 bands). */
 export interface FrameMeta {
@@ -117,10 +117,15 @@ export interface CheckResponse {
   first_finder: boolean;
   already_found: boolean;
   persisted: boolean;
+  /** True after a correct verdict (known, bot_match, nothing_correct) or when the spot was already open (practice); a wrong answer on a locked spot leaves it locked. */
   unlocked: boolean;
+  /** The spot was already open for this player: judged, but 0 points. */
+  practice?: boolean;
   reveal?: { frame: number; x: number; y: number };
   track?: { x0: number; y0: number; vx: number; vy: number; rms: number; rate_arcsec_per_hour: number };
   noise_bar_sigma: number | null;
+  /** Real title, kind and difficulty of the spot; sent only when unlocked (issue #10). */
+  spot_reveal?: { title: string; kind: FieldKind; difficulty: Difficulty };
 }
 
 export type VerdictKind =
@@ -140,8 +145,9 @@ export interface Verdict {
 
 export interface Spectrum {
   wl: number[]; // micron
-  flux: number[]; // mJy
-  err: number[];
+  /** Path (aperture) spectra are in mJy; cube (per-pixel) spectra are in MJy/sr. */
+  flux: number[];
+  err: number[]; // same unit as flux
   det?: number[];
 }
 

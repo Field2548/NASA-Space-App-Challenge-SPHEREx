@@ -4,10 +4,10 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type
 import { formatDec, formatRA } from "@/lib/coords";
 import { eclipticLatitude, lightCurveAt, toPlainType } from "@/lib/inspect";
 import { pixelToSky } from "@/lib/wcs";
-import { distanceLines, galactic, placePopup, type InfoExplore, type SourceStatus } from "@/lib/inspectPopup";
+import { distanceLines, galactic, placePopup, safeHttpsUrl, type InfoExplore, type SourceStatus } from "@/lib/inspectPopup";
 import type { Field } from "@/lib/types";
 
-const LOCKED_TEXT = "[LOCKED] Names and distances unlock after you submit.";
+const LOCKED_TEXT = "[LOCKED] Names and distances unlock after a correct answer on this spot.";
 const CAVEAT_TEXT = "Age and exact chemical amounts can't be measured from this data.";
 const SOURCE_NAME = { simbad: "SIMBAD", gaia: "Gaia", jpl: "JPL Horizons" } as const;
 
@@ -68,9 +68,11 @@ export interface InspectPopupProps {
   onClose: () => void;
   spectrumSlot?: ReactNode;
   lightCurveSlot?: ReactNode;
+  /** Ask /api/info by sky position, not by spot (a picked patch is not a ready spot). */
+  byPosition?: boolean;
 }
 
-export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectrumSlot, lightCurveSlot }: InspectPopupProps) {
+export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectrumSlot, lightCurveSlot, byPosition = false }: InspectPopupProps) {
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const hintId = `${baseId}-hint`;
@@ -130,7 +132,13 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
   const [result, setResult] = useState<{ key: string; data: InfoExplore | null } | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
-    const url = `/api/info?spot=${encodeURIComponent(field.slug)}&x=${px}&y=${py}&mode=${mode}`;
+    const where = byPosition
+      ? (() => {
+          const [r, d] = pixelToSky(field.wcs, field.size[1], px, py);
+          return `ra=${r.toFixed(6)}&dec=${d.toFixed(6)}&patch=1`;
+        })()
+      : `spot=${encodeURIComponent(field.slug)}&x=${px}&y=${py}`;
+    const url = `/api/info?${where}&mode=${mode}`;
     fetch(url, { credentials: "same-origin", signal: ctl.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -145,12 +153,17 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
         if (!ctl.signal.aborted) setResult({ key: reqKey, data: null });
       });
     return () => ctl.abort();
-  }, [field.slug, px, py, mode, reqKey]);
+  }, [field.slug, field.wcs, field.size, px, py, mode, reqKey, byPosition]);
 
   const current = result && result.key === reqKey ? result : null;
   const info = current?.data ?? null;
   const failed = current !== null && info === null;
   const locked = info?.locked === true;
+  // Every link comes from API data: only https:// addresses become links, anything else is dropped.
+  const safeLinks = (info?.links ?? []).flatMap((l) => {
+    const href = safeHttpsUrl(l.url);
+    return href ? [{ label: l.label, href }] : [];
+  });
 
   // Section A: where.
   const [ra, dec] = pixelToSky(field.wcs, field.size[1], x, y);
@@ -178,7 +191,8 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
   };
 
   const onTitleDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
+    // A press on a button (Close) is not a drag: capturing it retargets the click to the bar.
+    if (e.button !== 0 || (e.target as Element).closest("button")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { pointerX: e.clientX, pointerY: e.clientY, left: pos.left, top: pos.top };
   };
@@ -383,11 +397,11 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
           <p style={{ margin: 0, ...dimStyle }}>Loading catalog facts…</p>
         ) : failed ? (
           <p style={{ margin: 0 }}>Could not load catalog facts.</p>
-        ) : info && info.links?.length ? (
+        ) : safeLinks.length ? (
           <ul style={listStyle}>
-            {info.links.map((l) => (
-              <li key={l.url}>
-                <a href={l.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
+            {safeLinks.map((l) => (
+              <li key={l.href}>
+                <a href={l.href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
                   {l.label}
                 </a>
               </li>
@@ -427,10 +441,10 @@ function DetailsD({ info }: { info: InfoExplore }) {
                 {s.sp_type ? `, spectral type ${s.sp_type}` : ""}
                 {typeof s.sep_arcsec === "number" ? ` (${s.sep_arcsec.toFixed(1)}″ away)` : ""}
                 <Source>SIMBAD</Source>
-                {s.url ? (
+                {safeHttpsUrl(s.url) ? (
                   <>
                     {" "}
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
+                    <a href={safeHttpsUrl(s.url) as string} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)" }}>
                       SIMBAD page
                     </a>
                   </>

@@ -14,6 +14,7 @@ import numpy as np
 
 PIXEL_ARCSEC = 6.15          # same value as spectral_bands.PIXEL_SCALE
 NODATA = 65535               # u16 value for "no data" (NaN)
+ASINH_HALF = 32767           # exposures.u16 asinh encoding: value 32767 is 0 MJy/sr
 BLACK_SIGMA, SOFT_SIGMA = -1.0, 2.0   # the shared stretch of motion_frames.make_stretch
 
 
@@ -125,6 +126,23 @@ SPOTS = [
      "kind": "control", "difficulty": "control", "fov": 0.2, "track": None, "noise_bar": 8.4,
      "nothing_moves": True},
 ]
+
+
+SPHEREX_OBSERVER = "500@-163182"   # JPL Horizons id of the SPHEREx spacecraft as the observer
+MID_EXPOSURE_DAYS = 57.6 / 86400   # MJD-AVG minus DATE-OBS of a level 2 image (about half XPOSURE)
+
+
+def horizons_positions(track, mjds, wcs):
+    """Pixel position of a known object as SPHEREx sees it: Horizons with the spacecraft as
+    observer, at mid-exposure (a frame's mjd is the mean DATE-OBS, the start of exposure)."""
+    from astropy.coordinates import SkyCoord
+    from astropy.time import Time
+    from astroquery.jplhorizons import Horizons
+    jd = [Time(m + MID_EXPOSURE_DAYS, format="mjd", scale="utc").jd for m in mjds]
+    eph = Horizons(id=track, id_type="smallbody", location=SPHEREX_OBSERVER,
+                   epochs=jd).ephemerides(quantities="1")
+    x, y = wcs.world_to_pixel(SkyCoord(eph["RA"], eph["DEC"], unit="deg"))
+    return np.asarray(x), np.asarray(y), str(eph["targetname"][0])
 
 
 def _repo_imports():
@@ -305,22 +323,23 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
                nothing_moves=False):
     """The server-only answer key (field-schema.md section 6).
     track: a JPL Horizons small-body id; its position in every frame comes from
-    motion_frames.track_positions. frames (top-down) adds the measured S/N at each position
+    horizons_positions. frames (top-down) adds the measured S/N at each position
     (max of the 3x3 pixels, as the repo's --track check does). change_snr is the same 3x3
     maximum in the frame minus the median of the other frames (motion_frames.residuals): stars
     cancel, so it tells whether the object itself is seen there. star is reserved for the
-    Tier 2 star targets and not used yet. Each bot candidate gets a status (known, alias or
+    a star target (star_targets.STAR_SPOTS 'star' dict): its object gets the expected position
+    per frame (SIMBAD + proper motion + parallax), the measured centroid and offset, and the
+    brightness per frame. Each bot candidate gets a status (known, alias or
     unconfirmed), see candidate_status."""
-    if star is not None:
-        raise NotImplementedError("star targets are not built yet")
+    if star is not None and not isinstance(star, dict):
+        raise NotImplementedError("star must be a STAR_SPOTS entry's 'star' dict (star_targets.py)")
     _repo_imports()
     height, width = wcs.array_shape if wcs.array_shape else frames.shape[1:]
     mjds = np.asarray(mjds, dtype=float)
     t_ref = float(mjds.mean())
     objects = []
     if track:
-        from motion_frames import track_positions
-        fx, fy, name = track_positions(track, list(mjds), wcs)
+        fx, fy, name = horizons_positions(track, list(mjds), wcs)
         x, y = to_top_down(fx, fy, height)
         days = mjds - t_ref
         resid = None
@@ -343,6 +362,13 @@ def answer_key(folder, wcs, mjds, track=None, star=None, frames=None, noise_bar=
                         "positions": positions,
                         "vx_px_per_day": round(float(np.polyfit(days, x, 1)[0]), 3),
                         "vy_px_per_day": round(float(np.polyfit(days, y, 1)[0]), 3)})
+    if star is not None:
+        from star_targets import star_object
+        resid = None
+        if frames is not None:
+            from motion_frames import residuals
+            resid = np.array(residuals(list(frames)))
+        objects.append(star_object(folder, wcs, mjds, frames, star, resid))
     cands = read_candidates(folder, height)
     if noise_bar is None:
         cands = []          # never report a bot candidate without its noise bar
@@ -387,18 +413,26 @@ def wavelength_map(path, in_wcs, wcs, shape, cells=8):
 
 
 def quantize_plane(plane, noise):
-    """One exposure plane -> (u16 array, scale, offset, clipped). Linear, as the contract says.
-    The step never exceeds noise / 2 (so rounding adds under 2% to the noise); if the range is
-    too wide for that, the brightest pixels are clipped to 65534 and 'clipped' is True."""
-    lo, hi = float(np.nanmin(plane)), float(np.nanmax(plane))
-    offset = float(np.floor(lo * 1e4) / 1e4)
-    scale = max((hi - offset) / (NODATA - 1), 1e-9)
-    clipped = scale > noise / 2
-    if clipped:
-        scale = noise / 2
-    scale = float(f"{scale:.6g}") if clipped else float(np.ceil(scale * 1e7) / 1e7)
-    q = np.clip(np.rint((plane - offset) / scale), 0, NODATA - 1)
-    return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), scale, offset, bool(clipped)
+    """One exposure plane -> (u16 array, soft, step, clipped). asinh encoding, field-schema.md
+    section 7: value = round(asinh(x / soft) / step) + 32767, so MJy/sr = soft * sinh((value -
+    32767) * step). soft is the plane's noise (as written to the JSON); step puts the brightest
+    pixel at the end of the range, so nothing is clipped (clipped is always False)."""
+    soft = float(f"{noise:.5g}")
+    top = float(np.nanmax(np.abs(plane)))
+    step = max(float(np.ceil(np.arcsinh(top / soft) / ASINH_HALF * 1e9) / 1e9), 1e-9)
+    q = np.clip(np.rint(np.arcsinh(plane / soft) / step) + ASINH_HALF, 0, NODATA - 1)
+    return np.where(np.isfinite(plane), q, NODATA).astype("<u2"), soft, step, False
+
+
+def decode_exposure(q, e):
+    """One plane of exposures.u16 -> MJy/sr with NaN, for its exposures.json row: asinh (soft,
+    step) or the older linear (scale, offset)."""
+    q = np.asarray(q)
+    if "scale" in e:
+        v = q * e["scale"] + e["offset"]
+    else:
+        v = e["soft"] * np.sinh((q.astype("f8") - ASINH_HALF) * e["step"])
+    return np.where(q == NODATA, np.nan, v)
 
 
 def grid_for_shape(ra, dec, shape):
@@ -448,20 +482,20 @@ def export_exposures(folder, sky, out_dir, wcs=None):
             noise = float(noise_of(plane))
             obs_id, det = name[:-5].rsplit("_D", 1)
             date_obs = str(fits.getheader(path, "IMAGE")["DATE-OBS"])
-            q, scale, offset, clipped = quantize_plane(plane[::-1], noise)   # rows top-down
+            q, soft, step, clipped = quantize_plane(plane[::-1], noise)   # rows top-down
             grid, bandwidth = wavelength_map(path, in_wcs, wcs, (h, w))
             mjd = float(Time(date_obs).mjd)
             items.append({"k": len(items), "frame": m["i"], "mjd": round(mjd, 6),
                           "utc": date_obs[:19], "detector": int(det), "obs_id": obs_id,
                           "file": name, "source": urls.get((obs_id, int(det))),
-                          "scale": scale, "offset": offset, "noise": float(f"{noise:.5g}"),
+                          "soft": soft, "step": step, "noise": float(f"{noise:.5g}"),
                           "clipped": clipped, "bandwidth_um": bandwidth, "wavelength_um": grid})
             planes.append(q)
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "exposures.u16"), "wb") as f:
         f.write(np.array(planes, dtype="<u2").tobytes())
     info = {"file": "exposures.u16", "size": [w, h], "count": len(items), "units": "MJy/sr",
-            "nodata": NODATA, "wavelength_grid": 8, "exposures": items}
+            "encoding": "asinh", "nodata": NODATA, "wavelength_grid": 8, "exposures": items}
     with open(os.path.join(out_dir, "exposures.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(info, f, separators=(",", ":"))
         f.write("\n")
@@ -474,8 +508,7 @@ def read_exposures(spot_dir):
         info = json.load(f)
     w, h = info["size"]
     q = np.fromfile(os.path.join(spot_dir, info["file"]), dtype="<u2").reshape(info["count"], h, w)
-    planes = np.array([np.where(q[e["k"]] == NODATA, np.nan, q[e["k"]] * e["scale"] + e["offset"])
-                       for e in info["exposures"]])
+    planes = np.array([decode_exposure(q[e["k"]], e) for e in info["exposures"]])
     return planes, info
 
 
@@ -516,8 +549,6 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     The public files get a neutral title, kind 'spot' and a non-revealing difficulty; the real
     ones go into the answer key's 'reveal' block (issue #10).
     Returns field.json as a dict."""
-    if star is not None:
-        raise NotImplementedError("star targets are not built yet")
     out_dir = os.path.abspath(out_dir)
     answers_dir = answers_dir or os.path.join(os.path.dirname(os.path.dirname(out_dir)),
                                               "data", "answers")
@@ -540,7 +571,8 @@ def export_field(folder, slug, title, difficulty, out_dir, track=None, star=None
     if len(meta) != n:
         raise ValueError(f"{folder}: frames.csv has {len(meta)} rows but there are {n} frames")
     field = {
-        "slug": slug, "title": public_title(ra, dec), "kind": "spot",
+        # tool tests name their star on purpose ("Test your tool on Barnard's Star")
+        "slug": slug, "title": title if difficulty == "tool" else public_title(ra, dec), "kind": "spot",
         "difficulty": public_difficulty(difficulty),
         "ra": ra, "dec": dec, "fov_deg": fov, "pixel_arcsec": PIXEL_ARCSEC, "size": [w, h],
         "wcs": {"ctype": ["RA---TAN", "DEC--TAN"], "crval": [ra, dec],
@@ -596,12 +628,15 @@ def parse_args():
     p.add_argument("--all", action="store_true", help="export the five ready spots (SPOTS table)")
     p.add_argument("--slug")
     p.add_argument("--title")
-    p.add_argument("--difficulty", choices=["easy", "medium", "hard", "boss", "control"])
+    p.add_argument("--difficulty", choices=["easy", "medium", "hard", "boss", "tool", "control"])
     p.add_argument("--kind", default="asteroid",
                    choices=["asteroid", "dwarf-planet", "control", "star"])
     p.add_argument("--fov", type=float, default=0.2, help="field of view in degrees (default 0.2)")
     p.add_argument("--track", help="JPL Horizons small-body id of the known object")
-    p.add_argument("--star", help="reserved for star targets")
+    p.add_argument("--stars", action="store_true",
+                   help="export the tool-test star spots (STAR_SPOTS in star_targets.py; with "
+                        "--slug only that one; uses data/bands_<slug> for the spectrum tiles)")
+    p.add_argument("--star", help="reserved")
     p.add_argument("--noise-bar", type=float, help="the bot search's noise bar (sigma)")
     p.add_argument("--nothing-moves", action="store_true", help="control spot")
     p.add_argument("--bands", help="a data/bands_* folder (cube.fits) for the spectrum tiles; "
@@ -613,8 +648,13 @@ def parse_args():
 def main():
     a = parse_args()
     if a.star:
-        raise SystemExit("--star is reserved for star targets, which are not built yet")
-    if a.all:
+        raise SystemExit("--star is reserved; use --stars for the tool-test spots")
+    if a.stars:
+        from star_targets import STAR_SPOTS
+        jobs = [{"slug": s["slug"], "folder": os.path.join(ROOT, s["folder"]), "title": s["title"],
+                 "kind": "star", "difficulty": "tool", "fov": s["fov"], "star": s["star"],
+                 "noise_bar": None} for s in STAR_SPOTS if not a.slug or s["slug"] == a.slug]
+    elif a.all:
         jobs = [dict(s, folder=os.path.join(ROOT, s["folder"])) for s in SPOTS]
     elif a.folder and a.slug and a.title and a.difficulty:
         jobs = [{"slug": a.slug, "folder": a.folder, "title": a.title, "kind": a.kind,
@@ -623,9 +663,9 @@ def main():
     else:
         raise SystemExit("give FOLDER --slug --title --difficulty, or --all")
     for j in jobs:
-        bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all else None)
+        bands = j.get("bands") or (os.path.join(ROOT, "data", "bands_" + j["slug"]) if a.all or a.stars else None)
         f = export_field(j["folder"], j["slug"], j["title"], j["difficulty"], a.out, bands=bands,
-                         track=j.get("track"), kind=j["kind"], fov=j["fov"],
+                         track=j.get("track"), star=j.get("star"), kind=j["kind"], fov=j["fov"],
                          noise_bar=j.get("noise_bar"), nothing_moves=j.get("nothing_moves", False))
         print(f"{j['slug']}: {len(f['frames'])} frames {f['size'][0]}x{f['size'][1]}, "
               f"{f['data']['precision']}, scale {f['data']['scale']}, white {f['stretch']['white']}"
@@ -634,7 +674,9 @@ def main():
         # real spots have landed: the index lists them in game order, without the fixture
         with open(os.path.join(a.out, "index.json"), encoding="utf-8") as f:
             by_slug = {e["slug"]: e for e in json.load(f)}
-        write_json(os.path.join(a.out, "index.json"), [by_slug[s["slug"]] for s in SPOTS])
+        ready = [s["slug"] for s in SPOTS]
+        extra = [s for s in by_slug if s not in ready and s != "fixture"]      # e.g. the tool-test stars
+        write_json(os.path.join(a.out, "index.json"), [by_slug[s] for s in ready + extra])
 
 
 if __name__ == "__main__":

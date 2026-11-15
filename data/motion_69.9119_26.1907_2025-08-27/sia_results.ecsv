@@ -1,0 +1,437 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - name: s_ra
+#   unit: deg
+#   datatype: float64
+#   description: Central Spatial Position in ICRS Right ascension
+#   meta: !!omap
+#   - {ucd: pos.eq.ra}
+#   - {utype: 'obscore:char.spatialaxis.coverage.location.coord.position2d.value2.c1'}
+# - name: s_dec
+#   unit: deg
+#   datatype: float64
+#   description: Central Spatial Position in ICRS Declination
+#   meta: !!omap
+#   - {ucd: pos.eq.dec}
+#   - {utype: 'obscore:char.spatialaxis.coverage.location.coord.position2d.value2.c2'}
+# - name: facility_name
+#   datatype: string
+#   description: Name of telescope used to acquire observation
+#   meta: !!omap
+#   - {ucd: meta.id;instr.tel}
+#   - {utype: 'obscore:provenance.obsconfig.facility.name'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: instrument_name
+#   datatype: string
+#   description: Name of instrument used to acquire observation
+#   meta: !!omap
+#   - {ucd: meta.id;instr}
+#   - {utype: 'obscore:provenance.obsconfig.instrument.name'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: dataproduct_subtype
+#   datatype: string
+#   description: Product type (e.g. science, calibration, auxiliary, preview, info)
+#   meta: !!omap
+#   - {ucd: meta.code}
+#   - {utype: 'caom2:artifact.producttype'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: calib_level
+#   datatype: int16
+#   description: 'Calibration level of the observation: in {0, 1, 2, 3, 4}'
+#   meta: !!omap
+#   - {ucd: meta.code;obs.calib}
+#   - {utype: 'obscore:obsdataset.caliblevel'}
+# - name: dataproduct_type
+#   datatype: string
+#   description: Data product (file content) primary type
+#   meta: !!omap
+#   - {ucd: meta.id}
+#   - {utype: 'obscore:obsdataset.dataproducttype'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: energy_bandpassname
+#   datatype: string
+#   description: Collection-specific name for energy band (e.g. filter name)
+#   meta: !!omap
+#   - {utype: 'caom2:Energy.bandpassName'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: energy_emband
+#   datatype: string
+#   description: Generic name for energy band (Radio,Millimeter,Infrared,Optical,...)
+#   meta: !!omap
+#   - {utype: 'caom2:Energy.emBand'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: obs_id
+#   datatype: string
+#   description: Internal ID given by the ObsTAP service
+#   meta: !!omap
+#   - {ucd: meta.id}
+#   - {utype: 'obscore:dataid.observationid'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: s_resolution
+#   unit: arcsec
+#   datatype: float64
+#   format: '{:.6f}'
+#   description: Spatial resolution (FWHM)
+#   meta: !!omap
+#   - {ucd: pos.angResolution}
+#   - {precision: F6}
+#   - {utype: 'obscore:char.spatialaxis.resolution.refval.value'}
+# - name: em_min
+#   unit: m
+#   datatype: float64
+#   format: '{:.5g}'
+#   description: Lower bound on energy axis (barycentric wavelength)
+#   meta: !!omap
+#   - {ucd: em.wl;stat.min}
+#   - {precision: E5}
+#   - {utype: 'obscore:char.spectralaxis.coverage.bounds.limits.lolimit'}
+# - name: em_max
+#   unit: m
+#   datatype: float64
+#   format: '{:.5g}'
+#   description: Upper bound on energy axis (barycentric wavelength)
+#   meta: !!omap
+#   - {ucd: em.wl;stat.max}
+#   - {precision: E5}
+#   - {utype: 'obscore:char.spectralaxis.coverage.bounds.limits.hilimit'}
+# - name: em_res_power
+#   datatype: float64
+#   format: '{:.6f}'
+#   description: Spectral resolving power (R)
+#   meta: !!omap
+#   - {ucd: spect.resolution}
+#   - {precision: F6}
+#   - {utype: 'obscore:char.spectralaxis.resolution.resolpower.refval'}
+# - name: proposal_title
+#   datatype: string
+#   description: Proposal title
+#   meta: !!omap
+#   - {utype: 'caom2:Proposal.title'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: access_url
+#   datatype: string
+#   description: URI for the physical artifact
+#   meta: !!omap
+#   - {ucd: meta.ref.url}
+#   - {utype: 'obscore:access.reference'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: access_format
+#   datatype: string
+#   description: Content-Type of the representation at uri
+#   meta: !!omap
+#   - {ucd: meta.code.mime}
+#   - {utype: 'obscore:access.format'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: access_estsize
+#   unit: kbyte
+#   datatype: int64
+#   description: Estimated size of the download at uri
+#   meta: !!omap
+#   - {ucd: phys.size;meta.file}
+#   - {utype: 'obscore:access.size'}
+# - name: t_exptime
+#   unit: s
+#   datatype: float64
+#   format: '{:.6f}'
+#   description: Exposure time per pixel
+#   meta: !!omap
+#   - {ucd: time.duration;obs.exposure}
+#   - {precision: F6}
+#   - {utype: 'obscore:char.timeaxis.coverage.support.extent'}
+# - name: s_region
+#   unit: deg
+#   datatype: string
+#   description: AstroCoordArea Region covered in STC
+#   meta: !!omap
+#   - {ucd: pos.outline;obs.field}
+#   - {utype: 'obscore:char.spatialaxis.coverage.support.area'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: obs_collection
+#   datatype: string
+#   description: Data collection this observation belongs to
+#   meta: !!omap
+#   - {ucd: meta.id}
+#   - {utype: 'obscore:dataid.collection'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: obs_intent
+#   datatype: string
+#   description: 'Intended purpose of data (one of: science, calibration)'
+#   meta: !!omap
+#   - {utype: 'caom2:ObservationIntentType'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: algorithm_name
+#   datatype: string
+#   description: Algorithm that defines the observation
+#   meta: !!omap
+#   - {utype: 'caom2:Algorithm'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: facility_keywords
+#   datatype: string
+#   description: Telescope keywords formatted as a JSON string
+#   meta: !!omap
+#   - {utype: 'caom2:Telescope.keywords'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: instrument_keywords
+#   datatype: string
+#   description: Instrument keywords formatted as a JSON string
+#   meta: !!omap
+#   - {utype: 'caom2:Instrument.keywords'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: environment_photometric
+#   datatype: bool
+#   description: Conditions were photometric (0=false, 1=true)
+#   meta: !!omap
+#   - {utype: 'caom2:Environment.photometric'}
+# - name: proposal_id
+#   datatype: string
+#   description: Collection-specific unique proposal identifier
+#   meta: !!omap
+#   - {ucd: meta.id;obs.proposal}
+#   - {utype: 'obscore:provenance.proposal.identifier'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: proposal_pi
+#   datatype: string
+#   description: Proposal principal investigator
+#   meta: !!omap
+#   - {utype: 'caom2:Proposal.pi'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: proposal_project
+#   datatype: string
+#   description: Project that created/acquired the observation
+#   meta: !!omap
+#   - {utype: 'caom2:Proposal.project'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: target_name
+#   datatype: string
+#   description: Name of intended target
+#   meta: !!omap
+#   - {ucd: meta.id;src}
+#   - {utype: 'obscore:target.name'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: target_type
+#   datatype: string
+#   description: Classification of intended target ('object' or 'field')
+#   meta: !!omap
+#   - {utype: 'caom2:Target.type'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: target_standard
+#   datatype: bool
+#   description: Intended target is a standard (0=false, 1=true)
+#   meta: !!omap
+#   - {utype: 'caom2:Target.standard'}
+# - name: target_moving
+#   datatype: bool
+#   description: Intended target is moving (0=false, 1=true)
+#   meta: !!omap
+#   - {utype: 'caom2:Target.moving'}
+# - name: target_keywords
+#   datatype: string
+#   description: Target keywords formatted as a JSON string
+#   meta: !!omap
+#   - {utype: 'caom2:Target.keywords'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: obs_release_date
+#   datatype: string
+#   description: Timestamp of date the data becomes publicly available
+#   meta: !!omap
+#   - {ucd: time.release}
+#   - {utype: 'obscore:Curation.releaseDate'}
+#   - {xtype: timestamp}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: s_xel1
+#   datatype: int64
+#   description: Dimensions (number of pixels) along first spatial axis
+#   meta: !!omap
+#   - {ucd: meta.number}
+#   - {utype: 'obscore:char.spatialaxis.numbins1'}
+# - name: s_xel2
+#   datatype: int64
+#   description: Dimensions (number of pixels) along second spatial axis
+#   meta: !!omap
+#   - {ucd: meta.number}
+#   - {utype: 'obscore:char.spatialaxis.numbins2'}
+# - name: s_pixel_scale
+#   unit: arcsec
+#   datatype: float64
+#   format: '{:.3f}'
+#   description: Sample (pixel) size on spatial axes
+#   meta: !!omap
+#   - {precision: F3}
+#   - {utype: phys.angSize;instr.pixel}
+# - name: position_timedependent
+#   datatype: bool
+#   description: Position is time-dependent (0=false, 1=true)
+#   meta: !!omap
+#   - {utype: 'caom2:Position.timeDependent'}
+# - name: t_min
+#   unit: d
+#   datatype: float64
+#   format: '{:.6f}'
+#   description: Lower bound on time axis (Modified Julian Day)
+#   meta: !!omap
+#   - {ucd: time.start;obs.exposure}
+#   - {precision: F6}
+#   - {utype: 'obscore:char.timeaxis.coverage.bounds.limits.starttime'}
+# - name: t_max
+#   unit: d
+#   datatype: float64
+#   format: '{:.6f}'
+#   description: Upper bound on time axis (Modified Julian Day)
+#   meta: !!omap
+#   - {ucd: time.end;obs.exposure}
+#   - {precision: F6}
+#   - {utype: 'obscore:char.timeaxis.coverage.bounds.limits.stoptime'}
+# - name: t_resolution
+#   unit: s
+#   datatype: float64
+#   format: '{:.6f}'
+#   description: Resolution on the time axis
+#   meta: !!omap
+#   - {ucd: time.resolution}
+#   - {precision: F6}
+#   - {utype: 'obscore:char.timeaxis.resolution.refval.value'}
+# - name: t_xel
+#   datatype: int64
+#   description: Dimensions (number of pixels) along the time axis
+#   meta: !!omap
+#   - {ucd: meta.number}
+#   - {utype: 'obscore:char.timeaxis.numbins'}
+# - name: obs_publisher_did
+#   datatype: string
+#   description: IVOA Dataset ID given by the publisher
+#   meta: !!omap
+#   - {ucd: meta.ref.uri;meta.curation}
+#   - {utype: 'obscore:curation.publisherdid'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: s_fov
+#   unit: deg
+#   datatype: float64
+#   format: '{:.3g}'
+#   description: Estimated size of the covered region as the diameter of a containing circle
+#   meta: !!omap
+#   - {ucd: phys.angSize;instr.fov}
+#   - {precision: E3}
+#   - {utype: 'obscore:char.spatialaxis.coverage.bounds.extent.diameter'}
+# - name: em_xel
+#   datatype: int64
+#   description: Dimensions (number of pixels) along the energy axis
+#   meta: !!omap
+#   - {ucd: meta.number}
+#   - {utype: 'obscore:char.spectralaxis.numbins'}
+# - name: pol_states
+#   datatype: string
+#   description: List of polarization states present in the data file
+#   meta: !!omap
+#   - {ucd: meta.code;phys.polarization}
+#   - {utype: 'obscore:char.polarizationaxis.statelist'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: pol_xel
+#   datatype: int64
+#   description: Dimensions (number of pixels) along the polarization axis
+#   meta: !!omap
+#   - {ucd: meta.number}
+#   - {utype: 'obscore:char.polarizationaxis.numbins'}
+# - name: cloud_access
+#   datatype: string
+#   description: URI for the enclouded artifact
+#   meta: !!omap
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - name: o_ucd
+#   datatype: string
+#   description: UCD describing the observable axis (pixel values)
+#   meta: !!omap
+#   - {ucd: meta.ucd}
+#   - {utype: 'obscore:char.observableaxis.ucd'}
+#   - {_votable_string_dtype: char}
+#   - {_votable_arraysize: '*'}
+#   subtype: json
+# - {name: upload_row_id, datatype: int64}
+# schema: astropy-2.0
+s_ra s_dec facility_name instrument_name dataproduct_subtype calib_level dataproduct_type energy_bandpassname energy_emband obs_id s_resolution em_min em_max em_res_power proposal_title access_url access_format access_estsize t_exptime s_region obs_collection obs_intent algorithm_name facility_keywords instrument_keywords environment_photometric proposal_id proposal_pi proposal_project target_name target_type target_standard target_moving target_keywords obs_release_date s_xel1 s_xel2 s_pixel_scale position_timedependent t_min t_max t_resolution t_xel obs_publisher_did s_fov em_xel pol_states pol_xel cloud_access o_ucd upload_row_id
+68.1042308019813 26.97711916289295 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0416_1""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_1D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65258 113.5826 """POLYGON ICRS 70.238048202745 25.511736345120262 66.4359329381984 24.9812482435944 65.90564778327384 28.43673206017848 69.85789115541895 28.989686359319954 70.238048202745 25.511736345120262""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002177_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.117044 60914.118376 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_1/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_1D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.09937177479144 26.956504335304288 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0416_1""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_1D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 65932 113.5826 """POLYGON ICRS 70.23445959103154 25.496043220748973 66.43710875770022 24.960050371331533 65.89985931488401 28.411373633394962 69.8462149643936 28.96949382507348 70.23445959103154 25.496043220748973""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002177_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.117044 60914.118376 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_1/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_1D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.07027446071629 27.15138697430494 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0416_2""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_2D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66001 113.5826 """POLYGON ICRS 70.20895217543473 25.69076251334614 66.40539573455435 25.154768836659986 65.86660734884929 28.606083414696204 69.8203440030319 29.16428868079633 70.20895217543473 25.69076251334614""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002178_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.118536 60914.119868 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_2/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_2D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.0751369223916 27.171978379246788 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0416_2""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_2D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65302 113.5826 """POLYGON ICRS 70.21249930337855 25.706467209320767 66.4040856895204 25.17611511886363 65.87236348283508 28.631516839116966 69.83203327014996 29.18429133190827 70.21249930337855 25.706467209320767""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002178_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.118536 60914.119868 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_2/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_2D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.040211325792 27.346069101930752 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0416_3""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_3D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66062 113.5826 """POLYGON ICRS 70.18226855284067 25.88545360215707 66.37262879853186 25.34949443003663 65.83252072582097 28.80060759921294 69.79366564857999 29.358862370068774 70.18226855284067 25.88545360215707""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002179_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.120028 60914.121361 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_3/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_3D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.04506823042315 27.366681512259284 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0416_3""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_3D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65417 113.5826 """POLYGON ICRS 70.18584573677349 25.9010253064223 66.37144621445962 25.37076502085318 65.8382498160496 28.82610244991754 69.80534357651199 29.378882507490204 70.18584573677349 25.9010253064223""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002179_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.120028 60914.121361 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_3/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_3D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.00954678105484 27.540771365137537 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0416_4""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_4D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66096 113.5826 """POLYGON ICRS 70.15514166696589 26.079927040927146 66.33936697648498 25.543907932057028 65.79770971825764 28.995160764494898 69.76634043440225 29.55348735717569 70.15514166696589 26.079927040927146""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002180_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.121521 60914.122853 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_4/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0416_4D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.0144570371814 27.56138000725181 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0416_4""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_4D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65503 113.5826 """POLYGON ICRS 70.15886224850803 26.095645626769016 66.3381092308658 25.565357340174295 65.80339491044494 29.02051205020518 69.77781041367923 29.573442784965472 70.15886224850803 26.095645626769016""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_002180_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.121521 60914.122853 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0416_4/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0416_4D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.51804156693831 24.38983729413162 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0529_1""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_1D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65480 113.5826 """POLYGON ICRS 70.60883478649785 22.92607795389904 66.88219085174816 22.39520734785998 66.3697366471673 25.85140042998692 70.23080193899861 26.403272300637298 70.60883478649785 22.92607795389904""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000344_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.728566 60914.729899 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_1/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_1D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.51327215069225 24.369238226614318 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0529_1""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_1D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 65964 113.5826 """POLYGON ICRS 70.60533861501473 22.910339830128432 66.88342480323757 22.37378036852114 66.36419488801643 25.826134028971957 70.21940586833782 26.38327060180659 70.60533861501473 22.910339830128432""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000344_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.728566 60914.729899 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_1/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_1D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.48497730695485 24.56412352417859 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0529_2""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_2D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66027 113.5826 """POLYGON ICRS 70.5799279713146 23.10506193848138 66.85273437542386 22.568806352965513 66.33237827152455 26.020949519310335 70.19404605243845 26.57794929962059 70.5799279713146 23.10506193848138""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000345_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.730058 60914.731391 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_2/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_2D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.48972838545505 24.58472323364329 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0529_2""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_2D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65552 113.5826 """POLYGON ICRS 70.58347890716355 23.12072761214507 66.85161307444945 22.590055455372017 66.33803869490023 26.046366834519905 70.2053727107248 26.598075384405345 70.58347890716355 23.12072761214507""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000345_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.730058 60914.731391 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_2/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_2D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.45572659087543 24.75886210956106 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0529_3""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_3D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66114 113.5826 """POLYGON ICRS 70.55376705910429 23.299689262061694 66.82119037395819 22.763466584284547 66.2995851932423 26.215568724109115 70.16785664621426 26.772645918205285 70.55376705910429 23.299689262061694""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000346_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.731551 60914.732883 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_3/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_3D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.46053484481716 24.779463549780793 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0529_3""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_3D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65670 113.5826 """POLYGON ICRS 70.55731614613327 23.31534806833283 66.82005618197566 22.78483151867592 66.30516098507188 26.240958881314707 70.17893825367135 26.79253847855098 70.55731614613327 23.31534806833283""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000346_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.731551 60914.732883 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_3/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_3D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.42590099084919 24.95340931625797 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0529_4""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_4D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66212 113.5826 """POLYGON ICRS 70.52693666076917 23.49402889062531 66.78897787295696 22.957953762367545 66.26609075050168 26.41002456646394 70.1408883059478 26.967133908809192 70.52693666076917 23.49402889062531""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000347_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.733043 60914.734375 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_4/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0529_4D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.4306733686854 24.974012818057776 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0529_4""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_4D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65760 113.5826 """POLYGON ICRS 70.53051602234024 23.509705128943786 66.78776726469958 22.979306277997342 66.27176512003079 26.43538839875731 70.15237164567922 26.987177192553354 70.53051602234024 23.509705128943786""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000347_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60914.733043 60914.734375 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0529_4/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0529_4D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.39508829633394 25.16651849254123 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0639_1""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0639_1D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65486 113.5826 """POLYGON ICRS 70.49817134082934 23.70209258658645 66.74990907780794 23.171691240961266 66.23244538513555 26.62775746540949 70.11965107026955 27.179563295442954 70.49817134082934 23.70209258658645""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000348_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.335772 60915.337104 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0639_1/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0639_1D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.39032828818901 25.145919144522505 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0639_1""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0639_1D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66056 113.5826 """POLYGON ICRS 70.49452215662414 23.6863999294874 66.7510150843139 23.150357947077907 66.22673122270626 26.60235903050831 70.10826915191073 27.159601896315408 70.49452215662414 23.6863999294874""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000348_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.335772 60915.337104 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0639_1/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0639_1D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.36169571902258 25.340694004482636 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0639_2""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0639_2D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 65996 113.5826 """POLYGON ICRS 70.46906467917029 23.88105966798949 66.71999366597598 23.345040445590556 66.19450642714274 26.797005018671666 70.08270037086263 27.354282628704034 70.46906467917029 23.88105966798949""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000349_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.337264 60915.338596 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0639_2/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0639_2D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.36649031110102 25.361301323964042 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0639_2""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0639_2D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65400 113.5826 """POLYGON ICRS 70.47268060325746 23.89670586697794 66.71884395895651 23.366327821488028 66.20018609643094 26.82242337210629 70.09408758797115 27.37428507393714 70.47268060325746 23.89670586697794""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000349_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.337264 60915.338596 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0639_2/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0639_2D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.33206515572347 25.535403014100886 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0639_3""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0639_3D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66050 113.5826 """POLYGON ICRS 70.44256940064922 24.075645259260995 66.68801401468812 23.539739797820623 66.16124463091445 26.99162803371931 70.05604437841382 27.548746209876096 70.44256940064922 24.075645259260995""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000350_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.338756 60915.340089 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0639_3/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0639_3D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.33687613547764 25.55598731411966 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0639_3""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0639_3D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65417 113.5826 """POLYGON ICRS 70.4461899590115 24.091421074735912 66.68681381274548 23.561053632287834 66.16686564505122 27.0168535335539 70.06749670400586 27.56897919869942 70.4461899590115 24.091421074735912""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000350_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.338756 60915.340089 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0639_3/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0639_3D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.30175611395883 25.749455484538387 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0654_1""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_1D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65368 113.5826 """POLYGON ICRS 70.41432649982488 24.284725043323036 66.64934047718162 23.75427067543192 66.12800119836817 27.210273458331635 70.0354122514256 27.76236082762566 70.41432649982488 24.284725043323036""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000351_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.404025 60915.405357 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_1/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_1D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.29694389998791 25.728884545241005 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0654_1""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_1D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66091 113.5826 """POLYGON ICRS 70.41086521531996 24.268991218939505 66.65062782546629 23.733027765680625 66.12216157228868 27.184787884307262 70.02387437869282 27.742177623150084 70.41086521531996 24.268991218939505""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000351_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.404025 60915.405357 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_1/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_1D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.26832062309389 25.923719780325882 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0654_2""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_2D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66073 113.5826 """POLYGON ICRS 70.38540040761893 24.46355358003383 66.61946207086527 23.927746949872333 66.0898616484667 27.379554097422034 69.99835450274124 27.936959426046712 70.38540040761893 24.46355358003383""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000352_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.405517 60915.406849 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_2/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_2D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.27314866603798 25.94428034571417 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0654_2""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_2D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65400 113.5826 """POLYGON ICRS 70.3889642832821 24.47937325364795 66.61821771701814 23.949072895894098 66.09550542116212 27.40496904533243 70.00982485578506 27.957004954632847 70.3889642832821 24.47937325364795""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000352_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.405517 60915.406849 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_2/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_2D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.23868279077533 26.11836504617608 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0654_3""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_3D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66108 113.5826 """POLYGON ICRS 70.35901102244019 24.658174023720566 66.58720338431588 24.122366235479863 66.05634280110665 27.57407563189748 69.97188849427987 28.131561391845405 70.35901102244019 24.658174023720566""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000353_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.407009 60915.408342 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_3/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_3D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.2434962731732 26.13894950228515 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0654_3""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_3D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65454 113.5826 """POLYGON ICRS 70.36264213451356 24.67394853576485 66.58606749579339 24.143725066869557 66.06204877705332 27.59937962222297 69.98346270883853 28.151550450144413 70.36264213451356 24.67394853576485""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000353_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.407009 60915.408342 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_3/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_3D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.20842686533092 26.31283874479882 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_1A_0654_4""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_4D1_spx_l2b-v27-2026-230.fits""" """image/fits""" 66180 113.5826 """POLYGON ICRS 70.33212505239881 24.85254451564045 66.55450083875337 24.316793847365158 66.02224099831183 27.768451143868184 69.94482903847367 28.325906938975393 70.33212505239881 24.85254451564045""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000354_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.408501 60915.409834 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_4/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/1/level2_2025W35_1A_0654_4D1_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.21327160724974 26.33344132728056 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_1A_0654_4""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_4D4_spx_l2b-v27-2026-230.fits""" """image/fits""" 65561 113.5826 """POLYGON ICRS 70.33567844017178 24.868301079153856 66.55323832146914 24.338094818408813 66.02794237218988 27.793802451084037 69.95642090745237 28.34601937377667 70.33567844017178 24.868301079153856""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000354_S12""" """field""" False False """""" """2026-10-04 05:45:39""" 2040 2040 6.15 False 60915.408501 60915.409834 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_1A_0654_4/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_1A/l2b-v27-2026-230/4/level2_2025W35_1A_0654_4D4_spx_l2b-v27-2026-230.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.17203331229739 26.506241862342087 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_2A_0087_1""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_2A/l2b-v27-2026-231/1/level2_2025W35_2A_0087_1D1_spx_l2b-v27-2026-231.fits""" """image/fits""" 65915 113.5826 """POLYGON ICRS 70.2992451053407 25.04589887394125 66.51583570894559 24.509922981503863 65.9818448390808 27.961530325722077 69.91143217432702 28.519387074690144 70.2992451053407 25.04589887394125""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000355_S12""" """field""" False False """""" """2026-10-04 14:04:49""" 2040 2040 6.15 False 60915.947454 60915.948786 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_2A_0087_1/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_2A/l2b-v27-2026-231/1/level2_2025W35_2A_0087_1D1_spx_l2b-v27-2026-231.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.17689430896854 26.526838715114245 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_2A_0087_1""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_2A/l2b-v27-2026-231/4/level2_2025W35_2A_0087_1D4_spx_l2b-v27-2026-231.fits""" """image/fits""" 65235 113.5826 """POLYGON ICRS 70.30275532333789 25.0616537264919 66.51448904143919 24.531256864287908 65.98749426472821 27.98694577296233 69.92307675214688 28.539424110102445 70.30275532333789 25.0616537264919""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000355_S12""" """field""" False False """""" """2026-10-04 14:04:49""" 2040 2040 6.15 False 60915.947454 60915.948786 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_2A_0087_1/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_2A/l2b-v27-2026-231/4/level2_2025W35_2A_0087_1D4_spx_l2b-v27-2026-231.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.1479892439486 26.721581544294278 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D4""" """Infrared""" """2025W35_2A_0087_2""" 3.075 2.4027e-06 3.8473e-06 34.9 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_2A/l2b-v27-2026-231/4/level2_2025W35_2A_0087_2D4_spx_l2b-v27-2026-231.fits""" """image/fits""" 65212 113.5826 """POLYGON ICRS 70.27720710336519 25.256291883258697 66.48297249941157 24.72595999691007 65.95462053746168 28.18151493447513 69.89734071299576 28.734081916356377 70.27720710336519 25.256291883258697""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000356_S12""" """field""" False False """""" """2026-10-04 14:04:49""" 2040 2040 6.15 False 60915.948946 60915.950279 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_2A_0087_2/D4""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_2A/l2b-v27-2026-231/4/level2_2025W35_2A_0087_2D4_spx_l2b-v27-2026-231.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1
+68.14313842121072 26.700972165358085 """SPHEREx""" """SPHEREx""" """science""" 2 """image""" """SPHEREx-D1""" """Infrared""" """2025W35_2A_0087_2""" 3.075 7.455e-07 1.1167e-06 39.1 """SPHEREx LVF Survey Data""" """https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/level2/2025W35_2A/l2b-v27-2026-231/1/level2_2025W35_2A_0087_2D1_spx_l2b-v27-2026-231.fits""" """image/fits""" 65880 113.5826 """POLYGON ICRS 70.27355912935595 25.24051056584656 66.48416190750893 24.704710470501723 65.9489065720648 28.156137518168542 69.88581345304624 28.714048269306122 70.27355912935595 25.24051056584656""" """spherex_dr1""" """science""" """exposure""" """""" """""" "" """""" """""" """SPHEREx""" """SPS_000356_S12""" """field""" False False """""" """2026-10-04 14:04:49""" 2040 2040 6.15 False 60915.948946 60915.950279 "" "" """ivo://irsa.ipac/spherex_dr1?2025W35_2A_0087_2/D1""" 3.485 "" """""" "" """{\""aws\"": {\""bucket_name\"": \""nasa-irsa-spherex\"", \""key\"":\""dr1/level2/2025W35_2A/l2b-v27-2026-231/1/level2_2025W35_2A_0087_2D1_spx_l2b-v27-2026-231.fits\"", \""region\"": \""us-east-1\""}}""" """""" 1

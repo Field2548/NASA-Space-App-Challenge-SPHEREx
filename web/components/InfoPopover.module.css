@@ -1,0 +1,46 @@
+.root {
+  display: inline-block;
+}
+
+.btn {
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  font-style: italic;
+  font-family: serif;
+  line-height: 1;
+}
+
+.dialog {
+  position: fixed;
+  z-index: 50;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3, 12px);
+  background: var(--bg, #000);
+  color: var(--text, #fff);
+  border: 1px solid var(--cyan, #0ff);
+  font-size: 13px;
+  text-align: left;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.body p {
+  margin: 0;
+}

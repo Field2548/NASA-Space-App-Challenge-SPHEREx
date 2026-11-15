@@ -85,8 +85,12 @@ export interface ExposureRecord {
   obs_id: string;
   file: string;
   source: string | null;
-  scale: number;
-  offset: number;
+  /** asinh encoding (top-level `encoding: "asinh"`): MJy/sr = soft * sinh((value - 32767) * step). */
+  soft?: number;
+  step?: number;
+  /** Older linear encoding: MJy/sr = value * scale + offset. Used when `scale` is present. */
+  scale?: number;
+  offset?: number;
   noise: number; // MJy/sr, sigma-clipped std of the plane
   clipped: boolean;
   bandwidth_um: number | null;
@@ -99,6 +103,7 @@ export interface ExposuresJson {
   size: [number, number];
   count: number;
   units: "MJy/sr";
+  encoding?: "asinh";
   nodata: number;
   wavelength_grid: number;
   exposures: ExposureRecord[];
@@ -120,7 +125,13 @@ export function toExposureMeta(e: ExposureRecord): ExposureMeta {
   return { obs_id: e.obs_id, mjd: e.mjd, utc: e.utc, detector: e.detector, frame: e.frame, path: e.source ?? e.file };
 }
 
-/** Decode exposures.u16 bytes (K x H x W, little-endian, own scale/offset per plane, 65535 = NaN). */
+/** One u16 value of one exposure to MJy/sr: linear when the row has `scale`, else asinh. */
+export function decodeExposureValue(v: number, e: Pick<ExposureRecord, "soft" | "step" | "scale" | "offset">): number {
+  if (e.scale !== undefined) return v * e.scale + (e.offset ?? 0);
+  return (e.soft as number) * Math.sinh((v - 32767) * (e.step as number));
+}
+
+/** Decode exposures.u16 bytes (K x H x W, little-endian, own encoding per plane, 65535 = NaN). */
 export function decodeExposures(json: ExposuresJson, bytes: ArrayBuffer, firstFrameMjd: number): ExposurePlanes {
   const [w, h] = json.size;
   const plane = w * h;
@@ -135,7 +146,7 @@ export function decodeExposures(json: ExposuresJson, bytes: ArrayBuffer, firstFr
     const base = e.k * plane * 2;
     for (let i = 0; i < plane; i++) {
       const v = view.getUint16(base + 2 * i, true);
-      p[i] = v === json.nodata ? NaN : v * e.scale + e.offset;
+      p[i] = v === json.nodata ? NaN : decodeExposureValue(v, e);
     }
     planes[e.k] = p;
   }

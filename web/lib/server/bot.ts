@@ -1,15 +1,15 @@
 // The "Shift-and-stack bot" scoreboard row (owner: SERVER). Server only: reads answer keys.
 // Contract: docs/contracts/api.md section 7; BP 8.11.
-// A bot candidate counts when it is above the noise bar and its path passes within 2 px of a
-// known object in at least 2 frames (the same rule /api/check uses for `known`).
+// A bot candidate counts when it is above the noise bar and its path passes within the shared
+// bot radius of a known object in at least 2 frames (botCandidateObject, the rule /api/check uses).
+// Each known object counts once per spot.
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   loadAnswerKey,
   loadFieldForScoring,
-  MATCH_RADIUS_PX,
-  MIN_MATCHED_FRAMES,
+  botCandidateObject,
   isAboveBar,
   pointsFor,
   type AnswerKey,
@@ -43,32 +43,18 @@ export function botScoreForSpot(
   field: Pick<FieldForScoring, "difficulty" | "frames">,
   slug = key.slug,
 ): BotSpot {
-  const mjd = new Map(field.frames.map((f) => [f.i, f.mjd]));
   const spot: BotSpot = { slug, score: 0, above_bar: 0, matched: 0, matches: [] };
+  // Each known object counts once per spot, however many candidates land on it.
+  const counted = new Set<string>();
   for (const c of key.bot.candidates) {
     if (!isAboveBar(c, key.noise_bar_sigma ?? null)) continue;
     spot.above_bar += 1;
-    let hit: string | null = null;
-    for (const obj of key.objects) {
-      let frames = 0;
-      for (const p of obj.positions) {
-        const t = mjd.get(p.frame);
-        if (!p.in_grid || t === undefined) continue;
-        const dt = t - key.t_ref_mjd;
-        const bx = c.x + c.vx_px_per_day * dt;
-        const by = c.y + c.vy_px_per_day * dt;
-        if (Math.hypot(bx - p.x, by - p.y) <= MATCH_RADIUS_PX) frames += 1;
-      }
-      if (frames >= MIN_MATCHED_FRAMES) {
-        hit = obj.name;
-        break;
-      }
-    }
-    if (hit) {
-      spot.matched += 1;
-      spot.score += pointsFor("known", field.difficulty, false);
-      spot.matches.push({ rank: c.rank, object: hit });
-    }
+    const obj = botCandidateObject(key, field, c);
+    if (!obj || counted.has(obj.id)) continue;
+    counted.add(obj.id);
+    spot.matched += 1;
+    spot.score += pointsFor("known", field.difficulty, false);
+    spot.matches.push({ rank: c.rank, object: obj.name });
   }
   return spot;
 }
@@ -127,9 +113,15 @@ export type BoardMe = { rank: number; name: string; score: number; accuracy: num
  */
 export function mergeBot(
   humans: { name: string; score: number; accuracy: number | null; is_me: boolean }[],
-  bot: { score: number; accuracy: number | null },
+  bot: { score: number; accuracy: number | null } | null,
   me?: BoardMe,
 ): { rows: BoardRow[]; me?: BoardMe } {
+  if (!bot) {
+    // No bot row (a spot the caller has not solved): humans only, ranks as the database gave them.
+    const rows = humans.map((h, i) => ({ rank: i + 1, name: h.name, score: h.score, accuracy: h.accuracy, is_bot: false, is_me: h.is_me }));
+    const shown = rows.find((r) => r.is_me);
+    return me ? { rows, me: { ...me, rank: shown ? shown.rank : me.rank } } : { rows };
+  }
   const botRow: BoardRow = {
     rank: 0,
     name: BOT_NAME,

@@ -11,8 +11,8 @@ Conventions used by every type:
 | --- | --- | --- | --- |
 | `RGB` | `[r, g, b]`, 0 to 255 each | palettes | imaging, UI |
 | `Vision` | `normal`, `protan`, `deutan`, `tritan`, `mono` | VisionPicker | palettes, spectra |
-| `Difficulty` | `easy`, `medium`, `hard`, `boss`, `expert`, `control` | field.json | scoring, UI |
-| `FieldKind` | `asteroid`, `dwarf-planet`, `control`, `star`, `fixture` (DATA's field.json values), plus browser-only `quicklook` | field.json | UI |
+| `Difficulty` | `easy`, `medium`, `hard`, `boss`, `expert`, `tool`, `control` | field.json | scoring, UI |
+| `FieldKind` | `spot` (every public ready spot, issue #10), `fixture`; `asteroid`, `dwarf-planet`, `control`, `star` only in answer-key `reveal`; plus browser-only `quicklook` | field.json | UI |
 | `FrameMeta` | one burst: index `i`, `mjd`, `utc`, `hours_since_prev`, `n_bands`, `detectors` | field.json `frames[]` | timeline, framePicker, marks |
 | `FieldWcs` | gnomonic TAN, `crval`, `crpix` (1-based, bottom-up, exactly FITS; top-down reference pixel is `(crpix[0]-1, H-crpix[1])`), `cdelt` deg/px | field.json `wcs` | wcs.ts |
 | `FieldData` | `frames.u16` encoding: `scale`, `offset`, `units: "S/N"`, `precision: "float" or "png8"`, `nodata` (65535, decodes to NaN) | field.json `data` | fields.ts |
@@ -23,7 +23,7 @@ Conventions used by every type:
 | `Mark` | one player click: `frame`, `x`, `y`, `tDays` | FieldViewer | marks.ts |
 | `Track` | fitted straight-line motion: `x0, y0` at `t0Days`, `vx, vy` px/day, `rms`, `marks` | marks.ts | `/api/check`, timeline |
 | `CheckRequest` | body of `POST /api/check`: `spot`, `answer: "track"` with raw `marks` (frame from 1, x, y), or `answer: "nothing"`; the server fits the track (api.md 3) | GAME | SERVER |
-| `CheckResponse` | `/api/check` reply: `verdict`, `first_finder`, `already_found`, `persisted`, `unlocked`, `reveal?`, `track?`, `noise_bar_sigma` | SERVER | GAME |
+| `CheckResponse` | `/api/check` reply: `verdict`, `first_finder`, `already_found`, `persisted`, `unlocked`, `practice?`, `reveal?`, `spot_reveal?` (real title, kind, difficulty; only when unlocked, issue #10), `track?`, `noise_bar_sigma` | SERVER | GAME |
 | `VerdictKind` | `known`, `bot_match`, `candidate`, `static`, `nothing_correct`, `nothing_wrong` | SERVER | GAME |
 | `Verdict` | `{ kind, object_name?, points, message }` | `/api/check` | GAME |
 | `Spectrum` | `wl` (micron), `flux` (mJy), `err`, optional `det` | inspect.ts / spectra.ts | SpectrumChart, matchReferences |

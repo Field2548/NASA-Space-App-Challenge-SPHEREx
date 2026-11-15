@@ -109,7 +109,7 @@ export function Scoreboard({ slug = null, refreshKey = 0, defaultCollapsed = fal
         type="button"
         aria-expanded={expanded}
         aria-controls={expanded ? panelId : undefined}
-        title="click to minimize"
+        title={expanded ? "click to minimize" : "click to expand"}
         onClick={() => setExpanded((e) => !e)}
         style={toggleStyle}
       >

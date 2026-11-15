@@ -12,7 +12,7 @@
 set -u
 cd "$(dirname "$0")/../.."
 PY=.venv/bin/python
-declare -A FOLDER=( [eros]=data/motion_13.2004_14.38_2025-07-09 [eris]=data/motion_26.3271_-0.4338_2026-01-06 [makemake]=data/motion_200.0075_21.523_2025-05-30 [hektor]=data/motion_184.3049_-6.3773_2025-12-24 [cygnus]=data/motion_304.6935_42.4437 )
+declare -A FOLDER=( [eros]=data/motion_13.2004_14.38_2025-07-09 [eris]=data/motion_26.3271_-0.4338_2026-01-06 [makemake]=data/motion_200.0075_21.523_2025-05-30 [hektor]=data/motion_184.3049_-6.3773_2025-12-24 [cygnus]=data/motion_304.6935_42.4437 [barnard]=data/motion_269.4464_4.7686_2025-08-21 [eps-indi-b]=data/motion_331.0964_-56.8006_2025-04-27 [wise0855]=data/motion_133.7600_-7.2422_2025-05-06 [rw-aur]=data/motion_76.9566_30.4013_2025-09-02 [r-dra]=data/motion_248.1672_66.7550_2025-05-16 [taurus-ice]=data/motion_69.9119_26.1907_2025-08-27 )
 
 frames() { slug=$1; shift
   mkdir -p work/$slug; cp -n "${FOLDER[$slug]}/sia_results.ecsv" work/$slug/ 2>/dev/null
@@ -41,11 +41,19 @@ case "${1:-}" in
     frames makemake 200.0075 21.5230 --start 2025-05-30T22:50 --min-spacing 10 --fov 0.1
     frames hektor   184.3049 -6.3773 --start 2025-12-24T10:10
     frames cygnus   304.6935 42.4437 ;;
+  stars)   # tool-test stars; the committed sia_results.ecsv holds only the chosen bursts
+    frames barnard    269.4464 4.7686   --start 2025-08-21T15:14 --frames 5 --min-images 1 --fov 0.2
+    frames eps-indi-b 331.0964 -56.8006 --start 2025-04-27T16:48 --frames 5 --min-images 1 --fov 0.2
+    frames wise0855   133.7600 -7.2422  --start 2025-05-06T10:35 --frames 5 --min-images 1 --fov 0.1
+    frames rw-aur     76.9566 30.4013   --start 2025-09-02T23:21 --frames 6 --min-images 1 --fov 0.1
+    frames r-dra      248.1672 66.7550  --start 2025-05-16T22:50 --frames 6 --min-images 1 --fov 0.1
+    frames taurus-ice 69.9119 26.1907   --start 2025-08-27T02:00 --frames 5 --min-images 1 --fov 0.2 ;;
   bands)
     bands eros     13.2004 14.38    --size 0.3 --fov 0.2
     bands eris     26.3271 -0.4338
     bands makemake 200.0075 21.523
     bands hektor   184.3049 -6.3773 --size 0.3 --fov 0.2
-    bands cygnus   304.6935 42.4437 --size 0.3 --fov 0.2 ;;
-  *) echo "usage: $0 frames|bands"; exit 2 ;;
+    bands cygnus   304.6935 42.4437 --size 0.3 --fov 0.2
+    bands taurus-ice 69.9119 26.1907 --size 0.3 --fov 0.2 ;;
+  *) echo "usage: $0 frames|bands|stars"; exit 2 ;;
 esac
