@@ -51,6 +51,8 @@ export interface PatchCheckResponse extends CheckResponse {
   known_objects?: { asteroids: PatchKnownObject[]; stars: [] };
   /** Only for a `candidate` verdict. */
   report?: { saved: boolean; positions: SkyPoint[] };
+  /** Only for a `candidate` verdict with a database: agreement with other signed-in players' reports. */
+  crowd?: { others: number; agree: number; first: boolean };
   solve_saved: boolean;
 }
 
