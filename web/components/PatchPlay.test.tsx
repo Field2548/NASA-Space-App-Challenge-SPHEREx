@@ -4,6 +4,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { patchFromPoint } from "@/lib/patch";
+import { resetQuickLookListCache } from "@/lib/quicklookPrefetch";
 import PatchPlay, { NO_EXPOSURES_TEXT, patchRequest } from "./PatchPlay";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -26,6 +27,7 @@ function fakeFetch(list: unknown, status = 200) {
 }
 
 afterEach(() => {
+  resetQuickLookListCache();
   cleanup();
   vi.unstubAllGlobals();
 });

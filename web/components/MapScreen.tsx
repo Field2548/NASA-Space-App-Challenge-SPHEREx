@@ -1,7 +1,9 @@
 "use client";
 // /map (BP 8.1, 8.2): SERVER's SkyMap with the CoordinateBox over it. Any point on the sky is a
-// playable patch (lib/patch.ts): a wide view zooms in on a click, a close view picks the patch there
-// and the patch card sends it to /play?patch=<id>, the same game page as the ready spots.
+// playable patch (lib/patch.ts). Like a street map: a click picks the patch there and shows its card
+// (with a still picture) without moving the view, a double click zooms in, and Enter in the box
+// flies to the typed place and picks its patch. Picking starts the IRSA exposure query, so
+// /play?patch=<id> (the same game page as the ready spots) opens with it already on its way.
 // The dice in the coordinate box picks a point uniform on the sphere. Zoomed in to PATCH_SHOW_FOV, patches other
 // players already solved are drawn (GET /api/patches), so nobody plays the same patch twice.
 
@@ -14,11 +16,10 @@ import type { FieldSummary } from "@/lib/types";
 import { CoordinateBox } from "./CoordinateBox";
 import styles from "./MapScreen.module.css";
 import { PATCH_SHOW_FOV, SkyMap, type SkyPatch } from "./SkyMap";
-import { flyFovForSpot, spotCovering } from "./skymap/geometry";
+import { Still } from "./PatchPlay";
 import { loadSpotsOnce } from "./skymap/spots";
+import { prefetchQuickLookList } from "@/lib/quicklookPrefetch";
 
-/** Field of view (degrees) at or under which a click on the sky picks that patch. */
-export const PICK_FOV = PATCH_SHOW_FOV;
 /** Field of view a picked patch is shown at. */
 const PATCH_VIEW_FOV = 0.5;
 
@@ -69,8 +70,14 @@ export default function MapScreen() {
   }, [close, view]);
 
   const play = (slug: string) => router.push(playHref(slug));
-  const pick = (p: Patch) => {
+  /** Show a patch's card and start asking IRSA which exposures cover it. */
+  const select = (p: Patch) => {
     setPicked(p);
+    prefetchQuickLookList(p.ra, p.dec);
+  };
+  /** Select and fly to it (dice, Enter). */
+  const pick = (p: Patch) => {
+    select(p);
     setTarget({ ra: p.ra, dec: p.dec, fov: PATCH_VIEW_FOV });
   };
   const solved = picked ? patches?.find((p) => p.id === picked.id) : undefined;
@@ -89,27 +96,18 @@ export default function MapScreen() {
           patches={patches}
           picked={picked}
           onView={setView}
-          onClickSky={({ ra, dec, fov }) => {
-            // A wide view zooms in on the click; a close view picks the patch there.
-            if (fov !== undefined && fov > PICK_FOV) setTarget({ ra, dec, fov: PICK_FOV / 2 });
-            else setPicked(patchFromPoint(ra, dec));
-          }}
+          onClickSky={({ ra, dec }) => select(patchFromPoint(ra, dec))}
         />
         <div className={styles.box}>
           <CoordinateBox
             spots={spots}
-            onGo={({ ra, dec, source }) => {
-              if (source === "dice") return pick(patchFromPoint(ra, dec));
-              const s = spotCovering(ra, dec, spots ?? []);
-              setTarget({ ra, dec, fov: s ? flyFovForSpot(s) : 1 });
-            }}
+            onGo={({ ra, dec }) => pick(patchFromPoint(ra, dec))}
             onPlay={play}
-            onQuickLook={({ ra, dec }) => pick(patchFromPoint(ra, dec))}
-            quickLookLabel="Pick this patch"
           />
           <section className={`panel ${styles.card}`} aria-label="Patch">
             {picked ? (
               <>
+                <Still key={picked.id} patch={picked} className={styles.preview} />
                 <h2 className={styles.cardTitle}>Patch {picked.id}</h2>
                 <p className={styles.cardLine}>
                   {formatRA(picked.ra)} {formatDec(picked.dec)} · {(picked.size_deg * 60).toFixed(1)}′ square
@@ -131,7 +129,8 @@ export default function MapScreen() {
             ) : (
               <>
                 <p className={styles.cardLine}>
-                  Click the sky to zoom in, then click a spot to pick a patch, or press the dice for a random place.
+                  Click the sky to pick a patch, double-click to zoom in, type a place and press Enter, or press the dice
+                  for a random place.
                   Solved patches show in green once you are zoomed in.
                 </p>
               </>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// Picking a patch on the map: a wide view zooms in on the click, a close view picks that patch,
-// the card plays it on /play?patch=<id>, and Random picks a patch anywhere on the sky.
+// Picking a patch on the map: a click picks that patch without zooming (street-map style), Enter
+// picks the typed place, the card plays it on /play?patch=<id>, and the dice picks anywhere.
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { patchFromPoint } from "@/lib/patch";
@@ -16,11 +16,13 @@ vi.mock("./SkyMap", () => ({
   },
 }));
 
-import MapScreen, { PICK_FOV } from "./MapScreen";
+import { resetQuickLookListCache } from "@/lib/quicklookPrefetch";
+import MapScreen from "./MapScreen";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   last.push.mockReset();
+  resetQuickLookListCache();
   fetchMock = vi.fn(async (url: string) =>
     String(url).startsWith("/api/patches")
       ? Response.json({ patches: [] })
@@ -39,12 +41,24 @@ describe("MapScreen patch pick", () => {
     expect(last.props?.showSpots).toBe(false);
   });
 
-  it("zooms in on a click in a wide view and picks nothing", () => {
+  it("a click at any zoom shows the patch card with its still, never moves the view, and starts the IRSA query", () => {
     render(<MapScreen />);
-    act(() => last.props?.onClickSky?.({ ra: 40, dec: -10, fov: 60 }));
-    expect(last.props?.target).toEqual({ ra: 40, dec: -10, fov: PICK_FOV / 2 });
-    expect(last.props?.picked ?? null).toBeNull();
-    expect(screen.queryByRole("button", { name: "Play this patch" })).toBeNull();
+    act(() => last.props?.onClickSky?.({ ra: 40, dec: -10, fov: 360 }));
+    const p = patchFromPoint(40, -10);
+    expect(screen.getByRole("heading", { name: `Patch ${p.id}` })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /Still picture of this patch/ })).toBeTruthy();
+    expect(last.props?.target ?? null).toBeNull();
+    expect(fetchMock.mock.calls.some(([u]) => String(u) === `/api/quicklook/list?ra=${p.ra}&dec=${p.dec}`)).toBe(true);
+  });
+
+  it("Enter in the coordinate box flies to the place and picks its patch; no Pick this patch button", () => {
+    render(<MapScreen />);
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "40 -10" } });
+    expect(screen.queryByRole("button", { name: "Pick this patch" })).toBeNull();
+    fireEvent.submit(screen.getByRole("search"));
+    const p = patchFromPoint(40, -10);
+    expect(screen.getByRole("heading", { name: `Patch ${p.id}` })).toBeTruthy();
+    expect(last.props?.target).toMatchObject({ ra: p.ra, dec: p.dec });
   });
 
   it("picks the patch at the click in a close view and plays it on /play?patch=", () => {
