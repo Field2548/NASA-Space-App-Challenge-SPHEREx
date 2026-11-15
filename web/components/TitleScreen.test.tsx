@@ -25,7 +25,7 @@ describe("TitleScreen", () => {
       ["Game stages", "/stages"],
       ["Explore the sky", "/map"],
       ["Leaderboard", "/leaderboard"],
-      ["Settings", "/settings"],
+      ["Achievements", "/achievements"],
     ]);
     expect(screen.queryByRole("button", { name: "Log in" })).toBeNull(); // the account control is in the layout
     expect(screen.getByRole("progressbar", { name: "World progress" })).toBeTruthy();

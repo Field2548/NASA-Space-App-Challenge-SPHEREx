@@ -367,3 +367,16 @@ Picked patches whose centre is within `r` degrees (default 1, at most 5) of the 
 ```
 
 `loadLocalPatchSolves()` in `web/lib/patchSolves.ts` returns the same patch objects for this device's own solves and reports.
+
+## 16. `GET /api/achievements?solved=`
+
+Achievements for the caller. With a valid `Authorization: Bearer` token: `source: "account"`, solved spots and points read from `finds` with the service role. Without one: `source: "guest"`, solved spots from `?solved=slug1,slug2` (at most 40 entries, each `^[a-z0-9-]{1,40}$`, else `400`; unknown slugs ignored), points 0 and every `unlockedAt` null. A bad token is `401`; no database for an account call is `503 db_unavailable`. Rate limit 60/min. `Cache-Control: no-store`.
+
+```ts
+{ source: "account" | "guest", unlocked: number, total: number,
+  achievements: { id: string, title: string, description: string,
+                  progress: number /* min(count, goal) */, goal: number, unlocked: boolean,
+                  unlockedAt: string | null /* ISO time of the solve that completed it */ }[] }
+```
+
+A spot is solved by a `finds` row with verdict `known`, `bot_match` or `nothing_correct`; wrong answers do not count. `fixture` and `quicklook` are ignored. Goals for a kind (asteroids, dwarf planets, stars, the control field) are capped at the number of spots of that kind, and an achievement whose kind has no spot is left out, so no goal can be out of reach. Names and kinds of unsolved spots are never sent. Points achievements use the sum of `finds.points`, the same total as the leaderboard (thresholds in `web/lib/achievements.ts`). Logic: `web/lib/achievements.ts` (pure), `web/lib/server/achievements.ts`.

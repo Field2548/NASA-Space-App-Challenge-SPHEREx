@@ -15,18 +15,30 @@ vi.mock("next/link", () => ({
 }));
 
 const INDEX = ["a", "b", "c"].map((slug) => ({ slug, title: "Field", ra: 1, dec: 2, fov_deg: 0.1, difficulty: "easy", kind: "spot", thumbnail: `${slug}/t.webp` }));
+const ACH = {
+  source: "account",
+  unlocked: 1,
+  total: 2,
+  achievements: [
+    { id: "first-light", title: "First light", description: "Solve a stage.", progress: 1, goal: 1, unlocked: true, unlockedAt: "2026-03-05T10:00:00Z" },
+    { id: "boss", title: "Boss slayer", description: "Solve the boss.", progress: 0, goal: 1, unlocked: false, unlockedAt: null },
+  ],
+};
 const signOut = vi.fn(async () => ({}));
 
 const updateUser = vi.fn(async () => ({}));
 const update = vi.fn();
 const insert = vi.fn();
 
-function fakeClient(user: unknown, display: string | null, finds: { spot_slug: string }[] | null = []) {
+type FindRow = { spot_slug: string; verdict?: string; points?: number; created_at?: string };
+const row = (r: FindRow) => ({ verdict: "known", points: 100, created_at: "2026-03-05T10:00:00Z", ...r });
+
+function fakeClient(user: unknown, display: string | null, finds: FindRow[] | null = []) {
   const read = (table: string) => ({
     eq: () =>
       table === "finds"
-        ? { neq: () => Promise.resolve(finds ? { data: finds, error: null } : { data: null, error: { message: "x" } }) }
-        : { maybeSingle: async () => ({ data: display ? { display_name: display } : null }) },
+        ? { neq: () => Promise.resolve(finds ? { data: finds.map(row), error: null } : { data: null, error: { message: "x" } }) }
+        : { maybeSingle: async () => ({ data: display ? { display_name: display, created_at: "2026-01-02T12:00:00Z" } : null }) },
   });
   return {
     auth: { getSession: async () => ({ data: { session: user ? { user } : null } }), signOut, updateUser },
@@ -51,6 +63,7 @@ beforeEach(() => {
       if (u.startsWith("/api/leaderboard")) {
         return new Response(JSON.stringify({ scope: "all", slug: null, source: "db", updated_at: "x", rows: [], me: { rank: 14, name: "vega", score: 350, accuracy: 0.5 } }), { status: 200 });
       }
+      if (u.startsWith("/api/achievements")) return new Response(JSON.stringify(ACH), { status: 200 });
       return new Response("nope", { status: 404 });
     }),
   );
@@ -86,7 +99,7 @@ describe("ProfileScreen", () => {
     expect(await screen.findByText("Not logged in")).toBeTruthy();
   });
 
-  async function openForm(display: string | null, finds?: { spot_slug: string }[] | null) {
+  async function openForm(display: string | null, finds?: FindRow[] | null) {
     vi.spyOn(supa, "getSupabaseBrowser").mockReturnValue(fakeClient({ id: "u1" }, display, finds));
     render(<ProfileScreen />);
     return (await screen.findByLabelText("Display name")) as HTMLInputElement;
@@ -130,6 +143,43 @@ describe("ProfileScreen", () => {
   it("counts distinct solved stages from the database for a logged-in user", async () => {
     await openForm("vega", [{ spot_slug: "a" }, { spot_slug: "a" }, { spot_slug: "b" }]);
     expect(await screen.findByText("2 of 3")).toBeTruthy();
+  });
+
+  it("does not count wrong answers as solved", async () => {
+    await openForm("vega", [{ spot_slug: "a", verdict: "candidate" }, { spot_slug: "b", verdict: "nothing_wrong" }, { spot_slug: "c", verdict: "nothing_correct" }]);
+    expect(await screen.findByText("1 of 3")).toBeTruthy();
+    expect(screen.getAllByText(/^Solved /)).toHaveLength(1);
+    expect(screen.getAllByText("Not solved")).toHaveLength(2);
+  });
+
+  it("marks solved stages in the grid, links to play, and lists recent finds", async () => {
+    await openForm("vega", [{ spot_slug: "b", points: 250 }, { spot_slug: "a", verdict: "static", points: 0 }]);
+    expect(await screen.findByText("1 of 3")).toBeTruthy();
+    const links = screen.getAllByRole("link").filter((l) => l.getAttribute("href")?.startsWith("/play?spot="));
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/play?spot=a", "/play?spot=b", "/play?spot=c"]);
+    expect(links[1].textContent).toMatch(/Solved/);
+    expect(links[0].textContent).toMatch(/Not solved/);
+    expect(screen.getByRole("heading", { name: "Recent activity" })).toBeTruthy();
+    expect(screen.getByText("+250 points")).toBeTruthy();
+    expect(screen.queryByText("+0 points")).toBeNull();
+    expect(screen.getByText(/Explorer since/)).toBeTruthy();
+  });
+
+  it("shows an achievements strip and the unlocked count", async () => {
+    await openForm("vega");
+    expect(await screen.findByText("1 of 2")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Recent achievements" })).toBeTruthy();
+    expect(screen.getByText("First light")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "All achievements" }).getAttribute("href")).toBe("/achievements");
+  });
+
+  it("shows a dash for achievements when the fetch fails", async () => {
+    vi.spyOn(supa, "getSupabaseBrowser").mockReturnValue(fakeClient(null, null));
+    const orig = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (u: string) => (String(u).startsWith("/api/achievements") ? new Response("x", { status: 500 }) : orig(u))));
+    render(<ProfileScreen />);
+    await screen.findByText("Not logged in");
+    await waitFor(() => expect(screen.getByText("Achievements").nextElementSibling?.textContent).toBe("–"));
   });
 
   it("keeps the local count when the finds query fails", async () => {
