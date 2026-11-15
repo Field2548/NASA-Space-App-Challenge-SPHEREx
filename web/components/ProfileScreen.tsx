@@ -91,7 +91,6 @@ export default function ProfileScreen() {
       setUid(id);
       const { data: row } = await sb.from("profiles").select("display_name, created_at").eq("id", id).maybeSingle();
       setHasRow(!!row);
-      setDraft(row?.display_name ?? "");
       setSince(row?.created_at ?? null);
       const { data: finds, error } = await sb.from("finds").select("verdict, spot_slug, points, created_at").eq("user_id", id).neq("spot_slug", "quicklook");
       if (!error && finds) {
@@ -108,16 +107,14 @@ export default function ProfileScreen() {
     const display_name = draft.trim();
     const invalid = validateDisplayName(display_name);
     if (invalid) return setNameMsg(invalid);
-    if (!sb || !uid) return;
+    if (!sb || !uid || hasRow) return;
     setNameMsg(null);
-    // Update only display_name when the row exists (the column grant allows nothing else).
-    const { error } = hasRow
-      ? await sb.from("profiles").update({ display_name }).eq("id", uid)
-      : await sb.from("profiles").insert({ id: uid, display_name });
+    // One-time insert only: a name is chosen at sign-up and never changed (the database allows no update).
+    const { error } = await sb.from("profiles").insert({ id: uid, display_name });
     if (error) return setNameMsg(error.code === "23505" ? "That name is taken. Pick another." : "Could not save the name. Try again.");
     setHasRow(true);
     setName(display_name);
-    setNameMsg("Saved.");
+    setNameMsg(null);
     await sb.auth.updateUser({ data: { display_name } }); // USER_UPDATED refreshes the header
   }
 
@@ -200,9 +197,9 @@ export default function ProfileScreen() {
           )}
         </section>
       )}
-      {name && uid && (
+      {name && uid && !hasRow && (
         <form onSubmit={(e) => void saveName(e)}>
-          {!hasRow && <p>Pick a display name so you appear on the scoreboard.</p>}
+          <p>Pick a display name so you appear on the scoreboard.</p>
           <label htmlFor="profile-name">Display name </label>
           <input id="profile-name" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={20} autoComplete="nickname" aria-describedby="profile-name-msg" />{" "}
           <button type="submit" className={styles.button}>
