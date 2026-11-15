@@ -548,7 +548,7 @@ def test_bot_candidate_status_matches_the_measured_cases():
     assert hek[2]["status"] == "unconfirmed" and hek[3]["status"] == "unconfirmed"
     _, eris = _bot_by_rank("eris")
     assert eris[1]["status"] == "known" and eris[1]["object_id"] == "136199"
-    assert eris[2]["status"] == "alias" and eris[2]["near_object_frames"] == [5]
+    assert eris[1]["near_object_frames"] == list(range(1, 11))     # on Eris in all 10 frames
     _, mm = _bot_by_rank("makemake")
     assert mm[1]["status"] == "known"
     ans, _ = _bot_by_rank("cygnus")
