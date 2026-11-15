@@ -212,6 +212,8 @@ async function loadGame(props: Partial<Parameters<typeof PlayScreen>[0]> = {}, o
   stubFetch(true, over);
   render(<PlayScreen spot="fixture" {...props} />);
   const canvas = (await screen.findByTestId("field-canvas")) as HTMLCanvasElement;
+  // Flush pending effects (the window keydown listener) so a key pressed next is never lost under load.
+  await act(async () => {});
   vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 40, height: 20 } as DOMRect);
   return canvas;
 }
