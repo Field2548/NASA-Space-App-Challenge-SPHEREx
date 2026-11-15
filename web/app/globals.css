@@ -141,11 +141,8 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Main action: amber pill, dark text. SubmitBar's own CSS file is owned elsewhere, so its primary
-   button is matched here by its module class. */
-.btn-primary,
-button[class*="SubmitBar"][class*="primary"],
-button[class*="SubmitBar"][class*="primary"][aria-pressed] {
+/* Main action: amber pill, dark text (SubmitBar.module.css .primary matches this). */
+.btn-primary {
   color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
@@ -153,15 +150,10 @@ button[class*="SubmitBar"][class*="primary"][aria-pressed] {
   font-weight: 700;
 }
 
-.btn-primary:hover:not(:disabled),
-button[class*="SubmitBar"][class*="primary"]:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled) {
   color: var(--on-accent);
   background: #ffc46e;
   border-color: #ffc46e;
-}
-
-button[class*="SubmitBar"][class*="primary"]:active:not(:disabled) {
-  background: #f0a12d;
 }
 
 /* Soft card: frosted, rounded, no grid lines. A title is a plain heading; data-part is the text. */

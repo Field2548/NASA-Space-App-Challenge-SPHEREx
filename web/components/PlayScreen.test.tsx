@@ -661,7 +661,7 @@ describe("PlayScreen round mode", () => {
     const canvas = await loadGame({ showTitle: true, objectName: "433 Eros" });
     fireEvent.keyDown(window, { key: "i" });
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
-    expect(screen.getByTestId("inspect-object").textContent).toBe("433 Eros");
+    expect((await screen.findByTestId("inspect-object")).textContent).toBe("433 Eros"); // renders after a state update; slow under load
   });
 
   it("does not echo the slug while loading", () => {
