@@ -229,8 +229,22 @@ We used Claude Code (Anthropic's coding assistant) to help write the code in thi
 
 ## Acknowledgments
 
-This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration.
+These are the sentences the data providers ask us to print.
 
-This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology.
+**Gaia DR3 (ESA Gaia archive)**
+
+> This work has made use of data from the European Space Agency (ESA) mission Gaia ( https://www.cosmos.esa.int/gaia ), processed by the Gaia Data Processing and Analysis Consortium (DPAC, https://www.cosmos.esa.int/web/gaia/dpac/consortium ). Funding for the DPAC has been provided by national institutions, in particular the institutions participating in the Gaia Multilateral Agreement.
+
+**NASA/IPAC Infrared Science Archive (IRSA)**
+
+> This research has made use of the NASA/IPAC Infrared Science Archive, which is funded by the National Aeronautics and Space Administration and operated by the California Institute of Technology.
+
+**SIMBAD astronomical database**
+
+> This research has made use of the SIMBAD database, operated at CDS, Strasbourg, France.
+
+**SPHEREx level 2 spectral images (Data Release 1 and Quick Release 3), served by IRSA**
+
+> This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration.
 
 Every dataset, service, library, font and paper we used is listed in [`CREDITS.md`](CREDITS.md) with its author, link and license. This project is licensed under GPL-3.0, see [`LICENSE`](LICENSE).
