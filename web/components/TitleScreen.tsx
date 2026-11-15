@@ -1,5 +1,5 @@
-// Title screen `/` (BP 8.13): "PRESS START" feel over an ASCII starfield; Start training, Skip
-// to game, Explore the sky (/map) and Log in (AuthDialog). About and Credits sit in the site footer.
+// Title screen `/` (BP 8.13): "PRESS START" feel over an ASCII starfield; Start training, Stages,
+// Explore the sky (/map) and Log in (AuthDialog). About and Credits sit in the site footer.
 // Server-safe: the starfield comes from a fixed seed (same HTML on server and client), the
 // twinkle, the two-layer drift and the shooting stars are CSS only and stop under prefers-reduced-motion.
 
@@ -80,9 +80,6 @@ export default function TitleScreen() {
         <nav aria-label="Start" className={styles.buttons}>
           <Link href="/tutorial" className={styles.primary}>
             Start training
-          </Link>
-          <Link href="/play?spot=eros" className={styles.button}>
-            Skip to game
           </Link>
           <Link href="/stages" className={styles.button}>
             Stages
