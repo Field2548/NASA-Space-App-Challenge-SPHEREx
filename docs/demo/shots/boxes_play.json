@@ -1,0 +1,62 @@
+{
+ "canvas": {
+  "x": 467,
+  "y": 119,
+  "width": 476,
+  "height": 476
+ },
+ "inspect": {
+  "x": 25,
+  "y": 89,
+  "width": 279,
+  "height": 35
+ },
+ "color": {
+  "x": 25,
+  "y": 174,
+  "width": 279,
+  "height": 33
+ },
+ "submit": {
+  "x": 1106,
+  "y": 163,
+  "width": 309,
+  "height": 34
+ },
+ "nothing": {
+  "x": 1106,
+  "y": 205,
+  "width": 309,
+  "height": 34
+ },
+ "marks": {
+  "x": 1106,
+  "y": 119,
+  "width": 309,
+  "height": 36
+ },
+ "result": {
+  "x": 0,
+  "y": 723.5,
+  "width": 1440,
+  "height": 176.5
+ },
+ "resultTitle": {
+  "x": 376,
+  "y": 742.5,
+  "width": 166.515625,
+  "height": 33
+ },
+ "inspectPop": {
+  "x": 830,
+  "y": 271.25,
+  "width": 175.09375,
+  "height": 19.5
+ },
+ "vision": {
+  "x": 407.03125,
+  "y": 201,
+  "width": 234,
+  "height": 27
+ }
+}

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>Onion Sky demo deck</title>
+<style>
+@font-face { font-family: "Orbitron"; src: url("orbitron.woff2") format("woff2"); font-weight: 400 900; }
+@font-face { font-family: "JetBrains Mono"; src: url("jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; }
+:root {
+  --bg: #05080f; --panel: #0a1018; --line: #2a4a6b; --grid: #12304d;
+  --text: #d7e3f4; --dim: #8fa3bd; --cyan: #00e1ff; --green: #3dff8a; --amber: #ffb000; --magenta: #ff2e88;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+@page { size: 1920px 1080px; margin: 0; }
+html, body { background: var(--bg); }
+body { width: 1920px; font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--text); }
+.slide {
+  position: relative; width: 1920px; height: 1080px; overflow: hidden; page-break-after: always; break-after: page;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 80px 80px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 80px 80px,
+    radial-gradient(ellipse at 20% 0%, #0d2036 0%, var(--bg) 62%);
+  background-blend-mode: soft-light, soft-light, normal;
+}
+.slide:last-child { page-break-after: auto; break-after: auto; }
+.kicker { position: absolute; left: 64px; top: 40px; font-size: 28px; letter-spacing: .14em; color: var(--cyan); text-transform: uppercase; }
+.num { position: absolute; right: 64px; top: 40px; font-size: 28px; color: var(--dim); }
+h2 { position: absolute; left: 64px; top: 84px; font-family: "Orbitron", sans-serif; font-weight: 700; font-size: 64px; line-height: 1.1; letter-spacing: .02em; color: #fff; }
+h2 em { font-style: normal; color: var(--cyan); }
+.abs { position: absolute; }
+.body { font-size: 32px; line-height: 1.4; }
+.body p { margin-bottom: 26px; }
+.body b { color: var(--cyan); font-weight: 700; }
+.shot { position: absolute; overflow: hidden; outline: 2px solid var(--line); border-radius: 10px; background: #000; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.shot img { position: absolute; display: block; max-width: none; }
+.card { position: absolute; background: rgba(10,16,24,.92); border: 2px solid var(--line); border-radius: 14px; padding: 26px 30px; }
+.card h3 { font-family: "Orbitron", sans-serif; font-size: 36px; color: #fff; margin-bottom: 12px; letter-spacing: .02em; }
+.card p { font-size: 28px; line-height: 1.35; color: var(--text); }
+.card .n { position: absolute; top: -26px; left: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--cyan); color: #05080f; font-weight: 800; font-size: 30px; display: grid; place-items: center; }
+.chev { position: absolute; font-family: "Orbitron"; font-size: 64px; color: var(--cyan); }
+.chip { position: absolute; font-size: 28px; font-weight: 700; padding: 6px 16px; border-radius: 8px; background: rgba(5,8,15,.9); border: 2px solid var(--cyan); color: var(--cyan); }
+.call { position: absolute; display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 700; line-height: 1.15; color: #fff; }
+.call .c { flex: none; width: 52px; height: 52px; border-radius: 50%; background: var(--amber); color: #05080f; font-weight: 800; font-size: 30px; display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(5,8,15,.85); }
+.call .t { background: rgba(5,8,15,.92); border: 2px solid var(--amber); border-radius: 8px; padding: 6px 14px; }
+.call.l { flex-direction: row-reverse; }
+svg.ov { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; pointer-events: none; }
+.big { font-family: "Orbitron"; font-weight: 800; color: var(--green); }
+.dim { color: var(--dim); }
+.pill { display: inline-block; font-size: 40px; font-weight: 700; color: #05080f; background: var(--cyan); border-radius: 999px; padding: 12px 40px; }
+</style>
+</head>
+<body>
+
+<!-- 1 TITLE -->
+<section class="slide" id="s1">
+  <div class="kicker">NASA Space Apps Challenge 2026 · Planet X and SPHEREx</div>
+  <div class="abs" style="left:64px; top:190px; width:880px;">
+    <div style="font-family:Orbitron; font-weight:800; font-size:104px; line-height:1; color:#fff; letter-spacing:.02em;">ONION<span style="color:var(--cyan)">//</span>SKY</div>
+    <div style="font-size:36px; line-height:1.35; margin-top:36px; color:var(--text);">Improving Public Access to SPHEREx Through Temporal Visualization and Celestial Object Detection</div>
+    <div style="font-size:32px; line-height:1.4; margin-top:36px; color:var(--dim);">A web game that turns real NASA SPHEREx sky images into a hunt for moving worlds.</div>
+    <div style="margin-top:56px;"><span class="pill">onion-sky.vercel.app</span></div>
+  </div>
+  <div id="s1shot"></div>
+  <svg class="ov" id="s1svg"></svg>
+  <div class="abs dim" style="left:64px; bottom:36px; font-size:28px;">Data: NASA SPHEREx / NASA/IPAC Infrared Science Archive (IRSA)</div>
+</section>
+
+<!-- 2 PROBLEM / IDEA -->
+<section class="slide" id="s2">
+  <div class="kicker">The idea</div><div class="num">2 / 7</div>
+  <h2>Movers hide among <em>millions of stars</em></h2>
+  <div class="abs body" style="left:64px; top:250px; width:640px;">
+    <p>SPHEREx maps the <b>whole sky</b> in 102 near-infrared colours.</p>
+    <p>Asteroids, dwarf planets and maybe a <b>Planet X</b> drift between visits.</p>
+    <p>Our trick: give each <b>moment in time</b> its own colour.</p>
+  </div>
+  <div id="s2shot"></div>
+  <svg class="ov" id="s2svg"></svg>
+  <div class="abs" style="left:760px; top:858px; width:1096px; font-size:28px; line-height:1.4; color:var(--dim);">Asteroid (433) Eros over 5 moments. Still stars stay white; the mover leaves coloured dots. Circles: where JPL says Eros was.</div>
+</section>
+
+<!-- 3 HOW IT WORKS -->
+<section class="slide" id="s3">
+  <div class="kicker">How it works</div><div class="num">3 / 7</div>
+  <h2>From raw images to a <em>detection</em></h2>
+  <div class="card" style="left:64px; top:236px; width:400px; height:200px;"><div class="n">1</div><h3>Download</h3><p>SPHEREx images from NASA IRSA</p></div>
+  <div class="chev" style="left:474px; top:292px;">›</div>
+  <div class="card" style="left:540px; top:236px; width:400px; height:200px;"><div class="n">2</div><h3>Align</h3><p>One burst = one moment, lined up</p></div>
+  <div class="chev" style="left:950px; top:292px;">›</div>
+  <div class="card" style="left:1016px; top:236px; width:400px; height:200px;"><div class="n">3</div><h3>Colour</h3><p>Onion skin: one colour per moment</p></div>
+  <div class="chev" style="left:1426px; top:292px;">›</div>
+  <div class="card" style="left:1492px; top:236px; width:364px; height:200px;"><div class="n">4</div><h3>Stack</h3><p>Finds faint, slow movers</p></div>
+  <div id="s3shot"></div>
+  <svg class="ov" id="s3svg"></svg>
+  <div class="abs" style="left:1150px; top:490px; width:706px;">
+    <div class="dim" style="font-size:28px;">ERIS, A DWARF PLANET, FOUND BLIND</div>
+    <div class="big" style="font-size:96px; line-height:1.1; margin-top:6px;">6.9σ</div>
+    <div style="font-size:32px; line-height:1.35;">vs a <b style="color:var(--amber)">5.9σ noise bar</b> from a sign-flipped search.</div>
+    <div style="font-size:30px; line-height:1.4; margin-top:22px; color:var(--text);">Eris moves ~1.7 px between frames: too faint to see in any single one.</div>
+    <div style="font-size:30px; line-height:1.4; margin-top:18px; color:var(--dim);">Honest margin: about 1σ. The Cygnus control field has nothing above its bar.</div>
+  </div>
+</section>
+
+<!-- 4 DEMO 1 -->
+<section class="slide" id="s4">
+  <div class="kicker">Demo 1 · /map</div><div class="num">4 / 7</div>
+  <h2>Explore the <em>whole sky</em></h2>
+  <div id="s4a"></div><div id="s4b"></div>
+  <svg class="ov" id="s4svg"></svg>
+  <div class="abs" style="left:64px; top:880px; width:1792px; display:flex; align-items:center; justify-content:space-between; font-size:36px; font-weight:700;">
+    <div class="card" style="position:static; padding:18px 30px;">Search or click the sky</div><div class="chev" style="position:static;">›</div>
+    <div class="card" style="position:static; padding:18px 30px;">Pick a patch</div><div class="chev" style="position:static;">›</div>
+    <div class="card" style="position:static; padding:18px 30px;">Play its real frames</div>
+  </div>
+  <div class="chip" style="left:64px; top:238px;">The SPHEREx all-sky map</div>
+  <div class="chip" style="left:978px; top:238px;">Zoomed in on a spot</div>
+</section>
+
+<!-- 5 DEMO 2 -->
+<section class="slide" id="s5">
+  <div class="kicker">Demo 2 · /play</div><div class="num">5 / 7</div>
+  <h2>Hunt a <em>mover</em></h2>
+  <div id="s5a"></div><div id="s5b"></div><div id="s5c"></div>
+  <svg class="ov" id="s5svg"></svg>
+</section>
+
+<!-- 6 DEMO 3 -->
+<section class="slide" id="s6">
+  <div class="kicker">Demo 3</div><div class="num">6 / 7</div>
+  <h2>Check, inspect, <em>keep playing</em></h2>
+  <div id="s6a"></div><div id="s6b"></div><div id="s6c"></div><div id="s6d"></div>
+  <svg class="ov" id="s6svg"></svg>
+</section>
+
+<!-- 7 IMPACT -->
+<section class="slide" id="s7">
+  <div class="kicker">Impact and next steps</div><div class="num">7 / 7</div>
+  <h2>A new NASA dataset, <em>open to everyone</em></h2>
+  <div class="abs body" style="left:64px; top:250px; width:1130px;">
+    <div style="font-family:Orbitron; font-size:36px; color:var(--green); margin-bottom:16px;">IMPACT</div>
+    <p style="margin-bottom:14px;">Anyone can explore SPHEREx in a browser and learn to spot movers.</p>
+    <p style="margin-bottom:14px;">Real data, honest noise bars, open code.</p>
+    <div style="font-family:Orbitron; font-size:36px; color:var(--amber); margin:36px 0 16px;">NEXT</div>
+    <p style="margin-bottom:14px;"><b>Rate classifier:</b> speed to distance, flag Planet X-slow movers.</p>
+    <p style="margin-bottom:14px;"><b>Longer baselines:</b> days to months for ~1 px/day motion.</p>
+    <p style="margin-bottom:14px;"><b>Cross-match</b> known objects with the Minor Planet Center.</p>
+  </div>
+  <div class="card" style="left:1336px; top:250px; width:520px; height:690px; text-align:center; padding-top:34px;">
+    <div style="background:#fff; border-radius:12px; width:400px; height:400px; margin:0 auto; padding:16px;"><img src="qr.svg" alt="QR code for onion-sky.vercel.app" style="width:368px;height:368px;image-rendering:pixelated; shape-rendering:crispEdges;"></div>
+    <div style="font-size:32px; font-weight:700; margin-top:30px; color:var(--cyan);">onion-sky.vercel.app</div>
+    <div style="font-size:28px; margin-top:12px; color:var(--dim);">Scan and play. Guests welcome.</div>
+    
+  </div>
+  <div class="abs dim" style="left:64px; bottom:36px; font-size:28px; width:1792px;">Data: NASA SPHEREx / IPAC IRSA · Code (GPL-3.0): github.com/Field2548/NASA-Space-App-Challenge-SPHEREx</div>
+</section>
+
+<script>
+// ---- helpers: place a screenshot (cropped, scaled) and map CSS-pixel coordinates to slide coordinates ----
+const ACC = "#ffb000";
+function shot(id, o) {
+  // o: src, baseW (css width of whole image), baseH, crop [x,y,w,h] in css px, at [X,Y] on slide, scale
+  const host = document.getElementById(id);
+  const [cx, cy, cw, ch] = o.crop;
+  const d = document.createElement("div");
+  d.className = "shot";
+  d.style.left = o.at[0] + "px"; d.style.top = o.at[1] + "px";
+  d.style.width = cw * o.scale + "px"; d.style.height = ch * o.scale + "px";
+  const im = document.createElement("img");
+  im.src = o.src; im.style.width = o.baseW * o.scale + "px";
+  im.style.left = -cx * o.scale + "px"; im.style.top = -cy * o.scale + "px";
+  d.appendChild(im); host.appendChild(d);
+  const bw = 2; // border width
+  return {
+    p: (x, y) => [o.at[0] + (x - cx) * o.scale, o.at[1] + (y - cy) * o.scale],
+    r: (b) => [o.at[0] + (b[0] - cx) * o.scale, o.at[1] + (b[1] - cy) * o.scale, b[2] * o.scale, b[3] * o.scale],
+    scale: o.scale,
+  };
+}
+function rectEdge(box, from, pad) {
+  // intersection of ray from box centre to `from`, with the padded box edge (so arrows land exactly on the element)
+  const [x, y, w, h] = box; const cx = x + w / 2, cy = y + h / 2;
+  const hw = w / 2 + pad, hh = h / 2 + pad;
+  const dx = from[0] - cx, dy = from[1] - cy;
+  const t = Math.min(dx ? hw / Math.abs(dx) : 1e9, dy ? hh / Math.abs(dy) : 1e9);
+  return [cx + dx * t, cy + dy * t];
+}
+function annotate(slideId, items) {
+  const svg = document.getElementById(slideId + "svg");
+  const slide = document.getElementById(slideId);
+  let defs = `<defs><marker id="ah-${slideId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${ACC}"/></marker></defs>`;
+  let out = defs;
+  for (const it of items) {
+    const [x, y, w, h] = it.box; const pad = it.pad ?? 8;
+    out += `<rect x="${x - pad}" y="${y - pad}" width="${w + 2 * pad}" height="${h + 2 * pad}" rx="${it.round ?? 10}" fill="none" stroke="${ACC}" stroke-width="5"/>`;
+    const [cx, cy] = it.at; const R = 26;
+    const tgt = rectEdge(it.box, [cx, cy], pad + 2);
+    const dx = tgt[0] - cx, dy = tgt[1] - cy, L = Math.hypot(dx, dy) || 1;
+    const sx = cx + (dx / L) * (R + 3), sy = cy + (dy / L) * (R + 3);
+    if (L > R + 8) out += `<line x1="${sx}" y1="${sy}" x2="${tgt[0]}" y2="${tgt[1]}" stroke="${ACC}" stroke-width="5" stroke-linecap="round" marker-end="url(#ah-${slideId})"/>`;
+    const side = it.side || "r";
+    const div = document.createElement("div");
+    div.className = "call " + (side === "l" ? "l" : "");
+    div.innerHTML = `<div class="c">${it.n}</div>` + (it.cap ? `<div class="t"${it.maxw ? ` style="max-width:${it.maxw}px"` : ""}>${it.cap}</div>` : "");
+    if (side === "l") div.style.right = (1920 - (cx + R)) + "px"; else div.style.left = (cx - R) + "px";
+    div.style.top = (cy - R) + "px";
+    slide.appendChild(div);
+  }
+  svg.innerHTML = out;
+}
+
+// ---- Slide 1 ----
+{
+  const S = shot("s1shot", { src: "img/play_color.jpg", baseW: 1440, crop: [330, 48, 690, 580], at: [1040, 250], scale: 1.1 });
+  annotate("s1", [{ n: 1, box: S.r([595, 265, 235, 200]), at: S.p(470, 520), cap: "Coloured dots = a moving asteroid", maxw: 360, side: "r" }]);
+}
+// ---- Slide 2 ----
+{
+  const S = shot("s2shot", { src: "img/eros_summary.jpg", baseW: 1440, crop: [0, 0, 1440, 630], at: [760, 300], scale: 0.76 });
+  annotate("s2", [
+    { n: 1, box: S.r([76, 392, 26, 26]), at: S.p(330, 330), cap: "White = did not move", side: "r" },
+    { n: 2, box: S.r([86, 424, 144, 114]), at: S.p(380, 585), cap: "Colour = one asteroid, 3 moments", maxw: 420, side: "r" },
+  ]);
+}
+// ---- Slide 3 ----
+{
+  const S = shot("s3shot", { src: "img/eris_stack.jpg", baseW: 1360, crop: [0, 40, 1360, 700], at: [64, 480], scale: 0.7 });
+  // coordinates inside the image are native px; crop y offset 40
+  annotate("s3", [
+    { n: 1, box: S.r([160, 227, 50, 50]), at: S.p(120, 465), cap: "Eris found: 6.9σ", side: "r" },
+    { n: 2, box: S.r([361, 104, 305, 306]), at: S.p(700, 465), cap: "Noise only: top is 5.9σ", side: "r" },
+  ]);
+}
+// ---- Slide 4 ----
+{
+  const A = shot("s4a", { src: "img/map_whole.jpg", baseW: 1440, crop: [0, 48, 1440, 800], at: [64, 300], scale: 0.62 });
+  const B = shot("s4b", { src: "img/map_zoom.jpg", baseW: 1440, crop: [0, 48, 1440, 800], at: [978, 300], scale: 0.62 });
+  annotate("s4", [
+    { n: 1, box: A.r([30, 66, 300, 36]), at: A.p(430, 120), cap: "Type a place or coordinates", side: "r" },
+    { n: 2, box: A.r([12, 775, 214, 54]), at: A.p(330, 705), cap: "Community patches legend", side: "r" },
+    { n: 3, box: B.r([21, 132, 225, 34]), at: B.p(470, 215), cap: "Search finds a stage", side: "r" },
+    { n: 4, box: B.r([618, 356, 204, 204]), at: B.p(960, 330), cap: "Pick a patch of sky", side: "r", maxw: 250 },
+    { n: 5, box: B.r([29, 614, 190, 34]), at: B.p(470, 700), cap: "Then play it", side: "r" },
+  ]);
+}
+// ---- Slide 5 ----
+{
+  const M = shot("s5a", { src: "img/play_marked.jpg", baseW: 1440, crop: [0, 48, 1440, 852], at: [64, 200], scale: 0.886 });
+  const T = shot("s5b", { src: "img/play_f1.jpg", baseW: 1440, crop: [540, 250, 300, 230], at: [1396, 262], scale: 1.45 });
+  const C = shot("s5c", { src: "img/play_color.jpg", baseW: 1440, crop: [540, 250, 300, 230], at: [1396, 660], scale: 1.45 });
+  document.getElementById("s5b").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1396px; top:204px;">Plain frame: where is it?</div>`);
+  document.getElementById("s5c").insertAdjacentHTML("beforeend", `<div class="chip" style="left:1396px; top:602px; border-color:var(--amber); color:var(--amber);">Colour by time: found</div>`);
+  annotate("s5", [
+    { n: 1, box: M.r([122, 693, 591, 142]), at: M.p(790, 830), cap: "Flip through the frames", side: "r" },
+    { n: 2, box: M.r([25, 174, 279, 33]), at: M.p(375, 150), cap: "Colour by time", side: "r" },
+    { n: 3, box: M.r([598, 268, 230, 200]), at: M.p(690, 540), cap: "Coloured dots = the mover", side: "r" },
+    { n: 4, box: M.r([1106, 163, 309, 34]), at: M.p(1015, 190), cap: "Mark it, then Submit", side: "l", maxw: 250 },
+  ]);
+  { const b = C.r([606, 272, 205, 185]); document.getElementById("s5svg").insertAdjacentHTML("beforeend", `<rect x="${b[0]}" y="${b[1]}" width="${b[2]}" height="${b[3]}" rx="10" fill="none" stroke="#ffb000" stroke-width="5"/>`); }
+}
+// ---- Slide 6 ----
+{
+  const R = shot("s6a", { src: "img/play_result.jpg", baseW: 1440, crop: [360, 90, 1080, 810], at: [64, 220], scale: 0.86 });
+  const A = shot("s6b", { src: "img/achievements.jpg", baseW: 1440, crop: [50, 200, 1340, 230], at: [1010, 220], scale: 0.63 });
+  const S = shot("s6c", { src: "img/settings.jpg", baseW: 1440, crop: [250, 170, 940, 95], at: [1010, 400], scale: 0.9 });
+  const L = shot("s6d", { src: "img/leaderboard.jpg", baseW: 1440, crop: [120, 150, 1210, 490], at: [1010, 535], scale: 0.7 });
+  annotate("s6", [
+    { n: 1, box: R.r([376, 742, 430, 36]), at: R.p(470, 690), cap: "Scored on the server", side: "r" },
+    { n: 2, box: R.r([814, 261, 378, 150]), at: R.p(650, 185), cap: "Inspect: where, when, S/N", side: "r" },
+    { n: 3, box: R.r([768, 403, 64, 64]), at: R.p(560, 520), cap: "The mover it found", side: "r" },
+    { n: 4, box: A.r([58, 277, 319, 141]), at: A.p(520, 222), cap: "Achievements unlock", side: "r" },
+    { n: 5, box: S.r([407, 199, 236, 31]), at: S.p(700, 215), cap: "Colour-vision modes", side: "r" },
+    { n: 6, box: L.r([149, 541, 534, 48]), at: L.p(900, 330), cap: "Leaderboard", side: "r" },
+  ]);
+}
+</script>
+</body>
+</html>
