@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cellCenter, hpxNest } from "@/lib/healpix";
 import { PATCH_SOLVES_KEY, saveLocalPatchResult } from "@/lib/patchSolves";
 import { patchFromPoint } from "@/lib/patch";
+import { cellOfPatch, patchIpix } from "@/lib/hpxTiles";
 import type { AladinInstance, AladinStatic } from "./aladin";
-import { collectCells, createCommunityLayer, localCells, localFootprints, mergeFootprints, tileSpecs } from "./communityLayer";
+import { collectCells, createCommunityLayer, localCells, localFootprints, mergeFootprints, tileSpecs, withoutOwn } from "./communityLayer";
 import { GLOW_LEVELS, glowLevel, glowStyle } from "./communityGlyph";
 import type { TileData } from "./communityTiles";
 import { TileLoader } from "./communityTiles";
@@ -12,6 +13,7 @@ import { TileLoader } from "./communityTiles";
 beforeEach(() => window.localStorage.removeItem(PATCH_SOLVES_KEY));
 afterEach(() => vi.restoreAllMocks());
 
+const cellOf = (id: string) => cellOfPatch(patchIpix(id) as number, 5);
 const density = (cells: [number, number, number][]): TileData => ({ kind: "density", cells });
 
 describe("glow", () => {
@@ -63,6 +65,45 @@ describe("the player's own patches", () => {
     const cells = localCells({ ra: 83.8, dec: -5.4, fov: 360 }, 180, 7);
     expect(cells).toHaveLength(2);
     expect(cells.find((c) => c.ipix === hpxNest(83.8, -5.4, 7))).toMatchObject({ solves: 1, reports: 0, mine: true });
+  });
+});
+
+describe("the account's own patches", () => {
+  const p = patchFromPoint(83.8, -5.4);
+  const view = { ra: 83.8, dec: -5.4, fov: 360 };
+  it("count as own cells and footprints even with nothing on this device", () => {
+    const acct = [{ id: p.id, solved: true, reported: true }];
+    expect(localFootprints(view, 180, acct)).toEqual([{ id: p.id, solved: true, reported: true, mine: true }]);
+    expect(localCells(view, 180, 7, acct)).toMatchObject([{ ipix: hpxNest(83.8, -5.4, 7), solves: 1, reports: 1, mine: true }]);
+  });
+  it("are taken out of the community count: a mixed cell keeps only the others' share", () => {
+    const mine = localCells(view, 180, 7, [{ id: p.id, solved: true, reported: false }]);
+    const cell = mine[0].ipix;
+    const community = [{ ipix: cell, solves: 3, reports: 0, mine: false }, { ipix: 99, solves: 2, reports: 0, mine: false }];
+    expect(withoutOwn(community, mine).find((c) => c.ipix === cell)?.solves).toBe(2);
+    expect(withoutOwn([{ ipix: cell, solves: 1, reports: 0, mine: false }], mine)).toEqual([]); // all mine: cyan only
+    expect(withoutOwn(community, mine).find((c) => c.ipix === 99)?.solves).toBe(2);
+  });
+  it("leave the community count alone for a patch that is only on this device", () => {
+    saveLocalPatchResult(p.id, { solved: true, objects: [] });
+    const mine = localCells(view, 180, 7);
+    const cell = mine[0].ipix;
+    expect(withoutOwn([{ ipix: cell, solves: 1, reports: 0, mine: false }], mine)).toHaveLength(1);
+  });
+  it("draw cyan dots from afar and others' dots green", async () => {
+    const f = fakeAladin();
+    const other = patchFromPoint(200, 40);
+    const body = { cells: [[cellOf(other.id), 4, 0]], max: 4 };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(body), { status: 200 }));
+    const loader = new TileLoader({ onTile: () => {}, fetcher: fetcher as unknown as typeof fetch });
+    const loadMine = async () => [{ id: p.id, solved: true, reported: false }];
+    const layer = createCommunityLayer({ ...f, onFly: () => {}, loader, loadMine });
+    layer.update(view);
+    await new Promise((r) => setTimeout(r, 200));
+    layer.update(view);
+    const kinds = new Set(f.sources.map((s) => (s.data as { kind: string }).kind));
+    expect(kinds).toEqual(new Set(["community", "mine"]));
+    layer.destroy();
   });
 });
 
