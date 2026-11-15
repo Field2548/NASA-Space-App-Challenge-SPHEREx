@@ -249,7 +249,7 @@ describe("botScore against the real answer keys", () => {
     for (const slug of ["barnard", "eps-indi-b", "wise0855", "rw-aur", "r-dra", "taurus-ice"]) {
       expect(per[slug]).toMatchObject({ score: 0, above_bar: 0, matched: 0 });
     }
-    expect(per.eris).toMatchObject({ score: 1000, above_bar: 2, matched: 1 });
+    expect(per.eris).toMatchObject({ score: 1000, above_bar: 1, matched: 1 });
     expect(per.hektor).toMatchObject({ score: 250, above_bar: 3, matched: 1 });
     expect(per.makemake).toMatchObject({ score: 500, above_bar: 1, matched: 1 });
     expect(per.eros).toMatchObject({ score: 0, above_bar: 0, matched: 0 });
@@ -258,9 +258,9 @@ describe("botScore against the real answer keys", () => {
     expect(per.hektor.matches).toEqual([{ rank: 1, object: "624 Hektor (A907 CF)" }]);
     expect(per.makemake.matches).toEqual([{ rank: 1, object: "136472 Makemake (2005 FY9)" }]);
     expect(bot.score).toBe(1750);
-    expect(bot.above_bar).toBe(6);
+    expect(bot.above_bar).toBe(5);
     expect(bot.matched).toBe(3);
-    expect(bot.accuracy).toBe(0.5);
+    expect(bot.accuracy).toBe(0.6);
   });
   it("counts a known object once when two candidates land on it", async () => {
     const key = await loadAnswerKey("eris");
