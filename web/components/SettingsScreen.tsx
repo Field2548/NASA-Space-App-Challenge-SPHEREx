@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { DEFAULT_MUSIC_VOLUME, type MusicSettings, loadMusic, saveMusic } from "@/lib/music";
 import { loadVision, saveVision } from "@/lib/settings";
+import { loadUiSounds, saveUiSounds } from "@/lib/uiSound";
 import type { Vision } from "@/lib/types";
 import BackLink from "./BackLink";
 import styles from "./InfoPage.module.css";
@@ -13,10 +14,12 @@ export default function SettingsScreen() {
   // Server and first client render show the defaults; the saved values are read after mount.
   const [vision, setVision] = useState<Vision>("normal");
   const [music, setMusic] = useState<MusicSettings>({ on: true, volume: DEFAULT_MUSIC_VOLUME });
+  const [sounds, setSounds] = useState(true);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage exists only on the client
     setVision(loadVision());
     setMusic(loadMusic());
+    setSounds(loadUiSounds());
   }, []);
   const changeMusic = (m: Partial<MusicSettings>) => {
     setMusic((old) => ({ ...old, ...m }));
@@ -59,6 +62,20 @@ export default function SettingsScreen() {
           Space ambience on the map and menus, a cello piece during a round, and a short theme when you solve a spot.
           Music starts after your first click on the page.
         </p>
+      </section>
+      <section className="panel" data-part="SET-03 // SOUNDS">
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={sounds}
+            onChange={(e) => {
+              setSounds(e.target.checked);
+              saveUiSounds(e.target.checked);
+            }}
+          />
+          Interface sounds
+        </label>
+        <p>A soft tick when you press a button, tick a box or move a slider.</p>
       </section>
     </main>
   );

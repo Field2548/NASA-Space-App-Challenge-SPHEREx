@@ -13,7 +13,7 @@ export interface GuestFind {
 
 export interface GuestData {
   tutorial: { level: number; step: number; done: number[] };
-  settings: { vision: Vision; reducedMotion?: boolean; music?: boolean; musicVolume?: number };
+  settings: { vision: Vision; reducedMotion?: boolean; music?: boolean; musicVolume?: number; uiSounds?: boolean };
   finds: GuestFind[];
   name?: string;
 }
