@@ -1,0 +1,75 @@
+{
+ "slug": "fixture",
+ "nothing_moves": false,
+ "noise_bar_sigma": 6.0,
+ "t_ref_mjd": 61000.1875,
+ "reveal": {
+  "title": "Fixture (synthetic test spot)",
+  "kind": "fixture",
+  "difficulty": "easy"
+ },
+ "objects": [
+  {
+   "id": "fixture-1",
+   "name": "Fixture mover",
+   "kind": "asteroid",
+   "source": "synthetic",
+   "positions": [
+    {
+     "frame": 1,
+     "x": 10,
+     "y": 16,
+     "in_grid": true
+    },
+    {
+     "frame": 2,
+     "x": 12,
+     "y": 16,
+     "in_grid": true
+    },
+    {
+     "frame": 3,
+     "x": 14,
+     "y": 16,
+     "in_grid": true
+    },
+    {
+     "frame": 4,
+     "x": 16,
+     "y": 16,
+     "in_grid": true
+    }
+   ],
+   "vx_px_per_day": 16.0,
+   "vy_px_per_day": 0.0
+  }
+ ],
+ "bot": {
+  "source": "synthetic",
+  "candidates": [
+   {
+    "rank": 1,
+    "x": 13.0,
+    "y": 16.0,
+    "vx_px_per_day": 16.0,
+    "vy_px_per_day": 0.0,
+    "stacked_snr": 38.0,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     19.0,
+     19.0,
+     19.0,
+     19.0
+    ],
+    "status": "known",
+    "object_id": "fixture-1",
+    "near_object_frames": [
+     1,
+     2,
+     3,
+     4
+    ]
+   }
+  ]
+ }
+}

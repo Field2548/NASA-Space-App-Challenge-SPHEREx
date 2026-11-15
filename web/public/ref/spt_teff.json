@@ -1,0 +1,479 @@
+{
+ "source": "https://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt (Eric Mamajek, \"A Modern Mean Dwarf Stellar Color and Effective Temperature Sequence\"); columns SpT and Teff only, parsed verbatim by script, no values typed by hand",
+ "citation": "Pecaut & Mamajek (2013, ApJS, 208, 9)",
+ "version": "Version 2022.04.16",
+ "rows": [
+  {
+   "spt": "O3V",
+   "teff": 44900
+  },
+  {
+   "spt": "O4V",
+   "teff": 42900
+  },
+  {
+   "spt": "O5V",
+   "teff": 41400
+  },
+  {
+   "spt": "O5.5V",
+   "teff": 40500
+  },
+  {
+   "spt": "O6V",
+   "teff": 39500
+  },
+  {
+   "spt": "O6.5V",
+   "teff": 38300
+  },
+  {
+   "spt": "O7V",
+   "teff": 37100
+  },
+  {
+   "spt": "O7.5V",
+   "teff": 36100
+  },
+  {
+   "spt": "O8V",
+   "teff": 35100
+  },
+  {
+   "spt": "O8.5V",
+   "teff": 34300
+  },
+  {
+   "spt": "O9V",
+   "teff": 33300
+  },
+  {
+   "spt": "O9.5V",
+   "teff": 31900
+  },
+  {
+   "spt": "B0V",
+   "teff": 31400
+  },
+  {
+   "spt": "B0.5V",
+   "teff": 29000
+  },
+  {
+   "spt": "B1V",
+   "teff": 26000
+  },
+  {
+   "spt": "B1.5V",
+   "teff": 24500
+  },
+  {
+   "spt": "B2V",
+   "teff": 20600
+  },
+  {
+   "spt": "B2.5V",
+   "teff": 18500
+  },
+  {
+   "spt": "B3V",
+   "teff": 17000
+  },
+  {
+   "spt": "B4V",
+   "teff": 16400
+  },
+  {
+   "spt": "B5V",
+   "teff": 15700
+  },
+  {
+   "spt": "B6V",
+   "teff": 14500
+  },
+  {
+   "spt": "B7V",
+   "teff": 14000
+  },
+  {
+   "spt": "B8V",
+   "teff": 12300
+  },
+  {
+   "spt": "B9V",
+   "teff": 10700
+  },
+  {
+   "spt": "B9.5V",
+   "teff": 10400
+  },
+  {
+   "spt": "A0V",
+   "teff": 9700
+  },
+  {
+   "spt": "A1V",
+   "teff": 9300
+  },
+  {
+   "spt": "A2V",
+   "teff": 8800
+  },
+  {
+   "spt": "A3V",
+   "teff": 8600
+  },
+  {
+   "spt": "A4V",
+   "teff": 8250
+  },
+  {
+   "spt": "A5V",
+   "teff": 8100
+  },
+  {
+   "spt": "A6V",
+   "teff": 7910
+  },
+  {
+   "spt": "A7V",
+   "teff": 7760
+  },
+  {
+   "spt": "A8V",
+   "teff": 7590
+  },
+  {
+   "spt": "A9V",
+   "teff": 7400
+  },
+  {
+   "spt": "F0V",
+   "teff": 7220
+  },
+  {
+   "spt": "F1V",
+   "teff": 7020
+  },
+  {
+   "spt": "F2V",
+   "teff": 6820
+  },
+  {
+   "spt": "F3V",
+   "teff": 6750
+  },
+  {
+   "spt": "F4V",
+   "teff": 6670
+  },
+  {
+   "spt": "F5V",
+   "teff": 6550
+  },
+  {
+   "spt": "F6V",
+   "teff": 6350
+  },
+  {
+   "spt": "F7V",
+   "teff": 6280
+  },
+  {
+   "spt": "F8V",
+   "teff": 6180
+  },
+  {
+   "spt": "F9V",
+   "teff": 6050
+  },
+  {
+   "spt": "F9.5V",
+   "teff": 5990
+  },
+  {
+   "spt": "G0V",
+   "teff": 5930
+  },
+  {
+   "spt": "G1V",
+   "teff": 5860
+  },
+  {
+   "spt": "G2V",
+   "teff": 5770
+  },
+  {
+   "spt": "G3V",
+   "teff": 5720
+  },
+  {
+   "spt": "G4V",
+   "teff": 5680
+  },
+  {
+   "spt": "G5V",
+   "teff": 5660
+  },
+  {
+   "spt": "G6V",
+   "teff": 5600
+  },
+  {
+   "spt": "G7V",
+   "teff": 5550
+  },
+  {
+   "spt": "G8V",
+   "teff": 5480
+  },
+  {
+   "spt": "G9V",
+   "teff": 5380
+  },
+  {
+   "spt": "K0V",
+   "teff": 5270
+  },
+  {
+   "spt": "K1V",
+   "teff": 5170
+  },
+  {
+   "spt": "K2V",
+   "teff": 5100
+  },
+  {
+   "spt": "K3V",
+   "teff": 4830
+  },
+  {
+   "spt": "K4V",
+   "teff": 4600
+  },
+  {
+   "spt": "K5V",
+   "teff": 4440
+  },
+  {
+   "spt": "K6V",
+   "teff": 4300
+  },
+  {
+   "spt": "K7V",
+   "teff": 4100
+  },
+  {
+   "spt": "K8V",
+   "teff": 3990
+  },
+  {
+   "spt": "K9V",
+   "teff": 3930
+  },
+  {
+   "spt": "M0V",
+   "teff": 3850
+  },
+  {
+   "spt": "M0.5V",
+   "teff": 3770
+  },
+  {
+   "spt": "M1V",
+   "teff": 3660
+  },
+  {
+   "spt": "M1.5V",
+   "teff": 3620
+  },
+  {
+   "spt": "M2V",
+   "teff": 3560
+  },
+  {
+   "spt": "M2.5V",
+   "teff": 3470
+  },
+  {
+   "spt": "M3V",
+   "teff": 3430
+  },
+  {
+   "spt": "M3.5V",
+   "teff": 3270
+  },
+  {
+   "spt": "M4V",
+   "teff": 3210
+  },
+  {
+   "spt": "M4.5V",
+   "teff": 3110
+  },
+  {
+   "spt": "M5V",
+   "teff": 3060
+  },
+  {
+   "spt": "M5.5V",
+   "teff": 2930
+  },
+  {
+   "spt": "M6V",
+   "teff": 2810
+  },
+  {
+   "spt": "M6.5V",
+   "teff": 2740
+  },
+  {
+   "spt": "M7V",
+   "teff": 2680
+  },
+  {
+   "spt": "M7.5V",
+   "teff": 2630
+  },
+  {
+   "spt": "M8V",
+   "teff": 2570
+  },
+  {
+   "spt": "M8.5V",
+   "teff": 2420
+  },
+  {
+   "spt": "M9V",
+   "teff": 2380
+  },
+  {
+   "spt": "M9.5V",
+   "teff": 2350
+  },
+  {
+   "spt": "L0V",
+   "teff": 2270
+  },
+  {
+   "spt": "L1V",
+   "teff": 2160
+  },
+  {
+   "spt": "L2V",
+   "teff": 2060
+  },
+  {
+   "spt": "L3V",
+   "teff": 1920
+  },
+  {
+   "spt": "L4V",
+   "teff": 1870
+  },
+  {
+   "spt": "L5V",
+   "teff": 1710
+  },
+  {
+   "spt": "L6V",
+   "teff": 1550
+  },
+  {
+   "spt": "L7V",
+   "teff": 1530
+  },
+  {
+   "spt": "L8V",
+   "teff": 1420
+  },
+  {
+   "spt": "L9V",
+   "teff": 1370
+  },
+  {
+   "spt": "T0V",
+   "teff": 1255
+  },
+  {
+   "spt": "T1V",
+   "teff": 1240
+  },
+  {
+   "spt": "T2V",
+   "teff": 1220
+  },
+  {
+   "spt": "T3V",
+   "teff": 1200
+  },
+  {
+   "spt": "T4V",
+   "teff": 1180
+  },
+  {
+   "spt": "T4.5V",
+   "teff": 1170
+  },
+  {
+   "spt": "T5V",
+   "teff": 1160
+  },
+  {
+   "spt": "T5.5V",
+   "teff": 1040
+  },
+  {
+   "spt": "T6V",
+   "teff": 950
+  },
+  {
+   "spt": "T7V",
+   "teff": 825
+  },
+  {
+   "spt": "T7.5V",
+   "teff": 750
+  },
+  {
+   "spt": "T8V",
+   "teff": 680
+  },
+  {
+   "spt": "T8.5V",
+   "teff": 600
+  },
+  {
+   "spt": "T9V",
+   "teff": 560
+  },
+  {
+   "spt": "T9.5V",
+   "teff": 510
+  },
+  {
+   "spt": "Y0V",
+   "teff": 450
+  },
+  {
+   "spt": "Y0.5V",
+   "teff": 400
+  },
+  {
+   "spt": "Y1V",
+   "teff": 360
+  },
+  {
+   "spt": "Y1.5V",
+   "teff": 325
+  },
+  {
+   "spt": "Y2V",
+   "teff": 320
+  },
+  {
+   "spt": "Y4V",
+   "teff": 250
+  }
+ ]
+}

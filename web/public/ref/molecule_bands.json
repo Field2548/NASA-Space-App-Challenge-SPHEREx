@@ -1,0 +1,29 @@
+{
+  "about": "Shaded molecule bands for the Inspect rainbow spectrum chart. Every centre and every range comes from docs/BUILD_PROMPT.md section 8.16 'C. Spectrum view' item 1 ('Shaded, labeled molecule bands'). Where the build prompt gives only a centre ('near 1.4 um', 'H2O ice 3.0 um'), the range is a display width chosen by the web team (about one SPHEREx band either side, flagged per band in 'width'); the 'ice and dust' ranges are also the measurement bands of findFeatures in web/lib/inspect.ts. Please check against the literature before relying on the widths.",
+  "units": "micron",
+  "families": [
+    {
+      "id": "gas",
+      "label": "Gas in cool star and brown-dwarf atmospheres",
+      "bands": [
+        { "name": "H2O", "label": "H₂O", "center_um": 1.4, "range_um": [1.33, 1.5], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'H2O near 1.4 um'; width chosen by the web team" },
+        { "name": "H2O", "label": "H₂O", "center_um": 1.9, "range_um": [1.8, 2.0], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'H2O near 1.9 um'; width chosen by the web team" },
+        { "name": "H2O", "label": "H₂O", "center_um": 2.7, "range_um": [2.55, 2.85], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'H2O near 2.7 um'; width chosen by the web team" },
+        { "name": "CH4", "label": "CH₄", "center_um": 2.3, "range_um": [2.2, 2.4], "width": "given", "source": "BUILD_PROMPT 8.16 C.1: 'CH4 near 2.2-2.4 um'" },
+        { "name": "CH4", "label": "CH₄", "center_um": 3.4, "range_um": [3.2, 3.6], "width": "given", "source": "BUILD_PROMPT 8.16 C.1: 'CH4 near 3.2-3.6 um'" },
+        { "name": "CO2", "label": "CO₂", "center_um": 4.275, "range_um": [4.2, 4.35], "width": "given", "source": "BUILD_PROMPT 8.16 C.1: 'CO2 near 4.2-4.35 um'" },
+        { "name": "CO", "label": "CO", "center_um": 4.65, "range_um": [4.5, 4.8], "width": "given", "source": "BUILD_PROMPT 8.16 C.1: 'CO near 4.5-4.8 um'" }
+      ]
+    },
+    {
+      "id": "ice",
+      "label": "Ice and dust in clouds",
+      "bands": [
+        { "name": "H2O", "feature": "H2O", "label": "H₂O ice", "center_um": 3.0, "range_um": [2.9, 3.1], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'H2O ice 3.0 um'; width chosen by the web team" },
+        { "name": "PAH", "feature": "PAH", "label": "PAH glow", "center_um": 3.3, "range_um": [3.25, 3.35], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'PAH glow 3.3 um'; width chosen by the web team" },
+        { "name": "CO2", "feature": "CO2", "label": "CO₂ ice", "center_um": 4.27, "range_um": [4.24, 4.3], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'CO2 ice 4.27 um'; width chosen by the web team" },
+        { "name": "CO", "feature": "CO", "label": "CO ice", "center_um": 4.67, "range_um": [4.64, 4.7], "width": "chosen", "source": "BUILD_PROMPT 8.16 C.1: 'CO ice 4.67 um'; width chosen by the web team" }
+      ]
+    }
+  ]
+}

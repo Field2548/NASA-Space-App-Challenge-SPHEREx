@@ -1,0 +1,176 @@
+{
+ "slug": "eris",
+ "title": "Field in Cetus",
+ "kind": "spot",
+ "difficulty": "boss",
+ "ra": 26.3271,
+ "dec": -0.4338,
+ "fov_deg": 0.1,
+ "pixel_arcsec": 6.15,
+ "size": [
+  59,
+  59
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   26.3271,
+   -0.4338
+  ],
+  "crpix": [
+   30,
+   30
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 61047.05341,
+   "utc": "2026-01-07T01:16:54",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 61048.204827,
+   "utc": "2026-01-08T04:54:57",
+   "hours_since_prev": 27.63,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 61049.358593,
+   "utc": "2026-01-09T08:36:22",
+   "hours_since_prev": 27.69,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61049.63064,
+   "utc": "2026-01-09T15:08:07",
+   "hours_since_prev": 6.53,
+   "n_bands": 6,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61050.988521,
+   "utc": "2026-01-10T23:43:28",
+   "hours_since_prev": 32.59,
+   "n_bands": 6,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 6,
+   "mjd": 61052.211442,
+   "utc": "2026-01-12T05:04:28",
+   "hours_since_prev": 29.35,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 7,
+   "mjd": 61052.54878,
+   "utc": "2026-01-12T13:10:14",
+   "hours_since_prev": 8.1,
+   "n_bands": 4,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 8,
+   "mjd": 61054.723546,
+   "utc": "2026-01-14T17:21:54",
+   "hours_since_prev": 52.19,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 9,
+   "mjd": 61056.148365,
+   "utc": "2026-01-16T03:33:38",
+   "hours_since_prev": 34.2,
+   "n_bands": 4,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 10,
+   "mjd": 61056.557296,
+   "utc": "2026-01-16T13:22:30",
+   "hours_since_prev": 9.81,
+   "n_bands": 4,
+   "detectors": [
+    1,
+    4
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0947,
+  "offset": -6,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp",
+  "thumbs/6.webp",
+  "thumbs/7.webp",
+  "thumbs/8.webp",
+  "thumbs/9.webp",
+  "thumbs/10.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1,
+  "soft_sigma": 2,
+  "white": 314.196
+ },
+ "psf_fwhm_px": 1.654,
+ "has": {
+  "exposures": true,
+  "spectrum": true
+ }
+}

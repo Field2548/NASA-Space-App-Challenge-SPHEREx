@@ -1,0 +1,8 @@
+.root {
+  position: relative;
+}
+
+.link {
+  align-self: center;
+  font-size: 13px;
+}

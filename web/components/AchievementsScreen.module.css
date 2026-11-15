@@ -1,0 +1,111 @@
+.page {
+  padding: var(--space-5) clamp(16px, 4vw, 64px);
+  line-height: 1.6;
+}
+
+.total {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: 18px;
+}
+
+.guest {
+  color: var(--text-dim);
+  border-left: 3px solid var(--amber);
+  padding-left: var(--space-3);
+}
+
+.error {
+  border: 1px solid var(--magenta);
+  padding: var(--space-3);
+  background: var(--bg-1);
+}
+
+.bar {
+  height: 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--cyan);
+  transition: width 400ms ease-out;
+}
+
+.grid {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.badge {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.badge[data-unlocked="true"] {
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 25%, transparent);
+}
+
+.badge[data-unlocked="true"] .icon {
+  color: var(--green);
+}
+
+.badge[data-unlocked="false"] {
+  opacity: 0.6;
+}
+
+.badge[data-unlocked="false"] .bar span {
+  background: var(--text-dim);
+}
+
+.icon {
+  flex: none;
+  color: var(--text-dim);
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.badgeTitle {
+  margin: 0 0 var(--space-1);
+  font-size: 14px;
+}
+
+.desc {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.compact .desc {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar span {
+    transition: none;
+  }
+}

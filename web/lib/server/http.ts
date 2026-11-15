@@ -1,0 +1,129 @@
+// Shared helpers for route handlers (owner: SERVER). Server only.
+// Error shape and codes: docs/contracts/api.md section 1.
+
+import { unstable_rethrow } from "next/navigation";
+import { NextResponse } from "next/server";
+import type { ZodType } from "zod";
+import { ScoringError } from "@/lib/scoring";
+
+export type ErrorCode =
+  | "bad_request"
+  | "unauthorized"
+  | "not_found"
+  | "rate_limited"
+  | "upstream_failed"
+  | "db_unavailable"
+  | "internal";
+
+const STATUS: Record<ErrorCode, number> = {
+  bad_request: 400,
+  unauthorized: 401,
+  not_found: 404,
+  rate_limited: 429,
+  upstream_failed: 502,
+  db_unavailable: 503,
+  internal: 500,
+};
+
+/** Throw this anywhere inside a handler to answer with the contract's error shape. */
+export class ApiFail extends Error {
+  code: ErrorCode;
+  details?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  constructor(
+    code: ErrorCode,
+    message: string,
+    details?: Record<string, unknown>,
+    headers?: Record<string, string>,
+  ) {
+    super(message);
+    this.code = code;
+    this.details = details;
+    this.headers = headers;
+  }
+}
+
+export function errorResponse(
+  code: ErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+  headers?: Record<string, string>,
+): NextResponse {
+  return NextResponse.json(
+    { error: { code, message, details: details ?? {} } },
+    { status: STATUS[code], headers },
+  );
+}
+
+/** Validate with zod; a failure becomes a 400 that carries the zod issues. */
+export function parse<T>(schema: ZodType<T>, data: unknown): T {
+  const r = schema.safeParse(data);
+  if (r.success) return r.data;
+  const first = r.error.issues[0];
+  const where = first?.path?.length ? ` (${first.path.join(".")})` : "";
+  throw new ApiFail("bad_request", `That request is not valid${where}: ${first?.message ?? "bad input"}.`, {
+    issues: r.error.issues,
+  });
+}
+
+export const MAX_BODY_BYTES = 64_000;
+
+/** Read a JSON body. Refuses bodies over 64 kB (by Content-Length first, then by bytes) and anything that is not JSON. */
+export async function readJsonBody(request: Request): Promise<unknown> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null && !(Number(declared) <= MAX_BODY_BYTES)) {
+    throw new ApiFail("bad_request", "That request is too large.");
+  }
+  const text = await request.text();
+  if (Buffer.byteLength(text, "utf8") > MAX_BODY_BYTES) throw new ApiFail("bad_request", "That request is too large.");
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiFail("bad_request", "The request body must be JSON.");
+  }
+}
+
+/** Query string as a plain object (first value of each key). */
+export function queryObject(request: Request): Record<string, string> {
+  return Object.fromEntries(new URL(request.url).searchParams.entries());
+}
+
+/**
+ * Best guess at the caller's address, for the light rate limit only.
+ * Order: `x-vercel-forwarded-for` (first entry; Vercel's edge sets it from the real connection, so a
+ * client cannot choose it), then the LAST entry of `x-forwarded-for`, then `x-real-ip`. Each proxy
+ * appends the address it saw to the end of `x-forwarded-for`, so the last entry is the one added by
+ * the nearest proxy; the first entry is whatever the client wrote. `x-real-ip` comes after it
+ * because, off Vercel, a client can set that header to anything. Without any of them (local
+ * development): "local".
+ */
+export function clientIp(request: Request): string {
+  const first = (v: string | null) => (v ?? "").split(",")[0].trim();
+  const vercel = first(request.headers.get("x-vercel-forwarded-for"));
+  if (vercel) return vercel;
+  const fwd = (request.headers.get("x-forwarded-for") ?? "").split(",");
+  const last = fwd[fwd.length - 1].trim();
+  if (last) return last;
+  const real = (request.headers.get("x-real-ip") ?? "").trim();
+  return real || "local";
+}
+
+/** Next.js's own control-flow error while prerendering (cacheComponents): it must reach Next. */
+function isPrerenderBailout(e: unknown): boolean {
+  return typeof e === "object" && e !== null && (e as { digest?: unknown }).digest === "NEXT_PRERENDER_INTERRUPTED";
+}
+
+/** Run a handler and turn every failure into the contract's error JSON. */
+export async function handle(fn: () => Promise<Response>): Promise<Response> {
+  try {
+    return await fn();
+  } catch (e) {
+    // Framework errors (prerender bail-out, notFound, redirect, dynamic-usage) pass through.
+    unstable_rethrow(e);
+    if (isPrerenderBailout(e)) throw e;
+    if (e instanceof ApiFail) return errorResponse(e.code, e.message, e.details, e.headers);
+    if (e instanceof ScoringError) return errorResponse(e.code, e.message);
+    console.error("[api] unexpected error", e);
+    return errorResponse("internal", "Something went wrong on our side. Please try again.");
+  }
+}

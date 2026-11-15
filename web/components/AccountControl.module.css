@@ -1,0 +1,44 @@
+.account {
+  /* Absolute, not fixed: it sits in the top-right corner of the page and scrolls away with the page
+     header, so it never floats over content on a scrolled page. (<body> is not positioned, so this is
+     relative to the first screen.) Full-height screens do not scroll on a desktop, so it stays
+     visible there. On phones /play does scroll (min-height 600 px and taller panels), so the
+     control scrolls away there and a player scrolls up to reach Log in or the profile menu. */
+  position: absolute;
+  top: 8px;
+  right: var(--space-3);
+  z-index: 30;
+}
+
+.login,
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: 1px solid var(--cyan);
+  border-radius: 999px;
+  font: inherit;
+  color: var(--cyan);
+  background: rgb(0 0 0 / 0.72);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.login {
+  padding: 0 var(--space-3);
+  font-size: 14px;
+}
+
+.icon {
+  width: 32px;
+  font-weight: 700;
+}
+
+.login:hover,
+.icon:hover,
+.login:focus-visible,
+.icon:focus-visible {
+  color: var(--text);
+  border-color: var(--text);
+}

@@ -1,0 +1,127 @@
+{
+ "slug": "makemake",
+ "nothing_moves": false,
+ "noise_bar_sigma": 6.4,
+ "t_ref_mjd": 60827.255903,
+ "objects": [
+  {
+   "id": "136472",
+   "name": "136472 Makemake (2005 FY9)",
+   "kind": "dwarf-planet",
+   "source": "JPL Horizons",
+   "positions": [
+    {
+     "frame": 1,
+     "x": 21.79,
+     "y": 25.79,
+     "in_grid": true,
+     "snr": 1.8,
+     "change_snr": 2.1
+    },
+    {
+     "frame": 2,
+     "x": 24.49,
+     "y": 26.93,
+     "in_grid": true,
+     "snr": 5.9,
+     "change_snr": 3.7
+    },
+    {
+     "frame": 3,
+     "x": 29.42,
+     "y": 29.13,
+     "in_grid": true,
+     "snr": 12.2,
+     "change_snr": 12.1
+    },
+    {
+     "frame": 4,
+     "x": 32.4,
+     "y": 30.53,
+     "in_grid": true,
+     "snr": 9.7,
+     "change_snr": 5.7
+    },
+    {
+     "frame": 5,
+     "x": 36.81,
+     "y": 32.68,
+     "in_grid": true,
+     "snr": 21.0,
+     "change_snr": 10.6
+    }
+   ],
+   "vx_px_per_day": 5.534,
+   "vy_px_per_day": 2.537
+  }
+ ],
+ "bot": {
+  "source": "shift_stack.py",
+  "candidates": [
+   {
+    "rank": 1,
+    "x": 29,
+    "y": 29,
+    "vx_px_per_day": 5.83,
+    "vy_px_per_day": 2.637,
+    "stacked_snr": 7.91,
+    "above_noise_bar": true,
+    "snr_per_frame": [
+     2.0,
+     3.7,
+     12.1,
+     5.7,
+     6.3
+    ],
+    "status": "known",
+    "object_id": "136472",
+    "near_object_frames": [
+     1,
+     2,
+     3,
+     4,
+     5
+    ]
+   },
+   {
+    "rank": 2,
+    "x": 11,
+    "y": 50,
+    "vx_px_per_day": 1.413,
+    "vy_px_per_day": 3.373,
+    "stacked_snr": 6.05,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     3.5,
+     4.0,
+     1.9,
+     0.2,
+     4.4
+    ],
+    "status": "unconfirmed"
+   },
+   {
+    "rank": 3,
+    "x": 51,
+    "y": 29,
+    "vx_px_per_day": -1.901,
+    "vy_px_per_day": -9.512,
+    "stacked_snr": 6.01,
+    "above_noise_bar": false,
+    "snr_per_frame": [
+     4.4,
+     1.8,
+     2.2,
+     0.0,
+     6.0
+    ],
+    "status": "unconfirmed"
+   }
+  ]
+ },
+ "reveal": {
+  "title": "(136472) Makemake",
+  "kind": "dwarf-planet",
+  "difficulty": "hard"
+ }
+}

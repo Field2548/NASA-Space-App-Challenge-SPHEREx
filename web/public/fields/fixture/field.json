@@ -1,0 +1,104 @@
+{
+ "slug": "fixture",
+ "title": "Fixture (synthetic test spot)",
+ "kind": "fixture",
+ "difficulty": "easy",
+ "ra": 150.0,
+ "dec": 2.0,
+ "fov_deg": 0.0547,
+ "pixel_arcsec": 6.15,
+ "size": [
+  32,
+  32
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   150.0,
+   2.0
+  ],
+  "crpix": [
+   16.0,
+   16.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 61000.0,
+   "utc": "2025-11-21T00:00:00",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 61000.125,
+   "utc": "2025-11-21T03:00:00",
+   "hours_since_prev": 3.0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 61000.25,
+   "utc": "2025-11-21T06:00:00",
+   "hours_since_prev": 3.0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61000.375,
+   "utc": "2025-11-21T09:00:00",
+   "hours_since_prev": 3.0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.01,
+  "offset": -4.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 14.724
+ },
+ "psf_fwhm_px": 1.6,
+ "has": {
+  "exposures": false,
+  "spectrum": false
+ }
+}

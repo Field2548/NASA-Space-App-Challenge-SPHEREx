@@ -1,0 +1,369 @@
+/* Design tokens: BP section 12 ("blueprint terminal"). Owner GAME. */
+:root {
+  --bg-0: #04060b;
+  --bg-1: #0a0f1a;
+  --grid: #12304d;
+  --line: #2a4a6b;
+  --text: #d7e3f4;
+  --text-dim: #8fa3bd;
+  --cyan: #00e1ff;
+  --green: #3dff8a;
+  --magenta: #ff2e88;
+  --amber: #ffb000;
+  --viewport: #000000; /* science viewport: neutral black, no effects */
+
+  --font-display-stack: var(--font-display), system-ui, sans-serif;
+  --font-mono-stack: var(--font-mono), ui-monospace, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+  --radius-pill: 999px;
+}
+
+/* P3 overrides for UI accents only; science colours keep their sRGB values. */
+@media (color-gamut: p3) {
+  :root {
+    --cyan: color(display-p3 0 0.88 1);
+    --green: color(display-p3 0.3 1 0.55);
+    --magenta: color(display-p3 1 0.18 0.55);
+    --amber: color(display-p3 1 0.7 0);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+/* The site footer is position: fixed to the window bottom, so <body> reserves its height (only when
+   the footer is rendered; it is not on /embed) and the end of a long page scrolls fully into view
+   above it. Full-height screens are 100vh - var(--site-footer-h), which with this padding fills the
+   window exactly. If viewport-fit=cover is ever added, add env(safe-area-inset-bottom) here, to the
+   footer's height and to those screens. */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+body:has(> footer[data-site-footer]) {
+  padding-bottom: var(--site-footer-h, 0px);
+}
+
+body > * {
+  flex-shrink: 0;
+}
+
+body {
+  color: var(--text);
+  background-color: var(--bg-0);
+  /* Blueprint grid: 8 px minor, 40 px major, thin 1 px lines. */
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--grid) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--grid) 40%, transparent) 1px, transparent 1px);
+  background-size:
+    40px 40px,
+    40px 40px,
+    8px 8px,
+    8px 8px;
+  font-family: var(--font-mono-stack);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+button,
+.label {
+  font-family: var(--font-display-stack);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+h1 {
+  font-weight: 800;
+}
+
+h2,
+h3,
+button,
+.label {
+  font-weight: 600;
+}
+
+a {
+  color: var(--cyan);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+button {
+  color: var(--text);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 25%, transparent);
+  cursor: pointer;
+}
+
+/* Click feedback for every button and button-like link: hover lights up, a press sinks the
+   button, a toggle that is on stays lit, disabled looks disabled. */
+button,
+[role="button"],
+a[class] {
+  transition:
+    transform 80ms ease-out,
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out,
+    color 120ms ease-out;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background-color: color-mix(in srgb, var(--cyan) 10%, var(--bg-1));
+}
+
+button:active:not(:disabled),
+[role="button"]:active,
+a[class]:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+button:active:not(:disabled) {
+  background-color: color-mix(in srgb, var(--cyan) 25%, var(--bg-1));
+  box-shadow: inset 0 2px 4px color-mix(in srgb, black 50%, transparent);
+}
+
+button[aria-pressed="true"],
+button[aria-checked="true"] {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background-color: color-mix(in srgb, var(--cyan) 18%, var(--bg-1));
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 10px color-mix(in srgb, var(--cyan) 35%, transparent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Form controls: one look for every slider, tick box, radio, select and text field. */
+select,
+input:not([type]),
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+textarea {
+  color: var(--text);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px var(--space-2);
+  font: inherit;
+  font-size: 13px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 25%, transparent);
+  transition: border-color 120ms ease-out;
+}
+
+select {
+  cursor: pointer;
+}
+
+select option {
+  background: var(--bg-1);
+  color: var(--text);
+}
+
+select:hover:not(:disabled),
+input:hover:not(:disabled):not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+textarea:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: -3px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease-out,
+    background-color 120ms ease-out;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]::before,
+input[type="radio"]::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--cyan);
+  transform: scale(0);
+  transition: transform 100ms ease-out;
+}
+
+input[type="checkbox"]::before {
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+  width: 10px;
+  height: 10px;
+}
+
+input[type="radio"]::before {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  border-color: var(--cyan);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--cyan) 35%, transparent);
+}
+
+input[type="checkbox"]:checked::before,
+input[type="radio"]:checked::before {
+  transform: scale(1);
+}
+
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+
+input[type="range"] {
+  appearance: none;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--cyan);
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  background: var(--cyan);
+  border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  background: var(--bg-0);
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: var(--bg-0);
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+}
+
+input[type="range"]:hover:not(:disabled)::-webkit-slider-thumb {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--cyan) 50%, transparent);
+}
+
+input[type="range"]:hover:not(:disabled)::-moz-range-thumb {
+  box-shadow: 0 0 6px color-mix(in srgb, var(--cyan) 50%, transparent);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Panel with a part number, e.g. <section className="panel" data-part="PNL-02 // IMAGE TOOLS"> */
+.panel {
+  position: relative;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  padding: var(--space-3);
+}
+
+.panel[data-part]::before {
+  content: attr(data-part);
+  position: absolute;
+  top: -0.75em;
+  left: var(--space-2);
+  padding: 0 var(--space-1);
+  background: var(--bg-0);
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* Hazard stripes: experimental or Tier 2 features only. */
+.hazard {
+  border-top: 4px solid transparent;
+  border-image: repeating-linear-gradient(-45deg, var(--amber) 0 8px, var(--bg-0) 8px 16px) 4;
+}
+
+.science-viewport {
+  background: var(--viewport);
+  image-rendering: pixelated;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

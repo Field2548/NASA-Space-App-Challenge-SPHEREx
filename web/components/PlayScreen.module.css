@@ -1,0 +1,292 @@
+.screen {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  height: calc(100vh - var(--site-footer-h, 0px));
+  min-height: 600px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  padding-right: 112px; /* room for the account control (AccountControl, top-right, scrolls with the page) */
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-1);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--font-display-stack);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.logo svg {
+  color: var(--cyan);
+}
+
+.body {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr) var(--right-w, 360px);
+  grid-template-rows: 1fr 226px;
+  grid-template-areas:
+    "left center right"
+    "bottom bottom bottom";
+  min-height: 0;
+}
+
+.scoreClosed {
+  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr) 40px;
+}
+
+/* No scoreboard yet (tutorial level 0): the right column goes away. */
+.noRight {
+  grid-template-columns: var(--left-w, 330px) minmax(0, 1fr);
+  grid-template-areas:
+    "left center"
+    "bottom bottom";
+}
+
+.left,
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.left {
+  grid-area: left;
+  border-right: 1px solid var(--line);
+}
+
+.right {
+  grid-area: right;
+  border-left: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+
+.left :global(.panel),
+.right :global(.panel) {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2) var(--space-2);
+}
+
+.wide {
+  width: 100%;
+  font-size: 12px;
+}
+
+.wide[aria-pressed="true"] {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.wide:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.wide kbd {
+  font-family: var(--font-mono-stack);
+  border: 1px solid var(--line);
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+.slot {
+  border: 1px dashed var(--line);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: var(--space-1) var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+.viewportTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.viewer {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.kbd {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.kbd:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* FieldViewer draws the crosshair in its marks SVG. Keyboard users only: hidden after a pointer
+   press, shown again by Tab focus or an arrow key. */
+.kbd [data-testid="kb-cursor"] {
+  stroke: var(--magenta);
+}
+
+.kbd[data-pointer="true"] [data-testid="kb-cursor"],
+.kbd:not(:focus-within) [data-testid="kb-cursor"] {
+  display: none;
+}
+
+.kbdStatus {
+  margin: var(--space-1) 0 0;
+  min-height: 1.2em;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.notice {
+  color: var(--magenta);
+}
+
+.zoom {
+  position: absolute;
+  right: 0;
+  bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 12px;
+}
+
+.zoom button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.collapse {
+  align-self: flex-end;
+  font-size: 10px;
+  padding: var(--space-1) var(--space-2);
+}
+
+.small {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.bottom {
+  grid-area: bottom;
+  border-top: 1px solid var(--line);
+  background: var(--bg-1);
+  padding: var(--space-2) var(--space-3);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Phone and narrow windows: one column, viewer first, then tools, scoreboard and timeline. The
+   page scrolls down, never sideways; a zoomed image scrolls inside its own stage. */
+@media (max-width: 900px) {
+  .screen {
+    height: auto;
+    min-height: 0;
+  }
+
+  .body,
+  .scoreClosed,
+  .noRight {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas:
+      "center"
+      "left"
+      "right"
+      "bottom";
+  }
+
+  .viewer {
+    flex: none;
+    height: min(100vw, 560px);
+    min-height: 260px;
+  }
+
+  .left,
+  .right {
+    border: 0;
+    border-top: 1px solid var(--line);
+    overflow: visible;
+  }
+
+  .bottom {
+    overflow-x: auto;
+  }
+
+  .resizer {
+    display: none;
+  }
+}
+
+/* Panel width handles: a thin strip on the panel's inner border, above the bottom timeline row. */
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 226px;
+  width: 8px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizer[data-side="left"] {
+  left: calc(var(--left-w, 330px) - 4px);
+}
+
+.resizer[data-side="right"] {
+  right: calc(var(--right-w, 360px) - 4px);
+}
+
+.resizer:hover,
+.resizer:focus-visible {
+  background: color-mix(in srgb, var(--cyan) 45%, transparent);
+  outline: none;
+}
+
+.empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  color: var(--text-dim);
+}
+
+.empty pre {
+  color: var(--cyan);
+  margin: 0;
+}

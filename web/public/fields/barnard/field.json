@@ -1,0 +1,116 @@
+{
+ "slug": "barnard",
+ "title": "Test your tool on Barnard's Star",
+ "kind": "spot",
+ "difficulty": "tool",
+ "ra": 269.4464,
+ "dec": 4.7686,
+ "fov_deg": 0.2,
+ "pixel_arcsec": 6.15,
+ "size": [
+  119,
+  119
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   269.4464,
+   4.7686
+  ],
+  "crpix": [
+   60.0,
+   60.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 60908.641428,
+   "utc": "2025-08-21T15:23:39",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 60916.658314,
+   "utc": "2025-08-29T15:47:58",
+   "hours_since_prev": 192.41,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 61110.435297,
+   "utc": "2026-03-11T10:26:49",
+   "hours_since_prev": 4650.65,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61269.035657,
+   "utc": "2026-08-17T00:51:20",
+   "hours_since_prev": 3806.41,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61276.366696,
+   "utc": "2026-08-24T08:48:02",
+   "hours_since_prev": 175.94,
+   "n_bands": 8,
+   "detectors": [
+    1,
+    4
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.4983,
+  "offset": -2.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 418.723
+ },
+ "psf_fwhm_px": 1.654,
+ "has": {
+  "exposures": true,
+  "spectrum": false
+ }
+}

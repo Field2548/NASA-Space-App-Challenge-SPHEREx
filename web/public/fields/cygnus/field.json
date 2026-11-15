@@ -1,0 +1,116 @@
+{
+ "slug": "cygnus",
+ "title": "Field in Cygnus",
+ "kind": "spot",
+ "difficulty": "medium",
+ "ra": 304.6935,
+ "dec": 42.4437,
+ "fov_deg": 0.2,
+ "pixel_arcsec": 6.15,
+ "size": [
+  119,
+  119
+ ],
+ "wcs": {
+  "ctype": [
+   "RA---TAN",
+   "DEC--TAN"
+  ],
+  "crval": [
+   304.6935,
+   42.4437
+  ],
+  "crpix": [
+   60.0,
+   60.0
+  ],
+  "cdelt": [
+   -0.0017083,
+   0.0017083
+  ],
+  "rows": "top-down"
+ },
+ "frames": [
+  {
+   "i": 1,
+   "mjd": 61174.798617,
+   "utc": "2026-05-14T19:10:00",
+   "hours_since_prev": 0,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 2,
+   "mjd": 61175.679456,
+   "utc": "2026-05-15T16:18:25",
+   "hours_since_prev": 21.14,
+   "n_bands": 8,
+   "detectors": [
+    2,
+    5
+   ]
+  },
+  {
+   "i": 3,
+   "mjd": 61176.29025,
+   "utc": "2026-05-16T06:57:57",
+   "hours_since_prev": 14.66,
+   "n_bands": 6,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 4,
+   "mjd": 61176.902803,
+   "utc": "2026-05-16T21:40:02",
+   "hours_since_prev": 14.7,
+   "n_bands": 6,
+   "detectors": [
+    3,
+    6
+   ]
+  },
+  {
+   "i": 5,
+   "mjd": 61177.647687,
+   "utc": "2026-05-17T15:32:40",
+   "hours_since_prev": 17.88,
+   "n_bands": 8,
+   "detectors": [
+    3,
+    6
+   ]
+  }
+ ],
+ "data": {
+  "format": "u16",
+  "file": "frames.u16",
+  "scale": 0.0695,
+  "offset": -3.0,
+  "units": "S/N",
+  "precision": "float",
+  "nodata": 65535
+ },
+ "thumbs": [
+  "thumbs/1.webp",
+  "thumbs/2.webp",
+  "thumbs/3.webp",
+  "thumbs/4.webp",
+  "thumbs/5.webp"
+ ],
+ "stretch": {
+  "black_sigma": -1.0,
+  "soft_sigma": 2.0,
+  "white": 252.017
+ },
+ "psf_fwhm_px": 1.673,
+ "has": {
+  "exposures": true,
+  "spectrum": true
+ }
+}
