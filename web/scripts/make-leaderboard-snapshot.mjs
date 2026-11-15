@@ -1,4 +1,5 @@
 // Regenerates web/public/leaderboard-snapshot.json: the BOT row only, no invented players.
+// The bot row carries `movers` (known objects it reaches) for the Movers found board.
 // Run from web/:  node scripts/make-leaderboard-snapshot.mjs
 // Loads lib/server/bot.ts through Vite (a dependency of vitest), so no extra tooling is needed.
 
@@ -24,7 +25,7 @@ try {
     slug: null,
     source: "snapshot",
     updated_at: new Date().toISOString(),
-    rows: mergeBot([], bot).rows,
+    rows: mergeBot([], bot).rows.map((r) => (r.is_bot ? { ...r, movers: bot.matched } : r)),
   };
   const file = path.join(root, "public", "leaderboard-snapshot.json");
   await writeFile(file, JSON.stringify(snapshot, null, 2) + "\n");

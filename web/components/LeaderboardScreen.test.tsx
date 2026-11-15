@@ -15,6 +15,9 @@ vi.mock("next/link", () => ({
 
 import LeaderboardScreen from "./LeaderboardScreen";
 
+/** Most tests below are about the points board, so they open on it; the movers tests use the real default. */
+const PointsScreen = () => <LeaderboardScreen initialMetric="points" />;
+
 const spot = (slug: string, difficulty: string) => ({ slug, title: "Field", ra: 1, dec: 2, fov_deg: 0.1, difficulty, kind: "spot", thumbnail: `${slug}/t.webp` });
 const INDEX = [spot("eros", "easy"), spot("eris", "boss"), spot("hektor", "medium")];
 
@@ -26,11 +29,18 @@ const GLOBAL_ME = { rank: 4, name: "kt", score: 350, accuracy: 0.5, finds: 6 };
 const LOCAL_ROWS = [row(1, "tara", 450), row(2, "kt", 350, { is_me: true })];
 const LOCAL_ME = { rank: 2, name: "kt", score: 350, accuracy: 0.5, finds: 3 };
 
+const withMovers = (rows: Row[], counts: number[]) => rows.map((r, i) => ({ ...r, movers: counts[i] ?? 0 }));
+const GLOBAL_MOVERS = withMovers(GLOBAL_ROWS, [12, 9, 1, 4, 2]);
+const GLOBAL_MOVERS_ME = { ...GLOBAL_ME, movers: 4 };
+const LOCAL_MOVERS = withMovers(LOCAL_ROWS, [7, 4]);
+const LOCAL_MOVERS_ME = { ...LOCAL_ME, movers: 4 };
+
 type Over = Record<string, unknown>;
 /** The default API answer for a leaderboard URL: a logged-in "kt" with a rank on both boards. */
 function boardFor(u: string, over: Over = {}) {
   const q = new URL(u, "http://x").searchParams;
   const local = q.get("region") === "local";
+  const movers = q.get("metric") === "movers";
   const base = {
     scope: q.get("scope") === "spot" ? "spot" : "all",
     slug: q.get("slug"),
@@ -42,8 +52,9 @@ function boardFor(u: string, over: Over = {}) {
     detected_country: "TH",
     available: true,
     ...(local ? { countries: [{ code: "TH", players: 4 }, { code: "US", players: 2 }] } : {}),
-    rows: local ? LOCAL_ROWS : GLOBAL_ROWS,
-    me: local ? LOCAL_ME : GLOBAL_ME,
+    metric: q.get("metric") ?? "points",
+    rows: movers ? (local ? LOCAL_MOVERS : GLOBAL_MOVERS) : local ? LOCAL_ROWS : GLOBAL_ROWS,
+    me: movers ? (local ? LOCAL_MOVERS_ME : GLOBAL_MOVERS_ME) : local ? LOCAL_ME : GLOBAL_ME,
   };
   return { ...base, ...over };
 }
@@ -87,7 +98,7 @@ const viewBtn = (name: string) => screen.getByRole("button", { name: `View stats
 
 describe("LeaderboardScreen boards", () => {
   it("renders the global and local boards, each with a podium and a table", async () => {
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     const nova = await within(await screen.findByRole("region", { name: "Global" })).findByRole("button", { name: "View stats for nova" });
     expect(nova.closest("li")?.getAttribute("data-medal")).toBe("gold");
     expect(within(globalBoard()).getByRole("button", { name: "View stats for orion" }).closest("li")?.getAttribute("data-medal")).toBe("bronze");
@@ -113,7 +124,7 @@ describe("LeaderboardScreen boards", () => {
       json(
         boardFor(u, u.includes("region=global") ? { source: "snapshot", rows: [row(1, "Shift-and-stack bot", 1750, { is_bot: true, finds: null }), { rank: 2, name: "nova", score: 5, accuracy: null, is_bot: false, is_me: false }], me: null } : {}),
       );
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await screen.findByText(/Showing a saved copy/)).toBeTruthy();
     expect(within(globalBoard()).getByText("bot")).toBeTruthy();
     expect(within(globalBoard()).queryByRole("table")).toBeNull(); // only podium rows, no pinned me
@@ -121,7 +132,7 @@ describe("LeaderboardScreen boards", () => {
 
   it("pins my row at the bottom, after a gap marker, when I am outside the rows shown", async () => {
     respond = (u) => json(boardFor(u, u.includes("region=global") ? { rows: GLOBAL_ROWS.map((r) => ({ ...r, is_me: false })), me: { rank: 14, name: "kt", score: 40, accuracy: null, finds: 2 } } : {}));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     const mine = (await within(await screen.findByRole("region", { name: "Global" })).findByText("14")).closest("tr")!;
     expect(mine.getAttribute("data-me")).toBe("true");
     expect(within(mine).getByRole("button", { name: "View stats for kt" })).toBeTruthy();
@@ -132,7 +143,7 @@ describe("LeaderboardScreen boards", () => {
 
   it("shows an honest empty state", async () => {
     respond = (u) => json(boardFor(u, { rows: [], me: null }));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect((await within(await screen.findByRole("region", { name: "Global" })).findByText("No scores yet.")).tagName).toBe("P");
     fireEvent.click(screen.getByRole("button", { name: "This week" }));
     expect(await within(globalBoard()).findByText("No scores this week yet.")).toBeTruthy();
@@ -140,7 +151,7 @@ describe("LeaderboardScreen boards", () => {
 
   it("shows an error for a board that fails to load", async () => {
     respond = () => new Response("x", { status: 500 });
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await screen.findByText("The global board could not be loaded.")).toBeTruthy();
     expect(screen.getByText("The local board could not be loaded.")).toBeTruthy();
     expect(within(standing()).getByRole("alert").textContent).toMatch(/could not be loaded/);
@@ -149,7 +160,7 @@ describe("LeaderboardScreen boards", () => {
 
 describe("LeaderboardScreen controls", () => {
   it("switching to This week refetches both boards with period=week", async () => {
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     await screen.findByRole("button", { name: "View stats for nova" });
     const all = screen.getByRole("button", { name: "All time" });
     expect(all.getAttribute("aria-pressed")).toBe("true");
@@ -161,21 +172,8 @@ describe("LeaderboardScreen controls", () => {
     expect(screen.getByRole("button", { name: "This week" }).getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("the stage select names stages by number and difficulty and sends scope=spot&slug=", async () => {
-    render(<LeaderboardScreen />);
-    await screen.findByRole("option", { name: "Stage 2 (medium)" });
-    expect(screen.getByRole("option", { name: "All stages" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "Stage 3 (boss)" })).toBeTruthy();
-    expect(document.body.textContent).not.toMatch(/eros|hektor|eris/i);
-    fireEvent.change(screen.getByLabelText("Stage"), { target: { value: "hektor" } });
-    await waitFor(() => {
-      expect(boardCalls("region=global&scope=spot&slug=hektor")).toHaveLength(1);
-      expect(boardCalls("region=local&scope=spot&slug=hektor")).toHaveLength(1);
-    });
-  });
-
   it("the country select sends country= for the local board only", async () => {
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     const select = (await screen.findByLabelText("Country")) as HTMLSelectElement;
     await waitFor(() => expect(select.value).toBe("TH"));
     expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual([expect.stringContaining("Thailand"), expect.stringContaining("United States")]);
@@ -196,7 +194,7 @@ describe("LeaderboardScreen controls", () => {
       if (u.includes("period=week&region=global")) return json(boardFor(u, { rows: [row(1, "weekrow", 2)], me: null }));
       return json(boardFor(u));
     };
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     await screen.findByRole("button", { name: "View stats for tara" }); // local loaded, global still waiting
     fireEvent.click(screen.getByRole("button", { name: "This week" }));
     expect(await screen.findByRole("button", { name: "View stats for weekrow" })).toBeTruthy();
@@ -213,14 +211,14 @@ describe("LeaderboardScreen controls", () => {
 describe("LeaderboardScreen unavailable boards", () => {
   it("not_installed: weekly and local boards are being set up", async () => {
     respond = (u) => json(boardFor(u, { available: false, reason: "not_installed", rows: [], me: undefined }));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     const msgs = await screen.findAllByText("Weekly and local boards are being set up. All-time global scores are shown.");
     expect(msgs).toHaveLength(2);
   });
 
   it("no_database: live scores are unavailable", async () => {
     respond = (u) => json(boardFor(u, { available: false, reason: "no_database", rows: [], me: undefined }));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await screen.findAllByText("Live scores are unavailable right now.")).toHaveLength(2);
     expect(within(standing()).getByText("Your rank is not available right now.")).toBeTruthy();
   });
@@ -231,7 +229,7 @@ describe("LeaderboardScreen unavailable boards", () => {
       if (local && !u.includes("country=")) return json(boardFor(u, { available: false, reason: "no_country", country: null, detected_country: null, rows: [], me: undefined }));
       return json(boardFor(u));
     };
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await screen.findByText("We could not tell which country you are in. Pick one:")).toBeTruthy();
     const select = screen.getByLabelText("Country") as HTMLSelectElement;
     expect(select.value).toBe("");
@@ -244,7 +242,7 @@ describe("LeaderboardScreen unavailable boards", () => {
 
   it("no_country with no countries: says local boards appear once players have scores", async () => {
     respond = (u) => json(boardFor(u, u.includes("region=local") ? { available: false, reason: "no_country", country: null, detected_country: null, countries: [], rows: [], me: undefined } : {}));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await screen.findByText(/Local boards appear once players from a country have scores/)).toBeTruthy();
     expect(screen.queryByLabelText("Country")).toBeNull();
   });
@@ -254,7 +252,7 @@ describe("LeaderboardScreen standing card", () => {
   it("tells a guest to log in and never invents a rank", async () => {
     auth.header = {};
     respond = (u) => json(boardFor(u, { me: undefined, rows: GLOBAL_ROWS.map((r) => ({ ...r, is_me: false })) }));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await within(standing()).findByText("Log in to get a rank")).toBeTruthy();
     expect(within(standing()).getByText(/Log in button at the top right/)).toBeTruthy();
     expect(within(standing()).queryByText(/^#/)).toBeNull();
@@ -263,7 +261,7 @@ describe("LeaderboardScreen standing card", () => {
   });
 
   it("shows my rank, points, accuracy and classifications, and switches between global and local", async () => {
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await within(standing()).findByText("#4")).toBeTruthy();
     expect(within(standing()).getByText("350")).toBeTruthy();
     expect(within(standing()).getByText("50%")).toBeTruthy();
@@ -279,7 +277,7 @@ describe("LeaderboardScreen standing card", () => {
 
   it("says plainly when I am logged in with no points", async () => {
     respond = (u) => json(boardFor(u, { me: undefined, rows: GLOBAL_ROWS.map((r) => ({ ...r, is_me: false })) }));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     expect(await within(standing()).findByText(/You have no points yet\./)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "This week" }));
     expect(await within(standing()).findByText(/You have no points this week yet\./)).toBeTruthy();
@@ -296,7 +294,7 @@ describe("LeaderboardScreen player dialog", () => {
   it("opens from a name, fetches /api/player, shows stats, closes with Escape and returns focus", async () => {
     const base = respond;
     respond = (u) => (u.startsWith("/api/player") ? json(PLAYER) : base(u));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     const button = await within(await screen.findByRole("region", { name: "Global" })).findByRole("button", { name: "View stats for vega" });
     button.focus();
     fireEvent.click(button);
@@ -313,7 +311,7 @@ describe("LeaderboardScreen player dialog", () => {
   it("closes with the Close button and returns focus to the name", async () => {
     const base = respond;
     respond = (u) => (u.startsWith("/api/player") ? json(PLAYER) : base(u));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     const button = await within(await screen.findByRole("region", { name: "Global" })).findByRole("button", { name: "View stats for lyra" });
     fireEvent.click(button);
     fireEvent.click(await screen.findByRole("button", { name: "Close" }));
@@ -325,7 +323,7 @@ describe("LeaderboardScreen player dialog", () => {
     const base = respond;
     respond = (u) =>
       u.startsWith("/api/player") ? json({ name: "Shift-and-stack bot", is_bot: true, is_me: false, points: 1750, about: "An automatic search that plays every stage." }) : base(u);
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     fireEvent.click(await within(await screen.findByRole("region", { name: "Global" })).findByRole("button", { name: "View stats for nova" }));
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText(/plays every stage/)).toBeTruthy();
@@ -336,15 +334,104 @@ describe("LeaderboardScreen player dialog", () => {
   it("explains a 503", async () => {
     const base = respond;
     respond = (u) => (u.startsWith("/api/player") ? json({ error: { code: "db_unavailable", message: "x" } }, 503) : base(u));
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     fireEvent.click(await within(await screen.findByRole("region", { name: "Global" })).findByRole("button", { name: "View stats for nova" }));
     expect((await screen.findByRole("alert")).textContent).toBe("Player stats are not available right now.");
   });
 
   it("every name in the podium and the table is a button", async () => {
-    render(<LeaderboardScreen />);
+    render(<PointsScreen />);
     await screen.findByRole("button", { name: "View stats for nova" });
     for (const n of ["nova", "vega", "orion", "lyra", "tara"]) expect(viewBtn(n)).toBeTruthy();
     expect(within(localBoard()).getAllByRole("button", { name: /^View stats for/ }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("LeaderboardScreen movers metric", () => {
+  it("opens on Movers found, with no stage filter, and asks the API for metric=movers", async () => {
+    render(<LeaderboardScreen />);
+    await screen.findByRole("button", { name: "View stats for nova" });
+    expect(screen.getByRole("button", { name: "Movers found", pressed: true })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Points", pressed: false })).toBeTruthy();
+    expect(screen.queryByLabelText("Stage")).toBeNull();
+    expect(screen.queryByText("All stages")).toBeNull();
+    expect(boardCalls("period=all&region=global&metric=movers")).toHaveLength(1);
+    expect(boardCalls("period=all&region=local&metric=movers")).toHaveLength(1);
+    expect(calls.some((c) => c.includes("scope=") || c.includes("slug="))).toBe(false);
+    expect(screen.getAllByText("All time · Movers found", { selector: "p" })).toHaveLength(2); // Global and Local captions
+  });
+
+  it("shows movers on the podium and in the table, with Points and Accuracy beside them", async () => {
+    render(<LeaderboardScreen />);
+    await screen.findByRole("button", { name: "View stats for nova" });
+    const nova = within(globalBoard()).getByRole("button", { name: "View stats for nova" }).closest("li")!;
+    expect(within(nova).getByText("12 movers")).toBeTruthy();
+    expect(within(nova).getByText("900", { exact: false })).toBeTruthy();
+    // One mover is singular.
+    expect(within(within(globalBoard()).getByRole("button", { name: "View stats for orion" }).closest("li")!).getByText("1 mover")).toBeTruthy();
+    expect(within(globalBoard()).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Rank", "Player", "Movers", "Points", "Accuracy"]);
+    const kt = within(globalBoard()).getByRole("button", { name: "View stats for kt" }).closest("tr")!;
+    expect(within(kt).getAllByRole("cell").map((c) => c.textContent)).toEqual(["4", expect.stringContaining("kt"), "4", "350", "50%"]);
+  });
+
+  it("shows my standing in movers mode, on both boards", async () => {
+    render(<LeaderboardScreen />);
+    expect(await within(standing()).findByText("#4")).toBeTruthy();
+    expect(within(standing()).getByText("Movers found")).toBeTruthy();
+    expect(within(standing()).getByText("350")).toBeTruthy();
+    expect(within(standing()).queryByText("Classifications")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    expect(within(standing()).getByText("#2")).toBeTruthy();
+    expect(within(standing()).getByText("Local, Thailand · All time · Movers found")).toBeTruthy();
+  });
+
+  it("Points switches the boards back to points and refetches", async () => {
+    render(<LeaderboardScreen />);
+    await screen.findByRole("button", { name: "View stats for nova" });
+    fireEvent.click(screen.getByRole("button", { name: "Points" }));
+    await waitFor(() => {
+      expect(boardCalls("region=global&metric=points")).toHaveLength(1);
+      expect(boardCalls("region=local&metric=points")).toHaveLength(1);
+    });
+    await waitFor(() => expect(within(globalBoard()).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Rank", "Player", "Points", "Accuracy", "Classifications"]));
+    expect(screen.getByRole("button", { name: "Points", pressed: true })).toBeTruthy();
+  });
+
+  it("works with This week, and keeps the metric when the period changes", async () => {
+    render(<LeaderboardScreen />);
+    await screen.findByRole("button", { name: "View stats for nova" });
+    fireEvent.click(screen.getByRole("button", { name: "This week" }));
+    await waitFor(() => expect(boardCalls("period=week&region=global&metric=movers")).toHaveLength(1));
+    expect(await within(standing()).findByText("This week", { exact: false })).toBeTruthy();
+  });
+
+  it("asks the guest to log in, as on the points board", async () => {
+    auth.header = {};
+    respond = (u) => json(boardFor(u, { me: undefined, rows: GLOBAL_MOVERS.map((r) => ({ ...r, is_me: false })) }));
+    render(<LeaderboardScreen />);
+    expect(await within(standing()).findByText("Log in to get a rank")).toBeTruthy();
+  });
+
+  it("has honest empty states in movers mode", async () => {
+    respond = (u) => json(boardFor(u, { rows: [], me: undefined }));
+    render(<LeaderboardScreen />);
+    expect(await within(await screen.findByRole("region", { name: "Global" })).findByText("No movers found yet.")).toBeTruthy();
+    expect(within(standing()).getByText(/You have no movers found yet\./)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "This week" }));
+    expect(await within(globalBoard()).findByText("No movers found this week yet.")).toBeTruthy();
+  });
+
+  it("says the movers ranking is being set up when the database function is missing", async () => {
+    respond = (u) => json(boardFor(u, { available: false, reason: "not_installed", rows: [], me: undefined }));
+    render(<LeaderboardScreen />);
+    expect(await screen.findAllByText("The movers ranking is being set up. Switch to Points to see scores.")).toHaveLength(2);
+  });
+
+  it("shows a saved copy of the bot in movers mode", async () => {
+    respond = (u) =>
+      json(boardFor(u, u.includes("region=global") ? { source: "snapshot", rows: [{ ...row(1, "Shift-and-stack bot", 1750, { is_bot: true, finds: null }), movers: 3 }], me: null } : {}));
+    render(<LeaderboardScreen />);
+    expect(await screen.findByText(/Showing a saved copy/)).toBeTruthy();
+    expect(within(globalBoard()).getByText("3 movers")).toBeTruthy();
   });
 });

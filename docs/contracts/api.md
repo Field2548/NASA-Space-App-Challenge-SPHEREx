@@ -279,6 +279,8 @@ Inspect answers in full by default, in a round too (lock back with `INSPECT_LOCK
 
 Extra query parameters, all optional: `period=all|week` (default `all`; `week` = finds from the last 7 days, rolling), `region=global|local` (default `global`), `country=XX` (two letters, any case, only with `region=local`; when absent the caller's detected country is used). A malformed value is `400 bad_request`. They combine with `scope`/`slug`.
 
+`metric=points|movers` (default `points`, so older callers are unchanged; the /leaderboard page asks for `movers`). With `movers` the database function `leaderboard_movers` ranks players by distinct real movers found (stages: distinct `known` finds per spot and object key; patches: one per solve that lists a known object), then points, then who reached the count first. Rows and `me` carry `movers`; `score` stays the player's points; the response has `metric`. The all-time global board adds the bot (its movers = known objects it reaches). Without the function, that board is served from the snapshot and the others answer `not_installed`. The /leaderboard page has no stage filter; `scope`/`slug` still work for other callers.
+
 ```json
 { "scope": "all", "slug": null, "source": "db", "updated_at": "2026-11-15T09:30:00Z",
   "period": "week", "region": "local", "country": "TH", "detected_country": "TH", "available": true,

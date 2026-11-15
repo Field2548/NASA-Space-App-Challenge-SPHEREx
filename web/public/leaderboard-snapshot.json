@@ -2,7 +2,7 @@
   "scope": "all",
   "slug": null,
   "source": "snapshot",
-  "updated_at": "2026-11-14T21:32:34.340Z",
+  "updated_at": "2026-11-15T16:22:38.713Z",
   "rows": [
     {
       "rank": 1,
@@ -10,7 +10,8 @@
       "score": 1750,
       "accuracy": 0.6,
       "is_bot": true,
-      "is_me": false
+      "is_me": false,
+      "movers": 3
     }
   ]
 }

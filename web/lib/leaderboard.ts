@@ -4,16 +4,23 @@
 
 import { authHeader } from "./supabase";
 import type { MeRow, Row } from "./scoreboard";
-import { GROUPS, orderedSpots } from "./stageOrder";
-import type { FieldSummary } from "./types";
+import { GROUPS } from "./stageOrder";
 
 export type Period = "all" | "week";
 export type Region = "global" | "local";
+/** What a board ranks by: distinct real movers found, or points. */
+export type Metric = "movers" | "points";
+/** The page opens on movers. (The API itself answers points when no metric is asked for.) */
+export const DEFAULT_METRIC: Metric = "movers";
+/** A metric from untrusted text (a query string, storage): anything unknown is the default. */
+export function parseMetric(v: unknown): Metric {
+  return v === "points" || v === "movers" ? v : DEFAULT_METRIC;
+}
 export type UnavailableReason = "no_database" | "no_country" | "not_installed";
 
 /** One leaderboard row. `finds` (classifications) may be missing, and is null for the bot. */
-export type BoardRow = Row & { finds?: number | null };
-export type BoardMe = MeRow & { finds?: number | null };
+export type BoardRow = Row & { finds?: number | null; movers?: number | null };
+export type BoardMe = MeRow & { finds?: number | null; movers?: number | null };
 export type CountryCount = { code: string; players: number };
 
 /** An answer from GET /api/leaderboard, with every optional key filled in. */
@@ -24,6 +31,7 @@ export interface BoardV2 {
   updated_at: string | null;
   period: Period;
   region: Region;
+  metric: Metric;
   country: string | null;
   detected_country: string | null;
   available: boolean;
@@ -36,8 +44,8 @@ export interface BoardV2 {
 export interface BoardParams {
   period: Period;
   region: Region;
-  /** Stage filter; null means all stages. */
-  slug?: string | null;
+  /** Missing means the server default (points); the page always passes one. */
+  metric?: Metric;
   /** Local boards only; null or missing means "the country the server detected". */
   country?: string | null;
 }
@@ -52,7 +60,7 @@ export interface BoardResult {
 export function boardUrl(p: BoardParams): string {
   const q = [`period=${p.period}`, `region=${p.region}`];
   if (p.region === "local" && p.country) q.push(`country=${encodeURIComponent(p.country)}`);
-  if (p.slug) q.push("scope=spot", `slug=${encodeURIComponent(p.slug)}`);
+  if (p.metric) q.push(`metric=${p.metric}`);
   return `/api/leaderboard?${q.join("&")}`;
 }
 
@@ -78,6 +86,8 @@ function normaliseBoard(body: unknown): BoardV2 {
     updated_at: strOrNull(body.updated_at),
     period: body.period === "week" ? "week" : "all",
     region: body.region === "local" ? "local" : "global",
+    // An answer from before movers existed has no metric: it is a points board.
+    metric: body.metric === "movers" ? "movers" : "points",
     country: strOrNull(body.country)?.toUpperCase() ?? null,
     detected_country: strOrNull(body.detected_country)?.toUpperCase() ?? null,
     available,
@@ -264,11 +274,4 @@ export function exactTime(iso: string | null | undefined): string {
 /** The first three rows (the podium) and everything after them. */
 export function splitPodium<T>(rows: readonly T[]): { podium: T[]; rest: T[] } {
   return { podium: rows.slice(0, 3), rest: rows.slice(3) };
-}
-
-export type StageTab = { slug: string | null; label: string };
-
-/** "All stages", then "Stage N (difficulty)" in stage order. Never an object name. */
-export function stageTabs(index: FieldSummary[]): StageTab[] {
-  return [{ slug: null, label: "All stages" }, ...orderedSpots(index).map(({ n, spot }) => ({ slug: spot.slug, label: `Stage ${n} (${spot.difficulty})` }))];
 }
