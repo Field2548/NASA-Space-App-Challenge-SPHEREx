@@ -22,6 +22,80 @@
   display: block;
 }
 
+/* Rows hold their pattern twice, so -50% is one full period: the loop has no seam. */
+.far,
+.near {
+  right: auto;
+  width: max-content;
+  animation: drift 240s linear infinite;
+}
+
+.near {
+  color: var(--text);
+  animation-duration: 110s;
+}
+
+@keyframes drift {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.shootingSky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.shoot {
+  position: absolute;
+  font-size: 14px;
+  white-space: pre;
+  color: var(--cyan);
+  opacity: 0;
+  transform: rotate(18deg);
+  animation: shoot 9s linear infinite;
+}
+
+.shoot1 {
+  top: 12%;
+  left: 8%;
+}
+
+.shoot2 {
+  top: 30%;
+  left: 55%;
+  animation-duration: 13s;
+  animation-delay: 4s;
+}
+
+.shoot3 {
+  top: 62%;
+  left: 20%;
+  animation-duration: 17s;
+  animation-delay: 9s;
+}
+
+/* Visible for the first ~8% of each period, moving down-right along its trail. */
+@keyframes shoot {
+  0% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(0);
+  }
+  2% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(260px);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(260px);
+  }
+}
+
 .tw1,
 .tw2,
 .tw3 {
@@ -125,7 +199,13 @@
   .tw1,
   .tw2,
   .tw3,
+  .far,
+  .near,
   .press {
     animation: none;
+  }
+
+  .shoot {
+    display: none;
   }
 }

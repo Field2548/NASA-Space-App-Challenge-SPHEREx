@@ -1,11 +1,10 @@
 // URL view state shared by /play and /embed: ?frames=a-b (onion range, 0-based frame indexes),
-// ?spacing=real|even and ?vision=normal|protan|deutan|tritan|mono. Defaults are left out of the URL.
+// and ?vision=normal|protan|deutan|tritan|mono. Defaults are left out of the URL.
 
 import type { Vision } from "@/lib/types";
 
 export interface ViewState {
   frames: [number, number] | null; // null: the default onion range
-  realSpacing: boolean;
   vision: Vision;
 }
 
@@ -21,7 +20,6 @@ export function parseView(p: RawParams): ViewState {
   const vision = one(p.vision) as Vision | undefined;
   return {
     frames: m ? [Number(m[1]), Number(m[2])] : null,
-    realSpacing: one(p.spacing) === "real",
     vision: vision && VISIONS.includes(vision) ? vision : "normal",
   };
 }
@@ -31,8 +29,7 @@ export function applyView(params: URLSearchParams, v: ViewState): URLSearchParam
   const out = new URLSearchParams(params);
   if (v.frames) out.set("frames", `${Math.min(...v.frames)}-${Math.max(...v.frames)}`);
   else out.delete("frames");
-  if (v.realSpacing) out.set("spacing", "real");
-  else out.delete("spacing");
+  out.delete("spacing"); // the removed "real time spacing" key: old links stay valid, the key is dropped
   if (v.vision !== "normal") out.set("vision", v.vision);
   else out.delete("vision");
   return out;

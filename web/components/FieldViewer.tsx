@@ -15,6 +15,8 @@
 //   overlay?: "none" | "colorByTime" Color by time replaces the single frame
 //   overlayFrames?: number[]         array indices for Color by time (default: first 7)
 //   brightness?: number              black point in S/N (default field.stretch.black_sigma)
+//   morphology?: MorphSettings       erosion, dilation, opening ... on the frames before the stretch (default Off)
+//   curve?: Curve                    tone curve after the stretch (default identity)
 //   scale?: number                   integer upscale (default: fits 640 x 560)
 //   colors?: RGB[]                   time colours per frame (default timeColors(n, vision))
 //   vision?: Vision                  colour-vision mode for the default colours (default "normal")
@@ -29,6 +31,8 @@ import { colorByTime, makeSharedStretch, toImageData } from "@/lib/imaging";
 import type { Field, Mark, RGB, Vision } from "@/lib/types";
 import { pixelToSky } from "@/lib/wcs";
 import { timeColors } from "@/lib/palettes";
+import { DEFAULT_MORPH, type MorphSettings, morphFrames } from "@/lib/morphology";
+import { applyCurve, type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
 import styles from "./FieldViewer.module.css";
 import { asteroidsInFrame, type KnownOverlay } from "./overlay";
 
@@ -48,6 +52,10 @@ export interface FieldViewerProps {
   overlay?: ViewerOverlay;
   overlayFrames?: number[];
   brightness?: number;
+  /** Morphology applied to the frames before the stretch (default Off). */
+  morphology?: MorphSettings;
+  /** Tone curve applied after the stretch (default: identity, the plain asinh look). */
+  curve?: Curve;
   scale?: number;
   colors?: RGB[];
   vision?: Vision;
@@ -118,18 +126,22 @@ export default function FieldViewer(props: FieldViewerProps) {
   );
 
   const points = useMemo(() => stretchPoints(field, black), [field, black]);
+  // Morphology runs on the S/N frames before the stretch; the tone curve on the 0..1 gray after it.
+  const morphology = props.morphology ?? DEFAULT_MORPH;
+  const curve = props.curve ?? DEFAULT_CURVE;
+  const shownData = useMemo(() => morphFrames(frames, W, H, morphology), [frames, W, H, morphology]);
   const baseGrays = useMemo(() => {
-    const st = makeSharedStretch(frames, points.base);
-    return frames.map(st);
-  }, [frames, points]);
+    const st = makeSharedStretch(shownData, points.base);
+    return shownData.map((f) => applyCurve(st(f), curve));
+  }, [shownData, points, curve]);
   const overlayRgba = useMemo(() => {
     if (overlay !== "colorByTime" || overlayFrames.length === 0) return null;
-    const st = makeSharedStretch(frames, points.overlay);
+    const st = makeSharedStretch(shownData, points.overlay);
     return colorByTime(
-      overlayFrames.map((i) => st(frames[i])),
+      overlayFrames.map((i) => applyCurve(st(shownData[i]), curve)),
       overlayFrames.map((i) => colors[i]),
     );
-  }, [overlay, overlayFrames, frames, points, colors]);
+  }, [overlay, overlayFrames, shownData, points, colors, curve]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {

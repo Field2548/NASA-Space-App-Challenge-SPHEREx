@@ -1,11 +1,13 @@
 // /about body: one h1, then an h2 per section of lib/copy/about.ts.
 
 import { ABOUT_SECTIONS } from "@/lib/copy/about";
+import BackLink from "./BackLink";
 import styles from "./InfoPage.module.css";
 
 export default function AboutPage() {
   return (
     <main className={styles.page}>
+      <BackLink />
       <h1>About</h1>
       {ABOUT_SECTIONS.map((s) => (
         <section key={s.heading}>

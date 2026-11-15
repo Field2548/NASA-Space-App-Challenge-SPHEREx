@@ -2,12 +2,24 @@
 import { render, cleanup, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AboutPage from "./AboutPage";
 import CreditsPage, { CREDITS_URL, parseMarkdown } from "./CreditsPage";
 import { ABOUT_SECTIONS } from "@/lib/copy/about";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ back: vi.fn(), push: vi.fn() }) }));
+
 afterEach(cleanup);
+
+describe("Back control on the info pages", () => {
+  it("About and Credits both show a Back link to /", () => {
+    render(<AboutPage />);
+    expect(screen.getByRole("link", { name: /Back/ }).getAttribute("href")).toBe("/");
+    cleanup();
+    render(<CreditsPage markdown={null} />);
+    expect(screen.getByRole("link", { name: /Back/ }).getAttribute("href")).toBe("/");
+  });
+});
 
 const SAMPLE = `# Credits
 

@@ -22,19 +22,19 @@ afterEach(() => {
 describe("PlayRoute", () => {
   it("seeds the view from the params", () => {
     render(<PlayRoute spot="fixture" params={{ spot: "fixture", frames: "1-3", spacing: "real", vision: "mono" }} />);
-    expect(screen.props?.initialView).toEqual({ frames: [1, 3], realSpacing: true, vision: "mono" });
+    expect(screen.props?.initialView).toEqual({ frames: [1, 3], vision: "mono" });
   });
   it("writes changes to the address without a router navigation (which remounts the game and drops marks)", () => {
     window.history.replaceState(null, "", "/play?spot=fixture&ra=10");
     render(<PlayRoute spot="fixture" params={{ spot: "fixture", ra: "10" }} />);
-    screen.props?.onViewChange({ frames: [1, 3], realSpacing: false, vision: "tritan" });
+    screen.props?.onViewChange({ frames: [1, 3], vision: "tritan" });
     expect(window.location.pathname + window.location.search).toBe("/play?spot=fixture&ra=10&frames=1-3&vision=tritan");
     expect(nav.replace).not.toHaveBeenCalled();
   });
   it("does not replace when the URL already matches", () => {
     window.history.replaceState(null, "", "/play?spot=fixture&vision=mono");
     render(<PlayRoute spot="fixture" params={{ spot: "fixture", vision: "mono" }} />);
-    screen.props?.onViewChange({ frames: null, realSpacing: false, vision: "mono" });
+    screen.props?.onViewChange({ frames: null, vision: "mono" });
     expect(nav.replace).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatDec, formatRA } from "@/lib/coords";
+import { makeSharedStretch, toImageData } from "@/lib/imaging";
+import { DEFAULT_MORPH } from "@/lib/morphology";
+import { DEFAULT_CURVE, presetCurve } from "@/lib/toneCurve";
 import { pixelToSky } from "@/lib/wcs";
 import FieldViewer, { clientToPixel, fitScale, formatGap, stretchPoints } from "./FieldViewer";
 import { makeField, makeFrames, mockCanvas } from "./testFixtures";
@@ -166,5 +169,39 @@ describe("FieldViewer cursor and readout label", () => {
     const { canvas } = setup({ overlay: "colorByTime" });
     fireEvent.pointerMove(canvas, { clientX: 100 + 4 * 7 + 1, clientY: 50 + 4 * 3 + 1 });
     expect(screen.getByTestId("hover-readout").textContent).toContain("S/N (frame 2) 6.0");
+  });
+});
+
+describe("FieldViewer morphology and tone curve", () => {
+  const lastPixels = () => Array.from((ctx.putImageData.mock.calls.at(-1)![0] as ImageData).data);
+  const expected = (k: number) => {
+    const p = stretchPoints(field, field.stretch.black_sigma).base;
+    return Array.from(toImageData(makeSharedStretch(frames, p)(frames[k]), 20, 10).data);
+  };
+
+  it("renders the same pixels as the plain stretch when Morphology is Off and the curve is the default", () => {
+    setup();
+    expect(lastPixels()).toEqual(expected(1));
+    cleanup();
+    setup({ morphology: DEFAULT_MORPH, curve: DEFAULT_CURVE });
+    expect(lastPixels()).toEqual(expected(1));
+  });
+
+  it("opening removes the single hot pixel before the stretch; the readout still shows the raw S/N", () => {
+    const { canvas } = setup({ morphology: { ...DEFAULT_MORPH, op: "open" } });
+    const px = lastPixels();
+    const at = (a: number[], x: number) => a.slice(4 * (3 * 20 + x), 4 * (3 * 20 + x) + 3);
+    expect(at(px, 7)).toEqual(at(px, 12)); // now background
+    expect(at(expected(1), 7)).not.toEqual(at(expected(1), 12)); // was a bright spot
+    fireEvent.pointerMove(canvas, { clientX: 100 + 4 * 7 + 1, clientY: 50 + 4 * 3 + 1 });
+    expect(screen.getByTestId("hover-readout").textContent).toContain("S/N 6.0");
+  });
+
+  it("a non-default curve changes the pixels, the same way for every frame", () => {
+    setup({ curve: presetCurve("gamma") });
+    const p = lastPixels();
+    const e = expected(1);
+    const i = 4 * (3 * 20 + 7);
+    expect(p[i]).toBeGreaterThan(e[i]);
   });
 });

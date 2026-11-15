@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import BackLink from "@/components/BackLink";
 import styles from "@/components/InfoPage.module.css";
 
 export const metadata: Metadata = { title: "Licence" };
@@ -26,6 +27,7 @@ export default async function LicencePage() {
   const text = await readLicence();
   return (
     <main className={styles.page}>
+      <BackLink />
       <h1>Licence</h1>
       <p>
         This site&apos;s code is free software under the GNU General Public License, version 3. It includes Aladin Lite

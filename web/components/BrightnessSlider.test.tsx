@@ -37,6 +37,8 @@ describe("BrightnessSlider", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(onChange).toHaveBeenLastCalledWith(-1);
     expect(screen.getByText("asteroid")).toBeTruthy();
+    expect(screen.queryByText("Asteroid in a crowded field: S/N ~140–250")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About Brightness" }));
     expect(screen.getByText("Asteroid in a crowded field: S/N ~140–250")).toBeTruthy();
     expect(screen.getByText("Faintest distant mover: S/N ~2–4, needs Follow & stack")).toBeTruthy();
     expect(screen.getByText(/Fainter/)).toBeTruthy();

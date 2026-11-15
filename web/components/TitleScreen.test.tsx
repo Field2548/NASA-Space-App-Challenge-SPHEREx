@@ -22,6 +22,7 @@ describe("TitleScreen", () => {
     expect(h1s[0].textContent).toBe(PROJECT_NAME);
     expect(screen.getByRole("link", { name: "Start training" }).getAttribute("href")).toBe("/tutorial");
     expect(screen.getByRole("link", { name: "Skip to game" }).getAttribute("href")).toBe("/play?spot=eros");
+    expect(screen.getByRole("link", { name: "Stages" }).getAttribute("href")).toBe("/stages");
     expect(screen.getByRole("link", { name: "Explore the sky" }).getAttribute("href")).toBe("/map");
     const login = screen.getByRole("button", { name: "Log in" }) as HTMLButtonElement;
     expect(login.disabled).toBe(false);
@@ -43,5 +44,24 @@ describe("TitleScreen", () => {
     expect(stars).toBeGreaterThan(50);
     render(<TitleScreen />);
     expect(screen.getByTestId("starfield").getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("animates the sky: two drifting star layers that tile seamlessly, plus ASCII shooting stars", () => {
+    render(<TitleScreen />);
+    const far = screen.getByTestId("starfield");
+    const near = screen.getByTestId("starfield-near");
+    expect(near.getAttribute("aria-hidden")).toBe("true");
+    // Each row holds its pattern twice, so a drift of half the width loops without a seam.
+    for (const layer of [far, near]) {
+      const row = (layer.querySelector("span")?.textContent ?? "").replace(/\n$/, "");
+      expect(row.length % 2).toBe(0);
+      expect(row.slice(0, row.length / 2)).toBe(row.slice(row.length / 2));
+    }
+    const shooting = screen.getAllByTestId("shooting-star");
+    expect(shooting.length).toBeGreaterThanOrEqual(2);
+    for (const s of shooting) {
+      expect(s.closest("[aria-hidden=true]")).not.toBeNull();
+      expect(s.textContent).toMatch(/^[-=~.]+\*$/);
+    }
   });
 });

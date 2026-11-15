@@ -3,6 +3,7 @@
 // bare URLs. Server component; the page reads the file at build time.
 
 import { Fragment, type ReactNode } from "react";
+import BackLink from "./BackLink";
 import styles from "./InfoPage.module.css";
 
 export const CREDITS_URL = "https://github.com/Field2548/NASA-Space-App-Challenge-SPHEREx/blob/web/CREDITS.md";
@@ -156,6 +157,7 @@ export default function CreditsPage({ markdown, intro }: { markdown: string | nu
   const hasH1 = blocks.some((b) => b.kind === "heading" && b.level === 1);
   return (
     <main className={styles.page}>
+      <BackLink />
       {markdown && blocks.length > 0 ? (
         <>
           {!hasH1 && <h1>Credits</h1>}

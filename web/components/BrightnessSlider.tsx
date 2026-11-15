@@ -10,7 +10,11 @@
 // SHIFT = 2 so the default -1 sits on the log scale (log10(1) = 0). Range -1.5 .. 2000 S/N.
 
 import { useId } from "react";
+import HelpImage from "./HelpImage";
+import InfoPopover from "./InfoPopover";
 import styles from "./BrightnessSlider.module.css";
+
+const RAMP = Float32Array.from({ length: 48 }, (_, i) => (i % 12) / 11);
 
 export const BRIGHTNESS_SHIFT = 2;
 export const BLACK_MIN = -1.5;
@@ -89,7 +93,6 @@ export default function BrightnessSlider({ value: rawValue, onChange, defaultVal
           step="any"
           value={p}
           aria-valuetext={`black point ${formatBlack(value)}`}
-          aria-describedby={descId}
           onChange={(e) => onChange(effectiveBlack(sliderToBlack(Number(e.target.value)), png8, minBlack))}
           className={styles.input}
         />
@@ -106,11 +109,24 @@ export default function BrightnessSlider({ value: rawValue, onChange, defaultVal
           ))}
         </ul>
       </div>
-      <ul id={descId} className={styles.legend} aria-label="Landmarks">
-        {LANDMARKS.map((m) => (
-          <li key={m.name}>{m.text}</li>
-        ))}
-      </ul>
+      <div className={styles.row}>
+        <InfoPopover label="Brightness" title="Brightness: where black starts">
+          <p>
+            Anything fainter than the black point is drawn black, so sliding right keeps only the brighter things and hides the
+            faint noise. Sliding left shows more faint detail but more noise. The unit is sigma, the typical noise level of the
+            frame. Landmarks on the slider show where real objects sit:
+          </p>
+          <ul id={descId} className={styles.legend} aria-label="Landmarks">
+            {LANDMARKS.map((m) => (
+              <li key={m.name}>{m.text}</li>
+            ))}
+          </ul>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+            <HelpImage data={RAMP} w={12} h={4} label="Before: black point at the default, the whole ramp is visible" caption="Black at default" />
+            <HelpImage data={RAMP.map((v) => Math.max(0, (v - 0.4) / 0.6))} w={12} h={4} label="After: a higher black point turns the faint left part black" caption="Black raised" />
+          </div>
+        </InfoPopover>
+      </div>
       <div className={styles.row}>
         <output htmlFor={inputId} className={styles.value}>
           {png8 ? "levels " : "black "}
