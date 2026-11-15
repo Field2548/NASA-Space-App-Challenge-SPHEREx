@@ -255,6 +255,7 @@ describe("onion helpers", () => {
     expect(clampOnion([2, 2], 5)).toEqual([2, 3]);
     expect(clampOnion([4, 4], 5)).toEqual([3, 4]);
     expect(clampOnion([0, 20], 12)).toEqual([0, 6]);
+    expect(clampOnion([0, 20], 12, 12)).toEqual([0, 11]); // colour-blind-safe setting off: every frame
   });
 });
 
