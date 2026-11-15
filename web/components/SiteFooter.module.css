@@ -10,7 +10,8 @@
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  /* "safe": right-aligned when the items fit; start-aligned (scrollable) when they do not. */
+  justify-content: safe flex-end;
   gap: var(--space-4);
   /* Constant height; the phone home-indicator inset is added below the row. */
   height: calc(var(--site-footer-h, 32px) + env(safe-area-inset-bottom, 0px));
@@ -27,12 +28,6 @@
 
 .footer::-webkit-scrollbar {
   display: none;
-}
-
-/* With overflow, justify-content: flex-end would hide the first items; margin auto keeps them
-   reachable (right-aligned when they fit, scrollable from the left when they do not). */
-.footer > :first-child {
-  margin-left: auto;
 }
 
 .footer > * {
