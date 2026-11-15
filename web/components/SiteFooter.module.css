@@ -1,0 +1,15 @@
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  height: var(--site-footer-h, 32px);
+  padding: 0 var(--space-4);
+  border-top: 1px solid var(--line);
+  background: var(--bg-0);
+  font-size: 13px;
+}
+
+.footer a {
+  color: var(--text-dim);
+}
