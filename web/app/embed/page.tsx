@@ -1,8 +1,15 @@
-export default function EmbedPage() {
+import { Suspense } from "react";
+import EmbedViewer from "@/components/EmbedViewer";
+
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+// Same pattern as /play: the search params are read inside Suspense so the shell stays static.
+export default function EmbedPage({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <main style={{ padding: "var(--space-5)" }}>
-      <h1>embed</h1>
-      <p>Coming in phase 1.</p>
-    </main>
+    <Suspense fallback={<EmbedViewer params={{}} loading />}>
+      {searchParams.then((params) => (
+        <EmbedViewer spot={typeof params.spot === "string" && params.spot ? params.spot : undefined} params={params} />
+      ))}
+    </Suspense>
   );
 }

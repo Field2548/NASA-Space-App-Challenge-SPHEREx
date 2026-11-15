@@ -211,17 +211,29 @@ export function noiseOf(plane: Float32Array): number {
 // ---------------------------------------------------------------------------------------------
 // Rebuild
 
-/** Recipe steps 2 to 4: planes (MJy/sr) and their noises to one S/N frame. */
+/**
+ * Recipe steps 2 to 4: planes (MJy/sr) and their noises to one S/N frame.
+ *
+ * Noise guard: a plane whose given noise is not a finite positive number is skipped (not used, not
+ * counted in `planesUsed`); if the rebuilt frame's own noise is not a finite positive number, the
+ * frame is returned undivided. So a constant plane never yields Infinity or NaN-filled output.
+ * With no usable plane the frame is all NaN and `planesUsed` is 0 (rebuildFrames then treats it as
+ * a missing frame).
+ */
 export function rebuildFrame(planes: Float32Array[], noises: number[]): { frame: Float32Array; planesUsed: number } {
-  const n = planes.length;
-  if (n === 0) throw new Error("rebuildFrame needs at least one plane");
+  if (planes.length === 0) throw new Error("rebuildFrame needs at least one plane");
   const len = planes[0].length;
-  const sn: Float32Array[] = planes.map((p, i) => {
+  const sn: Float32Array[] = [];
+  planes.forEach((p, i) => {
+    const noise = noises[i];
+    if (!(Number.isFinite(noise) && noise > 0)) return;
     const f = new Float32Array(len);
-    const inv = 1 / noises[i];
+    const inv = 1 / noise;
     for (let k = 0; k < len; k++) f[k] = p[k] * inv;
-    return f;
+    sn.push(f);
   });
+  const n = sn.length;
+  if (n === 0) return { frame: new Float32Array(len).fill(NaN), planesUsed: 0 };
   let frame: Float32Array;
   if (n >= 3) {
     frame = sigmaClippedMean(sn);
@@ -241,7 +253,9 @@ export function rebuildFrame(planes: Float32Array[], noises: number[]): { frame:
     }
   }
   const noise = noiseOf(frame);
-  for (let k = 0; k < len; k++) frame[k] /= noise;
+  if (Number.isFinite(noise) && noise > 0) {
+    for (let k = 0; k < len; k++) frame[k] /= noise;
+  }
   return { frame, planesUsed: n };
 }
 
@@ -273,6 +287,11 @@ export function rebuildFrames(
       chosen.map((e) => planes[e.k]),
       chosen.map((e) => e.noise),
     );
+    if (planesUsed === 0) {
+      frames.push(null); // no plane had a usable noise: same as a frame with no exposure
+      planesPerFrame.push(0);
+      continue;
+    }
     frames.push(frame);
     planesPerFrame.push(planesUsed);
     if (planesUsed < 3) fewerThanThree = true;

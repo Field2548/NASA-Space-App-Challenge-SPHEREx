@@ -77,6 +77,26 @@ describe("parity with frames.u16", () => {
       const p99 = quantile(diffs, 0.99);
       console.log(`${slug}: ${r.frames.length} frames, ${planes.length} planes, median |diff| ${med.toFixed(4)} sigma, p99 ${p99.toFixed(3)} sigma, rebuild ${ms.toFixed(1)} ms`);
       expect(diffs.length).toBeGreaterThan(0);
+      // NaN masks: frames.u16 blanks every pixel not covered by ALL frames and the rebuild applies
+      // the same rule (step 5). Measured: eros has 10500 blanked pixels (all frames share one mask),
+      // makemake has none; the masks are identical, so assert equality (a regression in the
+      // blanking, in either direction, fails here).
+      let nanOnlyRebuilt = 0;
+      let nanOnlyRef = 0;
+      let nanRef = 0;
+      r.frames.forEach((f, i) => {
+        const ref = frames[i];
+        for (let k = 0; k < ref.length; k++) {
+          const a = Number.isNaN(f![k]);
+          const b = Number.isNaN(ref[k]);
+          if (b) nanRef++;
+          if (a && !b) nanOnlyRebuilt++;
+          if (!a && b) nanOnlyRef++;
+        }
+      });
+      expect(nanOnlyRebuilt).toBe(0);
+      expect(nanOnlyRef).toBe(0);
+      if (slug === "eros") expect(nanRef).toBe(10500);
       expect(med).toBeLessThan(0.1);
       expect(p99).toBeLessThan(2);
     });
@@ -160,6 +180,50 @@ describe("statistics", () => {
     const { frame, planesUsed } = rebuildFrame([a, b], [1, 1]);
     expect(planesUsed).toBe(2);
     expect(noiseOf(frame)).toBeCloseTo(1, 5);
+  });
+});
+
+describe("noise guard", () => {
+  it("a plane with noise 0 (or negative, NaN, Infinity) among valid planes is ignored", () => {
+    const planes = Array.from({ length: 5 }, (_, i) => normals(2000, 10 + i));
+    const base = rebuildFrame(planes.slice(0, 4), [1, 1, 1, 1]);
+    for (const bad of [0, -1, NaN, Infinity]) {
+      const r = rebuildFrame(planes, [1, 1, 1, 1, bad]);
+      expect(r.planesUsed).toBe(4);
+      expect(r.frame).toEqual(base.frame);
+    }
+    expect(base.planesUsed).toBe(4);
+  });
+
+  it("all-constant planes do not produce Infinity or throw", () => {
+    for (const n of [1, 2, 3, 5]) {
+      const planes = Array.from({ length: n }, (_, i) => new Float32Array(100).fill(i + 2));
+      const r = rebuildFrame(planes, planes.map(() => 1));
+      expect(r.planesUsed).toBe(n);
+      expect(Array.from(r.frame).every((v) => Number.isFinite(v))).toBe(true);
+    }
+    const zero = [new Float32Array(100), new Float32Array(100), new Float32Array(100)];
+    const r = rebuildFrame(zero, [1, 1, 1]);
+    expect(Array.from(r.frame).every((v) => v === 0)).toBe(true);
+  });
+
+  it("no plane with a usable noise gives an all-NaN frame and planesUsed 0, and rebuildFrames drops it", () => {
+    const r = rebuildFrame([normals(50, 1), normals(50, 2)], [0, NaN]);
+    expect(r.planesUsed).toBe(0);
+    expect(Array.from(r.frame).every((v) => Number.isNaN(v))).toBe(true);
+    const field = { frames: [{ i: 1 }, { i: 2 }] } as unknown as Pick<Field, "frames">;
+    const info = {
+      exposures: [
+        { k: 0, frame: 1, detector: 1, noise: 0 },
+        { k: 1, frame: 2, detector: 1, noise: 1 },
+        { k: 2, frame: 2, detector: 1, noise: 1 },
+      ],
+    } as unknown as ExposuresJson;
+    const out = rebuildFrames(field, [normals(50, 3), normals(50, 4), normals(50, 5)], info, "all");
+    expect(out.frames[0]).toBeNull();
+    expect(out.planesPerFrame).toEqual([0, 2]);
+    expect(out.frames[1]).not.toBeNull();
+    expect(Array.from(out.frames[1]!).every((v) => Number.isFinite(v))).toBe(true);
   });
 });
 

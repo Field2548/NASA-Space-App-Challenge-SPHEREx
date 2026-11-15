@@ -1,6 +1,6 @@
 // One shared load of fields/index.json for the sky map and the coordinate box. Owner: SERVER.
 
-import { loadIndex } from "@/lib/fields";
+import { loadFieldIndex as loadIndex } from "@/lib/fields";
 import type { FieldSummary } from "@/lib/types";
 
 let pending: Promise<FieldSummary[]> | null = null;
