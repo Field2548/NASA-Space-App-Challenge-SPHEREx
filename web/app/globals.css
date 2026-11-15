@@ -7,6 +7,7 @@
   --text: #d7e3f4;
   --text-dim: #8fa3bd;
   --cyan: #00e1ff;
+  --green: #3dff8a;
   --magenta: #ff2e88;
   --amber: #ffb000;
   --viewport: #000000; /* science viewport: neutral black, no effects */
@@ -26,6 +27,7 @@
 @media (color-gamut: p3) {
   :root {
     --cyan: color(display-p3 0 0.88 1);
+    --green: color(display-p3 0.3 1 0.55);
     --magenta: color(display-p3 1 0.18 0.55);
     --amber: color(display-p3 1 0.7 0);
   }

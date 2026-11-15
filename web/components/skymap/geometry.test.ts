@@ -145,6 +145,11 @@ describe("difficulty styles", () => {
     expect(new Set(glyphs).size).toBe(glyphs.length);
     for (const s of Object.values(DIFFICULTY_STYLE)) expect(s.word.length).toBeGreaterThan(0);
   });
+
+  it("gives Easy its own colour, not the Tool test one", () => {
+    expect(DIFFICULTY_STYLE.easy.cssVar).not.toBe(DIFFICULTY_STYLE.tool.cssVar);
+    expect(DIFFICULTY_STYLE.easy.fallback).not.toBe(DIFFICULTY_STYLE.tool.fallback);
+  });
 });
 
 describe("control fields stay hidden on the map", () => {

@@ -64,6 +64,8 @@ export interface SkyMapProps {
   onSpot?: (slug: string) => void;
   /** Extra word per spot slug (Solved, Tried, NEXT), added to the marker label. */
   spotMarks?: Record<string, string>;
+  /** Stage number per spot slug (/stages), shown first in the marker label. */
+  spotNumbers?: Record<string, number>;
 }
 
 /** A solved patch on the map: outline, matched known objects and players' reports. */
@@ -124,6 +126,7 @@ export function SkyMap({
   onView,
   onSpot,
   spotMarks,
+  spotNumbers,
 }: SkyMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLSpanElement>(null);
@@ -404,7 +407,7 @@ export function SkyMap({
       });
       a.addCatalog(cat);
       cat.addSources(
-        rows.map((s) => lib.source(s.ra, s.dec, { slug: s.slug, label: `${s.title} · ${difficultyStyle(d).word}${spotMarks?.[s.slug] ? ` · ${spotMarks[s.slug]}` : ""}` })),
+        rows.map((s) => lib.source(s.ra, s.dec, { slug: s.slug, label: `${spotNumbers?.[s.slug] ? `${spotNumbers[s.slug]}. ` : ""}${s.title} ·${difficultyStyle(d).word}${spotMarks?.[s.slug] ? ` · ${spotMarks[s.slug]}` : ""}` })),
       );
       cats.push(cat);
     }
@@ -417,7 +420,7 @@ export function SkyMap({
         }
       }
     };
-  }, [mapState, spots, showSpots, spotMarks]);
+  }, [mapState, spots, showSpots, spotMarks, spotNumbers]);
 
   // Fly to the target.
   const tRa = target?.ra;
