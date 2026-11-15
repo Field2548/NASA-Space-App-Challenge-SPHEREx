@@ -168,6 +168,14 @@ describe("Timeline thumbnails", () => {
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);
     await waitFor(() => expect(document.querySelectorAll('canvas[data-thumb="webp"]')).toHaveLength(4));
   });
+  it("draws from the given frames when thumbsFromFrames is set (band selected)", async () => {
+    const spy = vi.spyOn(fields, "loadThumbs").mockResolvedValue(Array.from({ length: 4 }, () => bm()));
+    render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} thumbsFromFrames />);
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(document.querySelectorAll('canvas[data-thumb="webp"]')).toHaveLength(0);
+    expect(document.querySelectorAll('canvas[data-thumb="frame"]')).toHaveLength(4);
+  });
   it("keeps the frame canvases on count mismatch and on error", async () => {
     const spy = vi.spyOn(fields, "loadThumbs").mockResolvedValue([bm(), bm()]);
     render(<Timeline field={field} frames={frames} index={0} onIndexChange={() => {}} />);

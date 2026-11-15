@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InfoExplore } from "@/lib/inspectPopup";
 import type { CheckResponse, Field } from "@/lib/types";
@@ -9,6 +9,9 @@ import { rgbCss } from "./FieldViewer";
 import { findTarget } from "./CoachMark";
 import PlayScreen, { neutralTitle, upsertMark } from "./PlayScreen";
 import { makeField, mockCanvas } from "./testFixtures";
+
+// The default 1 s findBy/waitFor budget ran out under a busy machine (load ~20) in full parallel runs.
+configure({ asyncUtilTimeout: 5000 });
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -134,7 +137,7 @@ describe("PlayScreen", () => {
       />,
     );
     await screen.findByTestId("field-canvas");
-    expect(seen.at(-1)).toEqual({ frames: [0, 1], realSpacing: true, vision: "mono" });
+    await waitFor(() => expect(seen.at(-1)).toEqual({ frames: [0, 1], realSpacing: true, vision: "mono" }));
     const pick = screen.getByLabelText("Colour vision") as HTMLSelectElement;
     expect(pick.value).toBe("mono");
     fireEvent.change(pick, { target: { value: "deutan" } });
@@ -146,7 +149,7 @@ describe("PlayScreen", () => {
     const seen: unknown[] = [];
     render(<PlayScreen spot="fixture" onViewChange={(v) => seen.push(v)} />);
     await screen.findByTestId("field-canvas");
-    expect(seen.at(-1)).toEqual({ frames: null, realSpacing: false, vision: "normal" });
+    await waitFor(() => expect(seen.at(-1)).toEqual({ frames: null, realSpacing: false, vision: "normal" }));
   });
 
   it("has exactly one h1 in every state", async () => {

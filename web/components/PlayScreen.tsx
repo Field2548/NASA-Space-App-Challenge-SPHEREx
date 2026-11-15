@@ -534,6 +534,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
         <Timeline
           field={field}
           frames={shownFrames}
+          thumbsFromFrames={shownFrames !== frames}
           vision={vision}
           index={blink.index}
           onIndexChange={(i) => {

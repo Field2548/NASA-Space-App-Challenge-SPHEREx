@@ -58,6 +58,8 @@ export interface TimelineProps {
   onOnionRangeChange?(r: [number, number]): void;
   realSpacing?: boolean;
   onRealSpacingChange?(v: boolean): void;
+  /** Draw thumbnails from `frames` (a rebuilt wavelength band) instead of the all-band field.thumbs. */
+  thumbsFromFrames?: boolean;
 }
 
 /** New index for a key press, or null if the key is not ours. */
@@ -167,7 +169,7 @@ export default function Timeline(props: TimelineProps) {
       live = false;
     };
   }, [field]);
-  const useWebp = thumbs !== null && n > 0 && thumbs.length === n;
+  const useWebp = !props.thumbsFromFrames && thumbs !== null && n > 0 && thumbs.length === n;
 
   const grays = useMemo(() => {
     if (useWebp) return null;
