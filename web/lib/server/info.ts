@@ -332,6 +332,11 @@ function simbadCoordLink(ra: number, dec: number) {
 
 // ------------------------------------------------------------------ the answer
 
+/** Inspect answers in full for every caller (no unlock cookie needed). INSPECT_LOCK=1 restores the old lock. */
+function inspectAlwaysOpen(): boolean {
+  return process.env.INSPECT_LOCK !== "1";
+}
+
 function lockedBody(position: Record<string, number>) {
   return { mode: "round", locked: true, position };
 }
@@ -385,7 +390,10 @@ export async function answerInfo(
   root?: string,
   live?: LiveDeps,
 ): Promise<Record<string, unknown>> {
-  const asked = q.mode === "explore";
+  // User decision 2026-11-15: Inspect shows everything from the start, in a round too
+  // ("on inspect, unlocked all information"). The mode is still read but no longer locks.
+  const open = inspectAlwaysOpen();
+  const asked = open || q.mode === "explore";
   const hits = await locate(q, root);
 
   if (hits.length === 0) {
@@ -410,6 +418,7 @@ export async function answerInfo(
   // The answer is built from the first containing spot the cookie covers.
   const first = hits[0];
   const position = { ra: round(first.ra, 6), dec: round(first.dec, 6), x: first.x, y: first.y };
+  if (open) return exploreReady(first, root);
   const covered = (h: Located) => isUnlocked(request, h.slug);
   const granted = asked && hits.every(covered);
   if (!granted) return lockedBody(position);
