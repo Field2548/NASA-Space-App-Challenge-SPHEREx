@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadGuest, resetGuest } from "@/lib/guest";
+import { loadGuestSubmissions } from "@/lib/auth";
+import { loadGuest,resetGuest } from "@/lib/guest";
 import type { CheckResponse, Mark } from "@/lib/types";
 import { ApiCallError } from "@/lib/check";
 import SubmitBar, { errorText, NOT_FOUND_TEXT, OFFLINE_TEXT, STATIC_HINT } from "./SubmitBar";
@@ -129,6 +130,31 @@ describe("SubmitBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     await screen.findByTestId("verdict");
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the sent body for guest replay on a guest submit, any verdict kind", async () => {
+    const fetcher = json({ ...known, verdict: { kind: "candidate", points: 20, message: "Unconfirmed." } });
+    render(<SubmitBar spot="eros" marks={two} fetcher={fetcher as unknown as typeof fetch} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    const body = JSON.parse((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(loadGuestSubmissions()).toEqual([body]);
+  });
+
+  it("does not save a replay entry for a persisted submit or a network error", async () => {
+    const persisted = json({ ...known, persisted: true });
+    render(<SubmitBar spot="eros" marks={two} fetcher={persisted as unknown as typeof fetch} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByTestId("verdict");
+    expect(loadGuestSubmissions()).toEqual([]);
+    cleanup();
+    const failing = vi.fn(async () => {
+      throw new TypeError("network");
+    });
+    render(<SubmitBar spot="eros" marks={two} fetcher={failing as unknown as typeof fetch} />);
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText(OFFLINE_TEXT);
+    expect(loadGuestSubmissions()).toEqual([]);
   });
 
   it("does not record a guest find for a persisted or non-scoring verdict", async () => {

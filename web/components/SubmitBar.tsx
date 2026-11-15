@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { ApiCallError, CHECK_URL, nothingRequest, submitCheck, toCheckRequest } from "@/lib/check";
+import { saveGuestSubmission } from "@/lib/auth";
 import { recordFind } from "@/lib/guest";
 import { fitTrack, isStatic, validateMarks } from "@/lib/marks";
 import type { CheckRequest, CheckResponse, Mark, VerdictKind } from "@/lib/types";
@@ -75,7 +76,11 @@ export default function SubmitBar({ spot, marks, fetcher, onResult }: SubmitBarP
     try {
       const res = await submitCheck(req, fetcher ?? fetch);
       if (!res || typeof res !== "object" || !res.verdict) throw new Error("no verdict");
-      if (!res.persisted && FIND_KINDS.includes(res.verdict.kind)) recordFind(spot, res.verdict.kind, res.verdict.points);
+      if (!res.persisted) {
+        // Guest: keep the request so sign-in can replay it (the server re-scores it).
+        saveGuestSubmission(req);
+        if (FIND_KINDS.includes(res.verdict.kind)) recordFind(spot, res.verdict.kind, res.verdict.points);
+      }
       setState({ s: "done", res });
       onResult?.(res);
     } catch (e) {
