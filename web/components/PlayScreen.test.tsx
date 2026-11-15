@@ -471,7 +471,7 @@ describe("PlayScreen tools (more)", () => {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
     expect(screen.queryByRole("slider", { name: "Onion range end" })).toBeNull();
-    expect(screen.queryByRole("complementary", { name: "Answer" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "Scoreboard panel" })).toBeNull();
     expect(document.querySelector('[data-slot="coordinate-box"], [data-slot="show-work"]')).toBeNull();
     const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim());
     expect(names).toEqual(ALLOWED_AT_LEVEL_0);
@@ -639,7 +639,7 @@ describe("PlayScreen round mode", () => {
 
   it("the tutorial shows no scoreboard", async () => {
     await loadGame({ showTitle: true, objectName: "433 Eros" });
-    expect(screen.getByRole("complementary", { name: "Answer" })).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: "Scoreboard panel" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Scoreboard/ })).toBeNull();
   });
 
@@ -661,7 +661,7 @@ describe("PlayScreen round mode", () => {
     const canvas = await loadGame({ showTitle: true, objectName: "433 Eros" });
     fireEvent.keyDown(window, { key: "i" });
     fireEvent.click(canvas, { clientX: 5, clientY: 5 });
-    expect((await screen.findByTestId("inspect-object")).textContent).toBe("433 Eros"); // renders after a state update; slow under load
+    expect(screen.getByTestId("inspect-object").textContent).toBe("433 Eros");
   });
 
   it("does not echo the slug while loading", () => {

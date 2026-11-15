@@ -8,23 +8,9 @@
   width: 100%;
 }
 
-.primary,
-.primary[aria-pressed] {
-  color: var(--on-accent);
-  background: var(--accent);
-  border-color: var(--accent);
-  border-radius: var(--radius-pill);
-  font-weight: 700;
-}
-
-.primary:hover:not(:disabled) {
-  color: var(--on-accent);
-  background: #ffc46e;
-  border-color: #ffc46e;
-}
-
-.primary:active:not(:disabled) {
-  background: #f0a12d;
+.primary {
+  border-color: var(--cyan);
+  color: var(--cyan);
 }
 
 .primary:disabled,

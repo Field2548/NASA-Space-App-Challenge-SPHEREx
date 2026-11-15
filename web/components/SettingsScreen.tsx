@@ -27,7 +27,7 @@ export default function SettingsScreen() {
       <BackLink />
       <h1>Settings</h1>
       <p>These choices are saved on this device.</p>
-      <section className="panel" data-part="Colour vision">
+      <section className="panel" data-part="SET-01 // COLOR VISION">
         <VisionPicker
           value={vision}
           onChange={(v) => {

@@ -661,7 +661,7 @@ export function SkyMap({
           role="alert"
           style={{ position: "absolute", inset: 0, overflow: "auto", padding: "var(--space-5) var(--space-4)" }}
         >
-          <div className="panel" data-part="Sky map offline" style={{ maxWidth: 560, margin: "0 auto" }}>
+          <div className="panel" data-part="MAP-00 // SKY MAP OFFLINE" style={{ maxWidth: 560, margin: "0 auto" }}>
             <p style={{ marginTop: 0 }}>{failReason}</p>
             <p style={{ color: "var(--text-dim)" }}>
               The game still works. Pick a ready spot below, or type a position in the coordinate box.
@@ -748,7 +748,7 @@ export function SkyMap({
             }
           }}
           className="panel"
-          data-part="Ready spot"
+          data-part="SPT-01 // READY SPOT"
           style={{ position: "absolute", right: 16, top: 72, width: 240, padding: "var(--space-3)" }}
         >
           <button
