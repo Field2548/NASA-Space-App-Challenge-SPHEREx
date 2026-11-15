@@ -16,6 +16,7 @@ const store = (over: Partial<PatchStore> = {}): PatchStore => ({
   reportsFor: async () => [],
   tileDensity: async () => [],
   tilePatches: async () => [],
+  minePatches: async () => [],
   ...over,
 });
 
@@ -78,6 +79,17 @@ describe("GET /api/patch-tiles", () => {
   it("is offline when the database fails", async () => {
     const res = await runPatchTiles(req("tileOrder=3&tile=5&order=8"), { store: () => store({ tileDensity: async () => null }) });
     expect(await res.json()).toMatchObject({ offline: true, cells: [] });
+  });
+  it("who=me gives only the signed-in player's own patches, never cached; guests get none", async () => {
+    const minePatches = vi.fn(async () => [{ id: "p11-1", solved: true, reported: false }]);
+    const deps = (id: string | null) => ({ store: () => store({ minePatches }), user: async () => (id ? { id } : null) });
+    const res = await runPatchTiles(req("who=me"), deps("u1"));
+    expect(minePatches).toHaveBeenCalledWith("u1");
+    expect(await res.json()).toEqual({ patches: [{ id: "p11-1", solved: true, reported: false }] });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    minePatches.mockClear();
+    expect(await (await runPatchTiles(req("who=me"), deps(null))).json()).toEqual({ patches: [] });
+    expect(minePatches).not.toHaveBeenCalled();
   });
   it("is rate limited", async () => {
     let last = 200;
