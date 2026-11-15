@@ -206,6 +206,8 @@ Catalog facts for the Inspect popup, sections D, E, G. Sections A, B, C, F need 
 
 `mode` is `round` or `explore` (section 2): missing means `round`, and any other value (for example `mode=zz`) answers `400 bad_request`.
 
+Inspect answers in full by default, in a round too (lock back with `INSPECT_LOCK=1`). A picked patch (`/play?patch=`, section 14) sends `patch=1`: there the mode locks as before, so `round` returns `{mode, locked, position}` and no object name appears before a correct answer.
+
 - Ready spot: send `spot`, `x`, `y`. The server reads `web/data/catalog/<slug>.json` (no network).
 - Anywhere else (sky map, quick look): send `ra`, `dec` in degrees. The server asks SIMBAD TAP and Gaia TAP live, in parallel, 8 s each. Partial results are fine. Cached by position rounded to 1 arcsec, for 10 minutes (30 seconds when a source failed).
 - Live lookups are SIMBAD and Gaia only. JPL is `skipped` for a position without a time, since there is nothing to ask. A round answer outside ready spots makes no network call.

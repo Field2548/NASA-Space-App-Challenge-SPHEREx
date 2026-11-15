@@ -135,7 +135,7 @@ export function InspectPopup({ field, frames, x, y, click, mode, onClose, spectr
     const where = byPosition
       ? (() => {
           const [r, d] = pixelToSky(field.wcs, field.size[1], px, py);
-          return `ra=${r.toFixed(6)}&dec=${d.toFixed(6)}`;
+          return `ra=${r.toFixed(6)}&dec=${d.toFixed(6)}&patch=1`;
         })()
       : `spot=${encodeURIComponent(field.slug)}&x=${px}&y=${py}`;
     const url = `/api/info?${where}&mode=${mode}`;
