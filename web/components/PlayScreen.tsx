@@ -31,7 +31,7 @@ import { formatDec, formatRA } from "@/lib/coords";
 import { loadField, loadFieldIndex, loadFrames } from "@/lib/fields";
 import { loadVision } from "@/lib/settings";
 import type { CheckResponse, Field, Mark, Vision } from "@/lib/types";
-import { DEFAULT_MORPH, type MorphSettings } from "@/lib/morphology";
+import { EMPTY_MORPH_STACK, type MorphStack } from "@/lib/morphology";
 import { type Curve, DEFAULT_CURVE } from "@/lib/toneCurve";
 import { type BlinkMode, MAX_BLINK_FPS, useBlink } from "@/lib/useBlink";
 import BrightnessSlider from "./BrightnessSlider";
@@ -241,7 +241,7 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
   const [overlay, setOverlay] = useState<ViewerOverlay>("none");
   const [knownOverlay, setKnownOverlay] = useState(false);
   const [black, setBlack] = useState(field.stretch.black_sigma);
-  const [morph, setMorph] = useState<MorphSettings>(DEFAULT_MORPH);
+  const [morph, setMorph] = useState<MorphStack>(EMPTY_MORPH_STACK);
   const [curve, setCurve] = useState<Curve>(DEFAULT_CURVE);
   // Game mounts after the field loads (client only), so window is there. On a phone the image fits the width.
   const fit = useMemo(() => fitScale(W, H, Math.min(900, (typeof window === "undefined" ? 1440 : window.innerWidth) - 40), 560), [W, H]);
@@ -467,9 +467,13 @@ function Game({ spot, field, frames, onEvent, markFrames, markHint, fetcher, sho
           </section>
         )}
         {tools.has("brightness") && (
+          <section className="panel" data-part="PNL-05 // MORPHOLOGY">
+            <MorphologyControl value={morph} onChange={setMorph} />
+          </section>
+        )}
+        {tools.has("brightness") && (
           <section className="panel" data-part="PNL-06 // BRIGHTNESS">
             <BrightnessSlider value={black} onChange={setBlack} defaultValue={field.stretch.black_sigma} png8={png8} minBlack={field.stretch.black_sigma} />
-            <MorphologyControl value={morph} onChange={setMorph} />
             <ToneCurveEditor value={curve} onChange={setCurve} />
           </section>
         )}

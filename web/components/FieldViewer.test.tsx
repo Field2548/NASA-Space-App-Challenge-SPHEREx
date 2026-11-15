@@ -183,12 +183,25 @@ describe("FieldViewer morphology and tone curve", () => {
     setup();
     expect(lastPixels()).toEqual(expected(1));
     cleanup();
-    setup({ morphology: DEFAULT_MORPH, curve: DEFAULT_CURVE });
+    setup({ morphology: [], curve: DEFAULT_CURVE });
     expect(lastPixels()).toEqual(expected(1));
   });
 
+  it("applies the stack first to last: [erode, dilate] is opening, and the order changes the pixels", () => {
+    const E = { ...DEFAULT_MORPH, op: "erode" as const };
+    const D = { ...DEFAULT_MORPH, op: "dilate" as const };
+    setup({ morphology: [{ ...DEFAULT_MORPH, op: "open" }] });
+    const opened = lastPixels();
+    cleanup();
+    setup({ morphology: [E, D] });
+    expect(lastPixels()).toEqual(opened);
+    cleanup();
+    setup({ morphology: [D, E] });
+    expect(lastPixels()).not.toEqual(opened);
+  });
+
   it("opening removes the single hot pixel before the stretch; the readout still shows the raw S/N", () => {
-    const { canvas } = setup({ morphology: { ...DEFAULT_MORPH, op: "open" } });
+    const { canvas } = setup({ morphology: [{ ...DEFAULT_MORPH, op: "open" }] });
     const px = lastPixels();
     const at = (a: number[], x: number) => a.slice(4 * (3 * 20 + x), 4 * (3 * 20 + x) + 3);
     expect(at(px, 7)).toEqual(at(px, 12)); // now background
@@ -198,7 +211,7 @@ describe("FieldViewer morphology and tone curve", () => {
   });
 
   it("a non-default curve changes the pixels, the same way for every frame", () => {
-    setup({ curve: presetCurve("gamma") });
+    setup({ curve: presetCurve("log") });
     const p = lastPixels();
     const e = expected(1);
     const i = 4 * (3 * 20 + 7);
